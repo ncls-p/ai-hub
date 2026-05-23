@@ -1,111 +1,150 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { type FormEvent, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { LogInIcon } from "lucide-react";
+
+import { DeodisLogo } from "@/components/deodis-logo";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import {
+	Field,
+	FieldContent,
+	FieldGroup,
+	FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function SignInPage() {
-    const router = useRouter();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
+	const router = useRouter();
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
+	const [error, setError] = useState("");
+	const [loading, setLoading] = useState(false);
 
-    async function handleSubmit(e: { preventDefault(): void }) {
-        e.preventDefault();
-        setError("");
-        setLoading(true);
+	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		setError("");
+		setLoading(true);
 
-        try {
-            const res = await fetch("/api/auth/sign-in/email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-            });
+		try {
+			const res = await fetch("/api/auth/sign-in/email", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ email, password }),
+			});
 
-            if (!res.ok) {
-                const data = await res.json().catch(() => null);
-                throw new Error(data?.message || "Sign in failed");
-            }
+			if (!res.ok) {
+				const data = await res.json().catch(() => null);
+				throw new Error(data?.message || "Sign in failed");
+			}
 
-            router.push("/");
-            router.refresh();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Sign in failed");
-        } finally {
-            setLoading(false);
-        }
-    }
+			router.push("/chat");
+			router.refresh();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Sign in failed");
+		} finally {
+			setLoading(false);
+		}
+	}
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-background">
-            <div className="w-full max-w-md p-8 space-y-6">
-                <div className="text-center space-y-2">
-                    <h1 className="text-2xl font-bold">Sign In</h1>
-                    <p className="text-muted-foreground text-sm">
-                        Sign in to your AI Hub account
-                    </p>
-                </div>
+	return (
+		<main
+			data-page="auth"
+			className="relative isolate flex min-h-svh items-center justify-center bg-background p-4"
+		>
+			<div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/40 to-transparent" />
+			<div className="flex w-full max-w-md flex-col gap-5">
+				<div className="flex justify-center">
+					<DeodisLogo priority className="h-8" />
+				</div>
+				<div className="surface-panel p-1">
+					<Card className="border-0 bg-transparent shadow-none">
+						<CardHeader className="gap-2 px-5 pt-5">
+							<div className="section-kicker">Account</div>
+							<CardTitle className="text-2xl">Sign in to AI Hub</CardTitle>
+							<CardDescription>
+								Welcome back. Open your workspace to manage providers, agents,
+								and conversations.
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="px-5 pb-5">
+							<form onSubmit={handleSubmit}>
+								<FieldGroup className="gap-4">
+									{error ? (
+										<Alert variant="destructive" aria-live="polite">
+											<AlertTitle>We couldn&apos;t sign you in</AlertTitle>
+											<AlertDescription>{error}</AlertDescription>
+										</Alert>
+									) : null}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {error && (
-                        <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg">
-                            {error}
-                        </div>
-                    )}
+									<Field>
+										<FieldLabel htmlFor="email">Email</FieldLabel>
+										<FieldContent>
+											<Input
+												id="email"
+												type="email"
+												autoComplete="email"
+												required
+												value={email}
+												onChange={(event) => setEmail(event.target.value)}
+												placeholder="you@company.com"
+											/>
+										</FieldContent>
+									</Field>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium" htmlFor="email">
-                            Email
-                        </label>
-                        <input
-                            id="email"
-                            type="email"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                            placeholder="you@example.com"
-                        />
-                    </div>
+									<Field>
+										<FieldLabel htmlFor="password">Password</FieldLabel>
+										<FieldContent>
+											<Input
+												id="password"
+												type="password"
+												autoComplete="current-password"
+												required
+												value={password}
+												onChange={(event) => setPassword(event.target.value)}
+												placeholder="Enter your password…"
+											/>
+										</FieldContent>
+									</Field>
 
-                    <div className="space-y-2">
-                        <label
-                            className="text-sm font-medium"
-                            htmlFor="password"
-                        >
-                            Password
-                        </label>
-                        <input
-                            id="password"
-                            type="password"
-                            required
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                            placeholder="••••••••"
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-                    >
-                        {loading ? "Signing in..." : "Sign In"}
-                    </button>
-                </form>
-
-                <p className="text-center text-sm text-muted-foreground">
-                    Don&apos;t have an account?{" "}
-                    <Link
-                        href="/auth/signup"
-                        className="text-primary hover:underline"
-                    >
-                        Sign up
-                    </Link>
-                </p>
-            </div>
-        </div>
-    );
+									<Button
+										type="submit"
+										size="lg"
+										className="w-full"
+										disabled={loading}
+									>
+										{loading ? (
+											<Spinner data-icon="inline-start" />
+										) : (
+											<LogInIcon data-icon="inline-start" aria-hidden="true" />
+										)}
+										Sign in
+									</Button>
+								</FieldGroup>
+							</form>
+						</CardContent>
+					</Card>
+				</div>
+				<p className="text-center text-sm text-muted-foreground">
+					Don&apos;t have an account?{" "}
+					<Link
+						href="/auth/signup"
+						className="font-medium text-primary hover:underline"
+					>
+						Sign up
+					</Link>
+				</p>
+			</div>
+		</main>
+	);
 }
