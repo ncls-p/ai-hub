@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+      BETTER_AUTH_SECRET: ci-production-safe-secret-minimum-32-characters
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/ai_hub_test
+      APP_ENCRYPTION_KEY: 1111111111111111111111111111111111111111111111111111111111111111
+      APP_ENCRYPTION_KEY_ID: test
+      DRAGONFLY_URL: redis://localhost:6379
+      DRAGONFLY_PASSWORD: ""
+      OBJECT_STORAGE_ENDPOINT: http://localhost:3900
+      OBJECT_STORAGE_REGION: garage
+      OBJECT_STORAGE_BUCKET: ai-hub-test
+      OBJECT_STORAGE_ACCESS_KEY_ID: test
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: test
+      OBJECT_STORAGE_FORCE_PATH_STYLE: "true"
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ai_hub_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_hub_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      dragonfly:
+        image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping || true"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test:ci
+
+      - name: Build
+        run: npm run build
