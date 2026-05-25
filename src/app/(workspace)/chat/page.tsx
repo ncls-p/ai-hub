@@ -81,8 +81,13 @@ function toolPartsFromMessage(message: ChatMessage) {
 
 function summarizeToolPart(content: string) {
 	try {
-		const parsed = JSON.parse(content) as { toolName?: string; output?: unknown };
-		return parsed.toolName ?? JSON.stringify(parsed.output ?? parsed).slice(0, 120);
+		const parsed = JSON.parse(content) as {
+			toolName?: string;
+			output?: unknown;
+		};
+		return (
+			parsed.toolName ?? JSON.stringify(parsed.output ?? parsed).slice(0, 120)
+		);
 	} catch {
 		return content.slice(0, 120);
 	}
@@ -563,17 +568,21 @@ export default function ChatPage() {
 										>
 											{isAssistant ? (
 												<div className="flex flex-col gap-2">
-													{toolPartsFromMessage(message).map((part, partIndex) => (
-														<div
-															key={`${message.id}-${part.type}-${partIndex}`}
-															className="rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground"
-														>
-															<span className="font-medium text-foreground">
-																{part.type === "tool-call" ? "Tool call" : "Tool result"}
-															</span>{" "}
-															{summarizeToolPart(part.content)}
-														</div>
-													))}
+													{toolPartsFromMessage(message).map(
+														(part, partIndex) => (
+															<div
+																key={`${message.id}-${part.type}-${partIndex}`}
+																className="rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground"
+															>
+																<span className="font-medium text-foreground">
+																	{part.type === "tool-call"
+																		? "Tool call"
+																		: "Tool result"}
+																</span>{" "}
+																{summarizeToolPart(part.content)}
+															</div>
+														),
+													)}
 													<Streamdown
 														plugins={{ code }}
 														caret="block"

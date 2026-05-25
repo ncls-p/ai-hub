@@ -186,7 +186,8 @@ export default function AgentBuilderPage() {
 						`/api/workspace/agents/${agentId}/tools?workspaceId=${workspaceId}&versionId=${loadedActiveVersion.id}`,
 						{ signal: controller.signal },
 					);
-					if (bindingRes.ok) loadedBindings = (await bindingRes.json()) as ToolBinding[];
+					if (bindingRes.ok)
+						loadedBindings = (await bindingRes.json()) as ToolBinding[];
 				}
 
 				if (cancelled) return;
@@ -468,11 +469,17 @@ export default function AgentBuilderPage() {
 									<span className="flex flex-col gap-1">
 										<span className="flex items-center gap-2 font-medium">
 											{tool.displayName}
-											<Badge variant={tool.riskLevel === "low" ? "secondary" : "outline"}>
+											<Badge
+												variant={
+													tool.riskLevel === "low" ? "secondary" : "outline"
+												}
+											>
 												{tool.riskLevel}
 											</Badge>
 										</span>
-										<span className="text-muted-foreground">{tool.description}</span>
+										<span className="text-muted-foreground">
+											{tool.description}
+										</span>
 									</span>
 								</label>
 							);

@@ -75,7 +75,8 @@ async function buildBoundTools(input: {
 						});
 						return {
 							denied: true,
-							message: "You do not have permission to execute this restricted tool.",
+							message:
+								"You do not have permission to execute this restricted tool.",
 						};
 					}
 				}
@@ -128,7 +129,8 @@ async function buildBoundTools(input: {
 						input: toolInput,
 						status: "failed",
 						latencyMs: Date.now() - startedAt,
-						errorMessage: error instanceof Error ? error.message : String(error),
+						errorMessage:
+							error instanceof Error ? error.message : String(error),
 					});
 					throw error;
 				}
