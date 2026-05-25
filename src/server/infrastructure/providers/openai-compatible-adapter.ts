@@ -1,5 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV2 } from "@ai-sdk/provider";
 import type {
     ProviderAdapter,
     ProviderRuntimeConfig,
@@ -113,7 +113,7 @@ export const openaiCompatibleAdapter: ProviderAdapter = {
     createChatModel(
         config: ProviderRuntimeConfig,
         modelId: string,
-    ): LanguageModelV3 {
+    ): LanguageModelV2 {
         const provider = createOpenAICompatible({
             name: config.name || "openai-compatible",
             apiKey: config.apiKey,

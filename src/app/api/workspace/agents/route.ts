@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/modules/auth/session";
+import { createAgent, listAgents } from "@/modules/agent/use-cases";
 import { db } from "@/server/infrastructure/db";
-import { agents, workspaces } from "@/server/infrastructure/db/schema";
+import { workspaces } from "@/server/infrastructure/db/schema";
 import { authorization } from "@/server/domain/services/authorization";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 
@@ -18,6 +19,12 @@ const createAgentSchema = z.object({
 	slug: slugSchema,
 	description: z.string().max(2048).optional(),
 	workspaceId: z.uuid(),
+	systemPrompt: z.string().max(64_000).optional(),
+	providerId: z.uuid().optional(),
+	modelId: z.uuid().optional(),
+	temperature: z.string().optional(),
+	topP: z.string().optional(),
+	maxOutputTokens: z.number().int().positive().optional(),
 });
 
 const listAgentsSchema = z.object({
@@ -49,7 +56,7 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
-		const { name, slug, description, workspaceId } = parsed.data;
+		const { workspaceId, ...input } = parsed.data;
 
 		// Verify workspace membership
 		const [workspace] = await db
@@ -79,26 +86,29 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
-		const [agent] = await db
-			.insert(agents)
-			.values({
-				workspaceId,
-				name,
-				slug,
-				description: description || null,
-				createdById: session.user.id,
-				visibility: "private",
-				sourceType: "custom",
-			})
-			.returning();
+		const result = await createAgent({
+			workspaceId,
+			userId: session.user.id,
+			...input,
+		});
 
-		return NextResponse.json(agent, { status: 201 });
+		return NextResponse.json(result, { status: 201 });
 	} catch (error) {
 		if (isUniqueConstraintError(error)) {
 			return NextResponse.json(
 				{ error: "Agent slug already exists in this workspace" },
 				{ status: 409 },
 			);
+		}
+		if (
+			error instanceof Error &&
+			[
+				"Provider not found",
+				"Model not found",
+				"Model requires a provider",
+			].includes(error.message)
+		) {
+			return NextResponse.json({ error: error.message }, { status: 400 });
 		}
 
 		logger.error("Failed to create agent", {}, error as Error);
@@ -144,13 +154,7 @@ export async function GET(req: NextRequest) {
 			);
 		}
 
-		const list = await db
-			.select()
-			.from(agents)
-			.where(
-				and(eq(agents.workspaceId, workspaceId), isNull(agents.archivedAt)),
-			)
-			.orderBy(agents.createdAt);
+		const list = await listAgents(workspaceId);
 
 		return NextResponse.json(list);
 	} catch (error) {
