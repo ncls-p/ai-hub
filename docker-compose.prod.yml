@@ -4,6 +4,7 @@ services:
       context: .
       target: migrator
     environment:
+      APP_ENV: production
       NODE_ENV: production
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
@@ -31,6 +32,7 @@ services:
     ports:
       - "3000:3000"
     environment:
+      APP_ENV: production
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: 1
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
@@ -73,6 +75,7 @@ services:
       context: .
       target: worker
     environment:
+      APP_ENV: production
       NODE_ENV: production
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
@@ -123,21 +126,22 @@ services:
     restart: unless-stopped
 
   garage:
-    image: adobe/garage:latest
+    image: minio/minio:latest
+    command: server /data --address ":3900" --console-address ":3901"
     volumes:
-      - garage_metadata_prod:/garage
       - garage_data_prod:/data
     environment:
-      GARAGE_LOG_LEVEL: warn
+      MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3900/"]
+      test: ["CMD", "curl", "-f", "http://localhost:3900/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 10
     restart: unless-stopped
 
   garage-init:
-    image: curlimages/curl:latest
+    image: minio/mc:latest
     depends_on:
       garage:
         condition: service_healthy
@@ -145,16 +149,15 @@ services:
       OBJECT_STORAGE_ACCESS_KEY_ID: ${OBJECT_STORAGE_ACCESS_KEY_ID}
       OBJECT_STORAGE_SECRET_ACCESS_KEY: ${OBJECT_STORAGE_SECRET_ACCESS_KEY}
       OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET}
-      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-http://garage:3900}
     entrypoint: >
       sh -c "
-        curl -X PUT ${OBJECT_STORAGE_ENDPOINT}/${OBJECT_STORAGE_BUCKET} &&
-        echo 'Storage bucket initialized'
+        mc alias set local http://garage:3900 $${OBJECT_STORAGE_ACCESS_KEY_ID} $${OBJECT_STORAGE_SECRET_ACCESS_KEY} &&
+        mc mb --ignore-existing local/$${OBJECT_STORAGE_BUCKET} &&
+        echo 'Object storage bucket initialized'
       "
     restart: "no"
 
 volumes:
   postgres_prod:
   dragonfly_prod:
-  garage_metadata_prod:
   garage_data_prod:

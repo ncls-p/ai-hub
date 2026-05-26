@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { DeodisLogo } from "@/components/deodis-logo";
+import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggleButton } from "@/components/theme-toggle-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -114,12 +115,15 @@ function SidebarContent({ displayName }: { displayName?: string }) {
 			<div className="flex flex-col gap-2 border-t border-border/70 pt-3">
 				<ThemeToggleButton />
 				{displayName ? (
-					<div className="rounded-xl bg-muted/60 px-3 py-2 text-sm">
-						<p className="truncate font-medium text-foreground">
-							{displayName}
-						</p>
-						<p className="text-xs text-muted-foreground">Workspace</p>
-					</div>
+					<>
+						<div className="rounded-xl bg-muted/60 px-3 py-2 text-sm">
+							<p className="truncate font-medium text-foreground">
+								{displayName}
+							</p>
+							<p className="text-xs text-muted-foreground">Workspace</p>
+						</div>
+						<SignOutButton />
+					</>
 				) : (
 					<Button asChild size="sm" className="justify-start rounded-xl">
 						<Link href="/auth/signin">

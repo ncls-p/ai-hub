@@ -2,7 +2,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     ports:
-      - "5432:5432"
+      - "15432:5432"
     environment:
       POSTGRES_DB: ai_hub
       POSTGRES_USER: postgres
@@ -18,7 +18,7 @@ services:
   dragonflydb:
     image: docker.dragonflydb.io/dragonflydb/dragonfly
     ports:
-      - "6379:6379"
+      - "16379:6379"
     volumes:
       - dragonfly_dev:/data
     healthcheck:
@@ -28,39 +28,36 @@ services:
       retries: 10
 
   garage:
-    image: adobe/garage:latest
+    image: minio/minio:latest
+    command: server /data --address ":3900" --console-address ":3901"
     ports:
-      - "3900:3900"
+      - "13900:3900"
+      - "13901:3901"
     volumes:
-      - garage_metadata_dev:/garage
       - garage_data_dev:/data
     environment:
-      GARAGE_LOG_LEVEL: info
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3900/"]
+      test: ["CMD", "curl", "-f", "http://localhost:3900/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 10
 
   garage-init:
-    image: curlimages/curl:latest
+    image: minio/mc:latest
     depends_on:
       garage:
         condition: service_healthy
-    environment:
-      GARAGE_ACCESS_KEY: minioadmin
-      GARAGE_SECRET_KEY: minioadmin
-      GARAGE_BUCKET: ai-hub
     entrypoint: >
       sh -c "
-        curl -X PUT http://garage:3900/ai-hub &&
-        curl -X PUT http://garage:3900/ai-hub/.garage/config -d '{\"AccessControlList\":{\"Grant\":[{\"Grantee\":{\"URI\":\"http://acs.amazonaws.com/v2/bucket-owner\"},\"Permission\":\"FULL_CONTROL\"}]}}' &&
-        echo 'Garage bucket initialized'
+        mc alias set local http://garage:3900 minioadmin minioadmin &&
+        mc mb --ignore-existing local/ai-hub &&
+        echo 'Object storage bucket initialized'
       "
     restart: "no"
 
 volumes:
   postgres_dev:
   dragonfly_dev:
-  garage_metadata_dev:
   garage_data_dev:

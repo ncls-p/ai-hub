@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      APP_ENV: test
       NODE_ENV: test
       BETTER_AUTH_SECRET: ci-production-safe-secret-minimum-32-characters
       BETTER_AUTH_URL: http://localhost:3000

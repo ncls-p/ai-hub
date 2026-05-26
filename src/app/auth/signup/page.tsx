@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type SyntheticEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UserPlusIcon } from "lucide-react";
@@ -32,7 +32,7 @@ export default function SignUpPage() {
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
-	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+	async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setError("");
 		setLoading(true);

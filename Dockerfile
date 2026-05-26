@@ -14,6 +14,16 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Build-time placeholders keep image builds reproducible. Runtime env is
+# validated strictly when NODE_ENV/APP_ENV indicate production.
+ENV BETTER_AUTH_SECRET=build-secret-minimum-32-characters \
+    BETTER_AUTH_URL=http://localhost:3000 \
+    BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000 \
+    DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_hub \
+    APP_ENCRYPTION_KEY=1111111111111111111111111111111111111111111111111111111111111111 \
+    OBJECT_STORAGE_BUCKET=ai-hub \
+    OBJECT_STORAGE_ACCESS_KEY_ID=build-access-key \
+    OBJECT_STORAGE_SECRET_ACCESS_KEY=build-storage-secret
 RUN npm run build
 
 # ─── Migrator ────────────────────────────────────────────────────────────
@@ -61,5 +71,3 @@ RUN npm install tsx --no-save
 EXPOSE 3001
 CMD ["npx", "tsx", "src/server/infrastructure/worker/index.ts"]
 
-# ─── Garage (S3-compatible storage) ─────────────────────────────────────
-FROM adobe/garage:latest AS garage

@@ -1,8 +1,14 @@
+import { loadEnvConfig } from "@next/env";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { db } from "../src/server/infrastructure/db";
-import { logger } from "../src/lib/logger";
+
+loadEnvConfig(process.cwd());
 
 async function run() {
+	const [{ db }, { logger }] = await Promise.all([
+		import("../src/server/infrastructure/db"),
+		import("../src/lib/logger"),
+	]);
+
 	try {
 		logger.info("Running migrations...");
 		await migrate(db, {
@@ -16,4 +22,4 @@ async function run() {
 	}
 }
 
-run();
+void run();

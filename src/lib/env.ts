@@ -16,10 +16,11 @@ const placeholderSecret = (value: string) => {
 	].some((placeholder) => normalized.includes(placeholder));
 };
 
+const runtimeEnvSchema = z.enum(["development", "production", "test"]);
+
 export const baseEnvSchema = z.object({
-	NODE_ENV: z
-		.enum(["development", "production", "test"])
-		.default("development"),
+	NODE_ENV: runtimeEnvSchema.default("development"),
+	APP_ENV: runtimeEnvSchema.optional(),
 	BETTER_AUTH_SECRET: z.string().min(1),
 	BETTER_AUTH_URL: z.url(),
 	BETTER_AUTH_TRUSTED_ORIGINS: z.string().min(1),
@@ -37,7 +38,6 @@ export const baseEnvSchema = z.object({
 });
 
 export const productionEnvSchema = baseEnvSchema.extend({
-	NODE_ENV: z.literal("production"),
 	BETTER_AUTH_SECRET: z
 		.string()
 		.min(32)
@@ -76,9 +76,10 @@ export type AppEnv = z.infer<typeof baseEnvSchema>;
 
 type EnvSource = Record<string, string | undefined>;
 
-function readEnv(source: EnvSource): Record<string, string> {
+function readEnv(source: EnvSource): EnvSource {
 	return {
 		NODE_ENV: source.NODE_ENV || "development",
+		APP_ENV: source.APP_ENV || undefined,
 		BETTER_AUTH_SECRET: source.BETTER_AUTH_SECRET || "",
 		BETTER_AUTH_URL: source.BETTER_AUTH_URL || "",
 		BETTER_AUTH_TRUSTED_ORIGINS: source.BETTER_AUTH_TRUSTED_ORIGINS || "",
@@ -99,21 +100,28 @@ function readEnv(source: EnvSource): Record<string, string> {
 	};
 }
 
+function shouldUseProductionValidation(env: EnvSource) {
+	if (env.APP_ENV === "production") return true;
+
+	const isNextProductionBuild =
+		process.env.NEXT_PHASE === "phase-production-build";
+
+	return env.NODE_ENV === "production" && !isNextProductionBuild;
+}
+
 export function validateEnvValues(source: EnvSource = process.env): AppEnv {
 	const env = readEnv(source);
-	const result =
-		env.NODE_ENV === "production"
-			? productionEnvSchema.safeParse(env)
-			: baseEnvSchema.safeParse(env);
+	const result = shouldUseProductionValidation(env)
+		? productionEnvSchema.safeParse(env)
+		: baseEnvSchema.safeParse(env);
 
 	if (!result.success) {
 		const issues = result.error.issues
 			.map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
 			.join("\n");
-		const prefix =
-			env.NODE_ENV === "production"
-				? "Production environment validation failed"
-				: "Environment validation failed";
+		const prefix = shouldUseProductionValidation(env)
+			? "Production environment validation failed"
+			: "Environment validation failed";
 		throw new Error(
 			`${prefix}. Missing or invalid required env vars:\n${issues}`,
 		);

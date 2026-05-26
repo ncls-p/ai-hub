@@ -1,8 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-let validateEnvValues: (
-	source?: Record<string, string | undefined>,
-) => unknown;
+let validateEnvValues: (source?: Record<string, string | undefined>) => unknown;
 
 const validEnv = {
 	NODE_ENV: "development",
@@ -53,13 +51,53 @@ describe("env validation", () => {
 		).toThrow(/BETTER_AUTH_SECRET/);
 	});
 
+	it("allows development secrets during Next.js production builds", () => {
+		const previousPhase = process.env.NEXT_PHASE;
+		process.env.NEXT_PHASE = "phase-production-build";
+
+		try {
+			const result = validateEnvValues({
+				...validEnv,
+				NODE_ENV: "production",
+			}) as { NODE_ENV: string };
+
+			expect(result.NODE_ENV).toBe("production");
+		} finally {
+			if (previousPhase === undefined) {
+				delete process.env.NEXT_PHASE;
+			} else {
+				process.env.NEXT_PHASE = previousPhase;
+			}
+		}
+	});
+
+	it("rejects explicit production app env during Next.js production builds", () => {
+		const previousPhase = process.env.NEXT_PHASE;
+		process.env.NEXT_PHASE = "phase-production-build";
+
+		try {
+			expect(() =>
+				validateEnvValues({
+					...validEnv,
+					NODE_ENV: "production",
+					APP_ENV: "production",
+				}),
+			).toThrow(/Production environment validation failed/);
+		} finally {
+			if (previousPhase === undefined) {
+				delete process.env.NEXT_PHASE;
+			} else {
+				process.env.NEXT_PHASE = previousPhase;
+			}
+		}
+	});
+
 	it("rejects production env with all-zero encryption key", () => {
 		expect(() =>
 			validateEnvValues({
 				...validEnv,
 				NODE_ENV: "production",
-				BETTER_AUTH_SECRET:
-					"real-production-secret-minimum-32-characters",
+				BETTER_AUTH_SECRET: "real-production-secret-minimum-32-characters",
 				DRAGONFLY_PASSWORD: "safe-cache-password",
 				OBJECT_STORAGE_ACCESS_KEY_ID: "prod-access-key",
 				OBJECT_STORAGE_SECRET_ACCESS_KEY: "safe-storage-secret",
@@ -72,8 +110,7 @@ describe("env validation", () => {
 			validateEnvValues({
 				...validEnv,
 				NODE_ENV: "production",
-				BETTER_AUTH_SECRET:
-					"real-production-secret-minimum-32-characters",
+				BETTER_AUTH_SECRET: "real-production-secret-minimum-32-characters",
 				APP_ENCRYPTION_KEY:
 					"1111111111111111111111111111111111111111111111111111111111111111",
 				DRAGONFLY_PASSWORD: "minioadmin-password",

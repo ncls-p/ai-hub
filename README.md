@@ -111,11 +111,12 @@ See `.env.example` for the full list.
 
 Important production requirements:
 
+- Set `APP_ENV=production` in deployed environments. `NODE_ENV` is controlled by Next.js.
 - `BETTER_AUTH_SECRET` must be at least 32 characters and not a placeholder.
 - `APP_ENCRYPTION_KEY` must be a 64-character hex string and not all zeroes.
 - `DRAGONFLY_PASSWORD` and object storage secrets must be strong non-placeholder values.
 
-The app validates environment variables at startup/build time and rejects insecure production configuration.
+The app validates environment variables at runtime and rejects insecure production configuration. `next build` may use safe local placeholder values so CI and image builds remain reproducible.
 
 ## Project Structure
 
@@ -156,7 +157,11 @@ Current foundation routes include:
 - `POST /api/workspaces` — create organization/workspace and assign owner role
 - `GET /api/workspace/agents?workspaceId=...` — list agents with IAM check
 - `POST /api/workspace/agents` — create agent with IAM check
-- `POST /api/workspace/[agentId]/chat` — persist encrypted user message placeholder for Phase 3 chat streaming
+- `POST /api/workspace/[agentId]/chat` — stream a provider-backed chat response and persist encrypted messages
+- `GET/POST /api/workspace/providers` — manage encrypted provider registry records
+- `GET/POST /api/workspace/knowledge-bases` — manage workspace RAG sources
+- `GET/POST /api/workspace/mcp-servers` — register MCP servers and discovered tools
+- `GET /api/workspace/usage` and `GET /api/workspace/audit` — operational visibility
 - `/api/auth/[...all]` — Better Auth handler
 
 ## Testing and Verification
