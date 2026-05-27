@@ -50,7 +50,7 @@ export default function RootLayout({
 				fontDisplay.variable,
 			)}
 		>
-			<body className="min-h-svh">
+			<body className="min-h-svh" suppressHydrationWarning>
 				<ThemeProvider>
 					<TooltipProvider>
 						{children}

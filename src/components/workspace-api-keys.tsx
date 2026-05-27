@@ -107,12 +107,20 @@ export function WorkspaceApiKeys() {
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
-				<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+				<div
+					className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+					suppressHydrationWarning
+				>
 					<div className="grid flex-1 gap-2">
 						<Label htmlFor="api-key-name">Key name</Label>
 						<Input
 							id="api-key-name"
 							autoComplete="off"
+							data-1p-ignore
+							data-bwignore
+							data-form-type="other"
+							data-lpignore="true"
+							data-protonpass-ignore
 							placeholder="CI pipeline…"
 							value={name}
 							onChange={(event) => setName(event.target.value)}

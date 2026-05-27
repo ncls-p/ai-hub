@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+	ChevronDownIcon,
 	Loader2,
 	NetworkIcon,
 	PencilIcon,
@@ -34,6 +35,11 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
 	Dialog,
 	DialogContent,
 	DialogFooter,
@@ -52,6 +58,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { cn } from "@/lib/utils";
 
 interface McpServer {
 	id: string;
@@ -111,6 +118,9 @@ export function McpServerManager() {
 	const [editServer, setEditServer] = useState<McpServer | null>(null);
 	const [editForm, setEditForm] = useState(emptyForm);
 	const [deleteId, setDeleteId] = useState<string | null>(null);
+	const [expandedServers, setExpandedServers] = useState<Record<string, boolean>>(
+		{},
+	);
 
 	const load = useCallback(async () => {
 		if (!workspaceId) return;
@@ -474,117 +484,163 @@ export function McpServerManager() {
 				</Card>
 			) : (
 				<div className="grid gap-4">
-					{servers.map((server) => (
-						<Card key={server.id}>
-							<CardHeader>
-								<div className="flex flex-wrap items-start justify-between gap-3">
-									<div>
-										<CardTitle className="flex items-center gap-2">
-											<NetworkIcon className="size-5" aria-hidden="true" />
-											{server.name}
-										</CardTitle>
-										<CardDescription>
-											{server.url || server.command || server.transport}
-										</CardDescription>
-									</div>
-									<div className="flex flex-wrap items-center justify-end gap-2">
-										<div className="flex items-center gap-2 text-sm">
-											<span>Enabled</span>
-											<Switch
-												aria-label={`Enable ${server.name}`}
-												checked={server.enabled}
-												onCheckedChange={(checked) =>
-													void toggleEnabled(server, checked)
-												}
-											/>
-										</div>
-										<Badge variant="outline">
-											{server.healthStatus || "unknown"}
-										</Badge>
-										{server.hasHeaders ? (
-											<Badge variant="secondary">API key</Badge>
-										) : null}
-										<Button
-											size="sm"
-											variant="outline"
-											onClick={() => void test(server.id)}
-										>
-											<ZapIcon data-icon="inline-start" aria-hidden="true" />
-											Test
-										</Button>
-										<Button
-											size="sm"
-											variant="outline"
-											onClick={() => void sync(server.id)}
-										>
-											<RefreshCwIcon
-												data-icon="inline-start"
-												aria-hidden="true"
-											/>
-											Sync
-										</Button>
-										<Button
-											size="icon-sm"
-											variant="ghost"
-											aria-label={`Edit ${server.name}`}
-											onClick={() => {
-												setEditServer(server);
-												setEditForm({
-													name: server.name,
-													transport: server.transport,
-													url: server.url ?? "",
-													command: server.command ?? "",
-													args: "",
-													headers: "",
-													env: "",
-												});
-											}}
-										>
-											<PencilIcon aria-hidden="true" />
-										</Button>
-										<Button
-											size="icon-sm"
-											variant="ghost"
-											aria-label={`Remove ${server.name}`}
-											onClick={() => setDeleteId(server.id)}
-										>
-											<Trash2Icon aria-hidden="true" />
-										</Button>
-									</div>
-								</div>
-							</CardHeader>
-							<CardContent className="grid gap-2">
-								{(toolsByServer[server.id] ?? []).length === 0 ? (
-									<p className="text-sm text-muted-foreground">
-										No tools discovered. Run sync after configuring credentials.
-									</p>
-								) : (
-									toolsByServer[server.id].map((tool) => (
-										<div
-											key={tool.id}
-											className="flex items-center justify-between gap-3 rounded-lg border p-3"
-										>
-											<div className="min-w-0">
-												<p className="truncate font-medium">{tool.name}</p>
-												{tool.description ? (
-													<p className="line-clamp-2 text-sm text-muted-foreground">
-														{tool.description}
-													</p>
-												) : null}
+					{servers.map((server) => {
+						const tools = toolsByServer[server.id] ?? [];
+						const isExpanded = expandedServers[server.id] ?? false;
+
+						return (
+							<Collapsible
+								key={server.id}
+								open={isExpanded}
+								onOpenChange={(open) =>
+									setExpandedServers((current) => ({
+										...current,
+										[server.id]: open,
+									}))
+								}
+							>
+								<Card>
+									<CardHeader>
+										<div className="flex flex-wrap items-start justify-between gap-3">
+											<div className="flex min-w-0 flex-1 items-start gap-2">
+												<CollapsibleTrigger asChild>
+													<Button
+														type="button"
+														variant="ghost"
+														size="icon"
+														className="mt-0.5 size-8 shrink-0"
+														aria-label={
+															isExpanded
+																? `Collapse ${server.name} tools`
+																: `Expand ${server.name} tools`
+														}
+													>
+														<ChevronDownIcon
+															className={cn(
+																"transition-transform",
+																isExpanded && "rotate-180",
+															)}
+															aria-hidden="true"
+														/>
+													</Button>
+												</CollapsibleTrigger>
+												<div className="min-w-0">
+													<CardTitle className="flex flex-wrap items-center gap-2">
+														<NetworkIcon className="size-5 shrink-0" aria-hidden="true" />
+														<span className="truncate">{server.name}</span>
+														{tools.length > 0 ? (
+															<Badge variant="secondary">
+																{tools.length} tool{tools.length === 1 ? "" : "s"}
+															</Badge>
+														) : null}
+													</CardTitle>
+													<CardDescription className="truncate">
+														{server.url || server.command || server.transport}
+													</CardDescription>
+												</div>
 											</div>
-											<Switch
-												aria-label={`Enable ${tool.name}`}
-												checked={tool.enabled}
-												onCheckedChange={(checked) =>
-													void toggleTool(server.id, tool.id, checked)
-												}
-											/>
+											<div className="flex flex-wrap items-center justify-end gap-2">
+												<div className="flex items-center gap-2 text-sm">
+													<span className="hidden sm:inline">Enabled</span>
+													<Switch
+														aria-label={`Enable ${server.name}`}
+														checked={server.enabled}
+														onCheckedChange={(checked) =>
+															void toggleEnabled(server, checked)
+														}
+													/>
+												</div>
+												<Badge variant="outline">
+													{server.healthStatus || "unknown"}
+												</Badge>
+												{server.hasHeaders ? (
+													<Badge variant="secondary">API key</Badge>
+												) : null}
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={() => void test(server.id)}
+												>
+													<ZapIcon data-icon="inline-start" aria-hidden="true" />
+													Test
+												</Button>
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={() => void sync(server.id)}
+												>
+													<RefreshCwIcon
+														data-icon="inline-start"
+														aria-hidden="true"
+													/>
+													Sync
+												</Button>
+												<Button
+													size="icon-sm"
+													variant="ghost"
+													aria-label={`Edit ${server.name}`}
+													onClick={() => {
+														setEditServer(server);
+														setEditForm({
+															name: server.name,
+															transport: server.transport,
+															url: server.url ?? "",
+															command: server.command ?? "",
+															args: "",
+															headers: "",
+															env: "",
+														});
+													}}
+												>
+													<PencilIcon aria-hidden="true" />
+												</Button>
+												<Button
+													size="icon-sm"
+													variant="ghost"
+													aria-label={`Remove ${server.name}`}
+													onClick={() => setDeleteId(server.id)}
+												>
+													<Trash2Icon aria-hidden="true" />
+												</Button>
+											</div>
 										</div>
-									))
-								)}
-							</CardContent>
-						</Card>
-					))}
+									</CardHeader>
+									<CollapsibleContent>
+										<CardContent className="grid max-h-96 gap-2 overflow-y-auto border-t border-border/60 pt-4">
+											{tools.length === 0 ? (
+												<p className="text-sm text-muted-foreground">
+													No tools discovered. Run sync after configuring credentials.
+												</p>
+											) : (
+												tools.map((tool) => (
+													<div
+														key={tool.id}
+														className="ui-list-row flex items-center justify-between gap-3 p-3"
+													>
+														<div className="min-w-0">
+															<p className="truncate font-medium">{tool.name}</p>
+															{tool.description ? (
+																<p className="line-clamp-2 text-sm text-muted-foreground">
+																	{tool.description}
+																</p>
+															) : null}
+														</div>
+														<Switch
+															aria-label={`Enable ${tool.name}`}
+															checked={tool.enabled}
+															onCheckedChange={(checked) =>
+																void toggleTool(server.id, tool.id, checked)
+															}
+														/>
+													</div>
+												))
+											)}
+										</CardContent>
+									</CollapsibleContent>
+								</Card>
+							</Collapsible>
+						);
+					})}
 				</div>
 			)}
 

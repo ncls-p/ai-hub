@@ -579,7 +579,7 @@ export default function ChatPage() {
 				onApprove={() => void resolveApproval("approve")}
 				onReject={() => void resolveApproval("reject")}
 			/>
-			<section className="min-h-0 flex-1 overflow-y-auto px-4 py-8">
+			<section className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-4 sm:py-8">
 				{!loadingMessages && messages.length === 0 ? (
 					<div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-center py-12">
 						<Empty className="min-h-64 border-0 bg-transparent p-4">

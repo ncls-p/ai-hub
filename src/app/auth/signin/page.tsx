@@ -67,9 +67,8 @@ export default function SignInPage() {
 				<div className="flex justify-center">
 					<DeodisLogo priority className="h-8" />
 				</div>
-				<div className="surface-panel p-1">
-					<Card className="border-0 bg-transparent shadow-none">
-						<CardHeader className="gap-2 px-5 pt-5">
+				<Card>
+						<CardHeader className="gap-2">
 							<div className="section-kicker">Account</div>
 							<CardTitle className="text-2xl">Sign in to AI Hub</CardTitle>
 							<CardDescription>
@@ -77,7 +76,7 @@ export default function SignInPage() {
 								and conversations.
 							</CardDescription>
 						</CardHeader>
-						<CardContent className="px-5 pb-5">
+						<CardContent>
 							<form onSubmit={handleSubmit}>
 								<FieldGroup className="gap-4">
 									{error ? (
@@ -133,8 +132,7 @@ export default function SignInPage() {
 								</FieldGroup>
 							</form>
 						</CardContent>
-					</Card>
-				</div>
+				</Card>
 				<p className="text-center text-sm text-muted-foreground">
 					Don&apos;t have an account?{" "}
 					<Link

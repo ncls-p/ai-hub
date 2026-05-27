@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState, type DragEvent } from "react";
 import { BookOpenIcon, Loader2, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { ListRow } from "@/components/list-row";
+import { PageEmptyState } from "@/components/page-empty-state";
 import { PageLoading } from "@/components/page-loading";
+import { SectionHeader } from "@/components/section-header";
 import { WorkspacePage } from "@/components/workspace-page";
 import { Button } from "@/components/ui/button";
 import {
@@ -310,45 +313,39 @@ export default function KnowledgePage() {
 			</Dialog>
 			<div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
 			<section className="flex flex-col gap-4">
-				<div>
-					<h2 className="text-sm font-semibold">Bases</h2>
-					<p className="text-xs text-muted-foreground">
-						Choose the source set to manage.
-					</p>
-				</div>
+				<SectionHeader
+					title="Bases"
+					description="Choose the source set to manage."
+				/>
 				{loading ? (
 					<Loader2 className="animate-spin" />
 				) : bases.length === 0 ? (
-					<Card>
-						<CardContent className="flex flex-col items-start gap-3 p-4 text-sm text-muted-foreground">
-							<p>No knowledge bases yet.</p>
-							<Button
-								type="button"
-								size="sm"
-								variant="outline"
-								onClick={() => setShowCreateDialog(true)}
-							>
-								<PlusIcon data-icon="inline-start" />
-								Create base
-							</Button>
-						</CardContent>
-					</Card>
+					<PageEmptyState
+						icon={BookOpenIcon}
+						title="No knowledge bases yet"
+						description="Create a base to upload documents for your assistants."
+					>
+						<Button
+							type="button"
+							size="sm"
+							onClick={() => setShowCreateDialog(true)}
+						>
+							<PlusIcon data-icon="inline-start" />
+							Create base
+						</Button>
+					</PageEmptyState>
 				) : (
 					<div className="flex flex-col gap-2">
 						{bases.map((base) => (
-							<div
+							<ListRow
 								key={base.id}
-								className={cn(
-									"group flex items-start gap-2 rounded-2xl border p-3 text-left text-sm transition-colors",
-									selectedId === base.id
-										? "border-primary/45 bg-primary/10"
-										: "border-border/60 bg-card/70 hover:bg-muted/50",
-								)}
+								selected={selectedId === base.id}
+								className="group items-start gap-2"
 							>
 								<button
 									type="button"
 									onClick={() => setSelectedId(base.id)}
-									className="min-w-0 flex-1 text-left"
+									className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left text-sm shadow-none outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
 								>
 									<span className="block truncate font-medium">{base.name}</span>
 									{base.description ? (
@@ -383,18 +380,18 @@ export default function KnowledgePage() {
 										<Trash2Icon aria-hidden="true" />
 									</Button>
 								</div>
-							</div>
+							</ListRow>
 						))}
 					</div>
 				)}
 			</section>
 			<section className="flex flex-col gap-4">
 				{!selectedId ? (
-					<Card>
-						<CardContent className="p-8 text-center text-sm text-muted-foreground">
-							Select or create a knowledge base to add documents.
-						</CardContent>
-					</Card>
+					<PageEmptyState
+						icon={BookOpenIcon}
+						title="Select a knowledge base"
+						description="Choose or create a base on the left to manage documents."
+					/>
 				) : (
 					<>
 						<Card>

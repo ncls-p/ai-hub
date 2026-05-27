@@ -193,6 +193,13 @@
   }
 }
 
+/*
+ * Radius scale (use consistently):
+ * - Controls (button, input, select): rounded-lg
+ * - Surfaces (card, empty, surface-panel): rounded-2xl
+ * - Pills (badge, section-kicker): rounded-full
+ * - List rows: .ui-list-row (rounded-xl)
+ */
 @layer components {
   .surface-panel {
     @apply relative overflow-hidden rounded-[calc(var(--radius)*1.5)] border border-border/70 bg-card/80 shadow-[0_24px_80px_-38px_color-mix(in_oklch,var(--foreground)_24%,transparent)] backdrop-blur-xl;
@@ -218,7 +225,7 @@
   }
 
   .section-kicker {
-    @apply inline-flex w-fit items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-[0.68rem] font-medium uppercase tracking-[0.22em] text-muted-foreground;
+    @apply inline-flex w-fit items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground;
   }
 
   .brand-divider {
@@ -227,18 +234,6 @@
 
   .brand-accent-bar {
     @apply h-1 w-14 rounded-full bg-primary;
-  }
-
-  .page-shell {
-    @apply mx-auto w-full max-w-7xl;
-    padding-top: max(0.75rem, env(safe-area-inset-top));
-    padding-right: max(1rem, env(safe-area-inset-right));
-    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
-    padding-left: max(1rem, env(safe-area-inset-left));
-  }
-
-  .chip-scroll {
-    @apply flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
   }
 
   .ui-step-badge {
@@ -262,27 +257,20 @@
   }
 
   .app-shell {
-    @apply flex min-h-svh flex-col;
+    @apply flex h-svh min-h-svh flex-col overflow-hidden bg-muted/20 text-foreground;
   }
 
   .app-shell__header {
-    @apply sticky top-0 z-30 shrink-0 border-b border-border/60 bg-background/90 backdrop-blur-xl;
-    padding-top: max(0.5rem, env(safe-area-inset-top));
+    @apply flex h-16 shrink-0 items-center justify-between border-b border-border/60 bg-background/85 px-4 shadow-sm shadow-foreground/5 backdrop-blur-xl;
+    padding-top: max(0rem, env(safe-area-inset-top));
   }
 
   .app-shell__main {
-    @apply mx-auto flex w-full max-w-7xl flex-1 flex-col;
-    padding-right: max(1rem, env(safe-area-inset-right));
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
-    padding-left: max(1rem, env(safe-area-inset-left));
+    @apply min-h-0 flex-1 overflow-y-auto;
   }
 
-  .marketing-layout {
-    @apply mx-auto flex w-full max-w-7xl flex-col gap-5 py-4 sm:gap-6 sm:py-5;
-    padding-top: max(0.75rem, env(safe-area-inset-top));
-    padding-right: max(1rem, env(safe-area-inset-right));
-    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
-    padding-left: max(1rem, env(safe-area-inset-left));
+  .app-shell__main--chat {
+    @apply overflow-hidden;
   }
 }
 

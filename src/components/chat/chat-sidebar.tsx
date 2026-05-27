@@ -158,19 +158,6 @@ export function ChatSidebar({
 		<div className={cn("flex h-full min-h-0 flex-col", className)}>
 			<div className="flex items-center justify-between border-b border-border/70 p-3">
 				<div className="flex items-center gap-2 text-sm font-medium">
-					<SparklesIcon aria-hidden="true" />
-					Chat
-				</div>
-				<div className="flex items-center gap-1">
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={onNewConversation}
-					>
-						<PlusIcon data-icon="inline-start" aria-hidden="true" />
-						New
-					</Button>
 					{onCollapsedChange ? (
 						<Tooltip>
 							<TooltipTrigger asChild>
@@ -187,6 +174,19 @@ export function ChatSidebar({
 							<TooltipContent>Collapse sidebar</TooltipContent>
 						</Tooltip>
 					) : null}
+					<SparklesIcon aria-hidden="true" />
+					Chat
+				</div>
+				<div className="flex items-center gap-1">
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						onClick={onNewConversation}
+					>
+						<PlusIcon data-icon="inline-start" aria-hidden="true" />
+						New
+					</Button>
 				</div>
 			</div>
 
@@ -244,9 +244,9 @@ export function ChatSidebar({
 								<div
 									key={conversation.id}
 									className={cn(
-										"group/conversation flex items-center gap-1 rounded-xl border border-transparent px-2 py-2 text-sm transition-colors hover:bg-accent",
+										"group/conversation ui-list-row flex items-center gap-1 border-transparent px-2 py-2 text-sm",
 										activeConversationId === conversation.id &&
-											"border-border bg-card shadow-sm",
+											"border-primary/45 bg-primary/10 shadow-sm",
 									)}
 								>
 									{editingConversationId === conversation.id ? (
@@ -303,7 +303,7 @@ export function ChatSidebar({
 											<button
 												type="button"
 												onClick={() => onSelectConversation(conversation.id)}
-												className="min-w-0 flex-1 text-left"
+												className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
 											>
 												<span className="block truncate font-medium">
 													{conversation.title}

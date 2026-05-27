@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { ListRow } from "@/components/list-row";
 import { PageLoading } from "@/components/page-loading";
 import { WorkspacePage } from "@/components/workspace-page";
 import { Badge } from "@/components/ui/badge";
@@ -817,9 +818,9 @@ export default function AgentConfigurePage() {
 							<div className="flex flex-col gap-2">
 								<p className="text-sm font-semibold">Built-in</p>
 							{builtinTools.map((tool) => (
-								<div
+								<ListRow
 									key={tool.id}
-									className="flex items-center justify-between rounded-xl border p-3"
+									className="items-center justify-between"
 								>
 									<div>
 										<p className="font-medium">{tool.name}</p>
@@ -860,7 +861,7 @@ export default function AgentConfigurePage() {
 											}
 										/>
 									</div>
-								</div>
+								</ListRow>
 							))}
 							</div>
 							<div className="flex flex-col gap-2 border-t border-border/70 pt-3">
@@ -892,7 +893,7 @@ export default function AgentConfigurePage() {
 														[server.id]: open,
 													}))
 												}
-												className="flex flex-col gap-3 rounded-xl border p-3"
+												className="ui-list-row flex flex-col gap-3 p-3"
 											>
 												<div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
 													<div className="flex min-w-0 gap-2">
@@ -973,9 +974,9 @@ export default function AgentConfigurePage() {
 																const toolSelected =
 																	tool.enabled && Boolean(binding?.enabled);
 																return (
-																	<div
+																	<ListRow
 																		key={tool.id}
-																		className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+																		className="flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
 																	>
 																		<div className="min-w-0">
 																			<div className="flex flex-wrap items-center gap-2">
@@ -1017,7 +1018,7 @@ export default function AgentConfigurePage() {
 																				/>
 																			</label>
 																		</div>
-																	</div>
+																	</ListRow>
 																);
 															})
 													)}
@@ -1061,7 +1062,7 @@ export default function AgentConfigurePage() {
 								knowledgeBases.map((kb) => (
 									<label
 										key={kb.id}
-										className="flex cursor-pointer items-center justify-between rounded-xl border p-3"
+										className="ui-list-row flex cursor-pointer items-center justify-between p-3"
 									>
 										<span className="font-medium">{kb.name}</span>
 										<Switch

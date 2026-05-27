@@ -12,6 +12,7 @@ import {
 	XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageEmptyState } from "@/components/page-empty-state";
 import { PageLoading } from "@/components/page-loading";
 import { WorkspacePage } from "@/components/workspace-page";
 import { Badge } from "@/components/ui/badge";
@@ -61,11 +62,7 @@ function ItemGrid({
 }) {
 	if (items.length === 0) {
 		return (
-			<Card>
-				<CardContent className="p-8 text-center text-sm text-muted-foreground">
-					{emptyLabel}
-				</CardContent>
-			</Card>
+			<PageEmptyState icon={StoreIcon} title={emptyLabel} />
 		);
 	}
 
@@ -365,11 +362,10 @@ export default function MarketplacePage() {
 					{loading ? (
 						<Loader2 className="animate-spin" />
 					) : reviewItems.length === 0 ? (
-						<Card>
-							<CardContent className="p-8 text-center text-sm text-muted-foreground">
-								No items pending review.
-							</CardContent>
-						</Card>
+						<PageEmptyState
+							icon={StoreIcon}
+							title="No items pending review"
+						/>
 					) : (
 						<div className="grid gap-4">
 							{reviewItems.map((item) => (

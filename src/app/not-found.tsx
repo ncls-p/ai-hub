@@ -2,26 +2,40 @@ import Link from "next/link";
 
 import { DeodisLogo } from "@/components/deodis-logo";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 
 export default function NotFound() {
 	return (
-		<main className="flex min-h-svh items-center justify-center bg-background p-4">
-			<Card className="w-full max-w-lg">
-				<CardContent className="flex flex-col items-center gap-5 p-8 text-center">
+		<main
+			data-page="auth"
+			className="relative isolate flex min-h-svh items-center justify-center bg-background p-4"
+		>
+			<div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/40 to-transparent" />
+			<div className="flex w-full max-w-md flex-col gap-5">
+				<div className="flex justify-center">
 					<DeodisLogo href="/chat" priority className="h-8" />
-					<div className="flex flex-col gap-2">
-						<p className="section-kicker">404</p>
-						<h1 className="text-2xl font-semibold">Page not found</h1>
-						<p className="text-sm leading-6 text-muted-foreground">
+				</div>
+				<Card>
+					<CardHeader className="gap-2 text-center">
+						<div className="section-kicker mx-auto">404</div>
+						<CardTitle className="text-2xl">Page not found</CardTitle>
+						<CardDescription>
 							The page you requested does not exist or has moved.
-						</p>
-					</div>
-					<Button asChild>
-						<Link href="/chat">Return to workspace</Link>
-					</Button>
-				</CardContent>
-			</Card>
+						</CardDescription>
+					</CardHeader>
+					<CardContent className="flex justify-center pb-6">
+						<Button asChild>
+							<Link href="/chat">Return to workspace</Link>
+						</Button>
+					</CardContent>
+				</Card>
+			</div>
 		</main>
 	);
 }
