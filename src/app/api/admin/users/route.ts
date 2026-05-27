@@ -9,12 +9,14 @@ import {
 	listAdminUsers,
 } from "@/modules/admin/use-cases";
 import { getSession } from "@/modules/auth/session";
+import { addWorkspaceMember } from "@/modules/workspace/use-cases";
 
 const createUserSchema = z.object({
 	name: z.string().min(1).max(255),
 	email: z.email(),
 	password: z.string().min(8).max(128),
 	role: z.enum(["user", "admin"]).default("user"),
+	workspaceId: z.uuid().optional(),
 });
 
 async function requireAdminSession() {
@@ -62,9 +64,21 @@ export async function POST(req: NextRequest) {
 		}
 
 		const user = await createAdminManagedUser({
-			...parsed.data,
+			name: parsed.data.name,
+			email: parsed.data.email,
+			password: parsed.data.password,
+			role: parsed.data.role,
 			headers: req.headers,
 		});
+
+		if (parsed.data.workspaceId) {
+			await addWorkspaceMember({
+				workspaceId: parsed.data.workspaceId,
+				userId: user.id,
+				invitedBy: auth.session.user.id,
+			});
+		}
+
 		return NextResponse.json({ user }, { status: 201 });
 	} catch (error) {
 		logger.error("Failed to create user", {}, error as Error);

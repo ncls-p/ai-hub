@@ -9,6 +9,7 @@ import {
 import { isAdminRole } from "@/modules/admin/use-cases";
 import { authorization } from "@/server/domain/services/authorization";
 import { logger } from "@/lib/logger";
+import { toolBindingInputSchema } from "@/modules/tool/use-cases";
 
 const routeParamsSchema = z.object({ agentId: z.uuid() });
 const workspaceQuerySchema = z.object({ workspaceId: z.uuid() });
@@ -37,15 +38,8 @@ const updateAgentSchema = z.object({
 	curationLabel: z
 		.enum(["none", "recommended", "organization_created"])
 		.optional(),
-	toolBindings: z
-		.array(
-			z.object({
-				toolSource: z.literal("builtin").default("builtin"),
-				toolId: z.uuid(),
-				requireApproval: z.boolean().optional(),
-			}),
-		)
-		.optional(),
+	toolBindings: z.array(toolBindingInputSchema).optional(),
+	knowledgeBindings: z.array(z.uuid()).optional(),
 });
 
 function isUniqueConstraintError(error: unknown) {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	CheckCircle2,
@@ -10,6 +11,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { PageLoading } from "@/components/page-loading";
+import { WorkspacePage } from "@/components/workspace-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +30,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 interface ToolInvocation {
 	id: string;
@@ -54,11 +58,6 @@ const TOOL_STATUS_FILTERS = [
 	{ value: "rejected", label: "Rejected" },
 	{ value: "denied", label: "Denied" },
 ] as const;
-
-function getBrowserWorkspaceId() {
-	if (typeof window === "undefined") return null;
-	return window.sessionStorage.getItem("active_workspace_id");
-}
 
 function isPendingApproval(invocation: ToolInvocation) {
 	return (
@@ -173,6 +172,17 @@ function InvocationSummary({ invocation }: { invocation: ToolInvocation }) {
 						<span>{invocation.latencyMs}ms</span>
 					</>
 				)}
+				{invocation.conversationId ? (
+					<>
+						<span>·</span>
+						<Link
+							href={`/chat?conversationId=${invocation.conversationId}`}
+							className="text-primary hover:underline"
+						>
+							View conversation
+						</Link>
+					</>
+				) : null}
 				{invocation.errorMessage && (
 					<>
 						<span>·</span>
@@ -285,9 +295,7 @@ function InvocationList({
 }
 
 export default function ToolInvocationsPage() {
-	const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
-		getBrowserWorkspaceId(),
-	);
+	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
 	const [invocations, setInvocations] = useState<ToolInvocation[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -324,32 +332,6 @@ export default function ToolInvocationsPage() {
 	);
 
 	useEffect(() => {
-		if (workspaceId) return;
-		let cancelled = false;
-
-		async function loadWorkspace() {
-			try {
-				const res = await fetch("/api/workspaces");
-				const data = await res.json();
-				if (cancelled || !Array.isArray(data) || data.length === 0) return;
-
-				const id = data[0].workspace?.id || data[0].id;
-				if (id) {
-					setWorkspaceId(id);
-					window.sessionStorage.setItem("active_workspace_id", id);
-				}
-			} catch {
-				toast.error("Unable to load workspace");
-			}
-		}
-
-		void loadWorkspace();
-		return () => {
-			cancelled = true;
-		};
-	}, [workspaceId]);
-
-	useEffect(() => {
 		if (!workspaceId) return;
 		let cancelled = false;
 		const controller = new AbortController();
@@ -377,15 +359,23 @@ export default function ToolInvocationsPage() {
 
 	useEffect(() => {
 		if (!workspaceId) return;
-		const interval = setInterval(() => {
+		const refresh = () => {
+			if (typeof document !== "undefined" && document.hidden) return;
 			void fetchInvocations()
 				.then(setInvocations)
 				.catch(() => {
 					// Keep polling silent; explicit loads and actions surface errors.
 				});
-		}, 5_000);
-
-		return () => clearInterval(interval);
+		};
+		const interval = setInterval(refresh, 30_000);
+		const onVisible = () => {
+			if (!document.hidden) refresh();
+		};
+		document.addEventListener("visibilitychange", onVisible);
+		return () => {
+			clearInterval(interval);
+			document.removeEventListener("visibilitychange", onVisible);
+		};
 	}, [fetchInvocations, workspaceId]);
 
 	async function runInvocationAction(invocationId: string, action: ToolAction) {
@@ -413,28 +403,17 @@ export default function ToolInvocationsPage() {
 		}
 	}
 
-	if (loading) {
-		return (
-			<div className="flex h-full items-center justify-center">
-				<Loader2
-					className="animate-spin text-muted-foreground"
-					aria-hidden="true"
-				/>
-			</div>
-		);
+	if (workspaceLoading || !workspaceId || loading) {
+		return <PageLoading label="Loading tool invocations" />;
 	}
 
 	return (
-		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-			<header>
-				<div className="section-kicker">Tools</div>
-				<h1 className="text-2xl font-semibold sm:text-3xl">Tool Invocations</h1>
-				<p className="mt-1 text-sm text-muted-foreground">
-					View and manage tool execution history. Approve or reject pending
-					invocations.
-				</p>
-			</header>
-
+		<WorkspacePage
+			kicker="Activity"
+			title="Approvals"
+			description="View and manage tool execution history. Approve or reject pending invocations."
+			width="wide"
+		>
 			<PendingApprovalsPanel
 				invocations={pendingInvocations}
 				busyInvocation={busyInvocation}
@@ -460,6 +439,6 @@ export default function ToolInvocationsPage() {
 					/>
 				</TabsContent>
 			</Tabs>
-		</div>
+		</WorkspacePage>
 	);
 }

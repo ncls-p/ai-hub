@@ -1,6 +1,8 @@
 import { ShieldAlertIcon } from "lucide-react";
 
+import { WorkspacePage } from "@/components/workspace-page";
 import { RegistrationSettings } from "@/components/admin/registration-settings";
+import { SystemHealthCard } from "@/components/admin/system-health-card";
 import {
 	Empty,
 	EmptyDescription,
@@ -23,7 +25,7 @@ export default async function SettingsPage() {
 
 	if (!session || !isAdmin) {
 		return (
-			<div className="mx-auto flex w-full max-w-3xl flex-col px-4 py-6 sm:px-6 sm:py-8">
+			<WorkspacePage title="Settings" width="narrow">
 				<Empty className="min-h-80 border border-border/70 bg-background/55">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
@@ -35,24 +37,21 @@ export default async function SettingsPage() {
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
-			</div>
+			</WorkspacePage>
 		);
 	}
 
 	const registration = await getRegistrationSetting();
 
 	return (
-		<div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
-			<div className="flex flex-col gap-2">
-				<div className="section-kicker">Admin</div>
-				<h1 className="text-2xl font-semibold sm:text-3xl">Settings</h1>
-				<p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-					Keep access intentional. Close public registration when users should
-					be created by an admin.
-				</p>
-			</div>
-
+		<WorkspacePage
+			kicker="Admin"
+			title="Settings"
+			description="Platform configuration, registration policy, and system health."
+			width="narrow"
+		>
 			<RegistrationSettings initialState={registration} />
-		</div>
+			<SystemHealthCard />
+		</WorkspacePage>
 	);
 }

@@ -4,6 +4,7 @@ import { Geist_Mono, Prompt } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const fontBody = Prompt({
@@ -51,8 +52,10 @@ export default function RootLayout({
 		>
 			<body className="min-h-svh">
 				<ThemeProvider>
-					{children}
-					<Toaster />
+					<TooltipProvider>
+						{children}
+						<Toaster />
+					</TooltipProvider>
 				</ThemeProvider>
 			</body>
 		</html>

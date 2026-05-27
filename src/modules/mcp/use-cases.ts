@@ -1,5 +1,6 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { encryptValue } from "@/lib/crypto";
+import { listRemoteMcpTools } from "@/modules/mcp/client";
 import { logger } from "@/lib/logger";
 import { audit } from "@/server/domain/services/audit";
 import { db } from "@/server/infrastructure/db";
@@ -191,38 +192,6 @@ export async function listMcpTools(serverId: string, workspaceId: string) {
 		.orderBy(mcpTools.name);
 }
 
-function parseMcpTools(payload: unknown) {
-	const value = payload as {
-		result?: { tools?: unknown[] };
-		tools?: unknown[];
-	};
-	const tools = Array.isArray(value.result?.tools)
-		? value.result.tools
-		: Array.isArray(value.tools)
-			? value.tools
-			: [];
-	return tools
-		.map(
-			(tool) =>
-				tool as {
-					name?: unknown;
-					description?: unknown;
-					inputSchema?: unknown;
-					outputSchema?: unknown;
-				},
-		)
-		.filter((tool) => typeof tool.name === "string")
-		.map((tool) => ({
-			name: tool.name as string,
-			description:
-				typeof tool.description === "string" ? tool.description : null,
-			inputSchemaJson:
-				(tool.inputSchema as Record<string, unknown> | undefined) ?? null,
-			outputSchemaJson:
-				(tool.outputSchema as Record<string, unknown> | undefined) ?? null,
-		}));
-}
-
 export async function syncMcpTools(
 	serverId: string,
 	workspaceId: string,
@@ -247,20 +216,16 @@ export async function syncMcpTools(
 	let healthStatus = "healthy";
 
 	try {
-		const response = await fetch(server.url, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				jsonrpc: "2.0",
-				id: "tools-list",
-				method: "tools/list",
-				params: {},
-			}),
-			signal: AbortSignal.timeout(10_000),
-		});
-		const payload = await response.json().catch(() => null);
-		if (!response.ok) throw new Error(`MCP server returned ${response.status}`);
-		discovered = parseMcpTools(payload);
+		const remoteTools = await listRemoteMcpTools(server);
+		discovered = remoteTools.map((tool) => ({
+			name: tool.name,
+			description:
+				typeof tool.description === "string" ? tool.description : null,
+			inputSchemaJson:
+				(tool.inputSchema as Record<string, unknown> | undefined) ?? null,
+			outputSchemaJson:
+				(tool.outputSchema as Record<string, unknown> | undefined) ?? null,
+		}));
 	} catch (error) {
 		healthStatus = "unhealthy";
 		logger.warn("MCP tool sync failed", {
@@ -305,4 +270,102 @@ export async function syncMcpTools(
 	});
 
 	return { status: healthStatus, discovered: discovered.length };
+}
+
+export async function testMcpConnection(
+	serverId: string,
+	workspaceId: string,
+	userId: string,
+) {
+	const server = await getMcpServer(serverId, workspaceId);
+	if (!server) throw new Error("MCP server not found");
+
+	if (server.transport === "stdio" || !server.url) {
+		await db
+			.update(mcpServers)
+			.set({ healthStatus: "manual", lastCheckedAt: new Date() })
+			.where(eq(mcpServers.id, serverId));
+		return { status: "manual", message: "stdio servers require manual tool registration" };
+	}
+
+	let healthStatus = "healthy";
+	let message = "Connection successful";
+
+	try {
+		const tools = await listRemoteMcpTools(server);
+		message =
+			tools.length > 0
+				? `Connected — ${tools.length} tools available`
+				: "Connected — no tools returned";
+	} catch (error) {
+		healthStatus = "unhealthy";
+		message =
+			error instanceof Error
+				? error.message
+				: "Unable to reach MCP server";
+	}
+
+	await db
+		.update(mcpServers)
+		.set({
+			healthStatus,
+			lastCheckedAt: new Date(),
+			updatedAt: new Date(),
+		})
+		.where(eq(mcpServers.id, serverId));
+
+	await audit.emit({
+		workspaceId,
+		actorPrincipalType: "user",
+		actorPrincipalId: userId,
+		action: "mcpServer.tested",
+		resourceType: "mcp_server",
+		resourceId: serverId,
+		outcome: healthStatus === "healthy" ? "success" : "failed",
+	});
+
+	return { status: healthStatus, message };
+}
+
+export async function updateMcpTool(input: {
+	toolId: string;
+	serverId: string;
+	workspaceId: string;
+	userId: string;
+	enabled?: boolean;
+}) {
+	const server = await getMcpServer(input.serverId, input.workspaceId);
+	if (!server) throw new Error("MCP server not found");
+
+	const updates: Record<string, unknown> = {};
+	if (input.enabled !== undefined) updates.enabled = input.enabled;
+	if (Object.keys(updates).length === 0) {
+		throw new Error("No updates provided");
+	}
+
+	const [tool] = await db
+		.update(mcpTools)
+		.set(updates)
+		.where(
+			and(
+				eq(mcpTools.id, input.toolId),
+				eq(mcpTools.mcpServerId, input.serverId),
+			),
+		)
+		.returning();
+
+	if (!tool) throw new Error("MCP tool not found");
+
+	await audit.emit({
+		workspaceId: input.workspaceId,
+		actorPrincipalType: "user",
+		actorPrincipalId: input.userId,
+		action: "mcpTool.updated",
+		resourceType: "mcp_server",
+		resourceId: input.serverId,
+		outcome: "success",
+		metadata: { toolId: input.toolId, enabled: input.enabled },
+	});
+
+	return tool;
 }

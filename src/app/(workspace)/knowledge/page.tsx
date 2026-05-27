@@ -1,9 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { BookOpenIcon, Loader2, PlusIcon, SearchIcon } from "lucide-react";
+import { useCallback, useEffect, useState, type DragEvent } from "react";
+import { BookOpenIcon, Loader2, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoading } from "@/components/page-loading";
+import { WorkspacePage } from "@/components/workspace-page";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import {
 	Card,
 	CardContent,
@@ -14,6 +23,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 interface KnowledgeBase {
 	id: string;
@@ -34,16 +45,14 @@ interface SearchResult {
 	score: number;
 }
 
-function getBrowserWorkspaceId() {
-	return typeof window === "undefined"
-		? null
-		: window.sessionStorage.getItem("active_workspace_id");
+function statusVariant(status: string) {
+	if (status === "ready") return "secondary" as const;
+	if (status === "processing") return "outline" as const;
+	return "destructive" as const;
 }
 
 export default function KnowledgePage() {
-	const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
-		getBrowserWorkspaceId(),
-	);
+	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
 	const [bases, setBases] = useState<KnowledgeBase[]>([]);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [documents, setDocuments] = useState<DocumentRow[]>([]);
@@ -52,25 +61,9 @@ export default function KnowledgePage() {
 	const [baseForm, setBaseForm] = useState({ name: "", description: "" });
 	const [docForm, setDocForm] = useState({ title: "", content: "" });
 	const [query, setQuery] = useState("");
-
-	useEffect(() => {
-		if (workspaceId) return;
-		let cancelled = false;
-		async function loadWorkspace() {
-			const res = await fetch("/api/workspaces");
-			const data = await res.json();
-			if (cancelled || !Array.isArray(data)) return;
-			const id = data[0]?.workspace?.id || data[0]?.id;
-			if (id) {
-				setWorkspaceId(id);
-				window.sessionStorage.setItem("active_workspace_id", id);
-			}
-		}
-		void loadWorkspace().catch(() => toast.error("Unable to load workspace"));
-		return () => {
-			cancelled = true;
-		};
-	}, [workspaceId]);
+	const [dragActive, setDragActive] = useState(false);
+	const [editingBase, setEditingBase] = useState<KnowledgeBase | null>(null);
+	const [editBaseForm, setEditBaseForm] = useState({ name: "", description: "" });
 
 	const loadBases = useCallback(async () => {
 		if (!workspaceId) return;
@@ -86,6 +79,48 @@ export default function KnowledgePage() {
 				: (data[0]?.id ?? null),
 		);
 	}, [workspaceId]);
+
+	const loadDocuments = useCallback(async () => {
+		if (!workspaceId || !selectedId) {
+			setDocuments([]);
+			return;
+		}
+		const res = await fetch(
+			`/api/workspace/knowledge-bases/${selectedId}/documents?workspaceId=${workspaceId}`,
+		);
+		if (!res.ok) throw new Error("Failed to load documents");
+		setDocuments(await res.json());
+	}, [workspaceId, selectedId]);
+
+	async function ingestFromContent(title: string, content: string) {
+		if (!workspaceId || !selectedId || !title.trim() || !content.trim()) return;
+		const res = await fetch(
+			`/api/workspace/knowledge-bases/${selectedId}/documents`,
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					workspaceId,
+					title: title.trim(),
+					content,
+				}),
+			},
+		);
+		if (!res.ok) return toast.error("Failed to ingest document");
+		setDocForm({ title: "", content: "" });
+		await loadDocuments();
+		toast.success("Document queued for indexing");
+	}
+
+	function handleFileDrop(event: DragEvent<HTMLDivElement>) {
+		event.preventDefault();
+		setDragActive(false);
+		const file = event.dataTransfer.files[0];
+		if (!file) return;
+		void file.text().then((content) => {
+			void ingestFromContent(file.name, content);
+		});
+	}
 
 	useEffect(() => {
 		if (!workspaceId) return;
@@ -109,29 +144,35 @@ export default function KnowledgePage() {
 	}, [loadBases, workspaceId]);
 
 	useEffect(() => {
-		if (!workspaceId || !selectedId) {
-			queueMicrotask(() => setDocuments([]));
-			return;
-		}
+		if (!workspaceId || !selectedId) return;
 		let cancelled = false;
 		async function run() {
-			const res = await fetch(
-				`/api/workspace/knowledge-bases/${selectedId}/documents?workspaceId=${workspaceId}`,
-			);
-			if (!res.ok) throw new Error("Failed to load documents");
-			if (!cancelled) setDocuments(await res.json());
+			try {
+				await loadDocuments();
+			} catch (error) {
+				if (!cancelled)
+					toast.error(
+						error instanceof Error ? error.message : "Failed to load documents",
+					);
+			}
 		}
-		void run().catch(
-			(error) =>
-				!cancelled &&
-				toast.error(
-					error instanceof Error ? error.message : "Failed to load documents",
-				),
-		);
+		void run();
 		return () => {
 			cancelled = true;
 		};
-	}, [workspaceId, selectedId]);
+	}, [loadDocuments, selectedId, workspaceId]);
+
+	useEffect(() => {
+		if (!workspaceId || !selectedId) return;
+		const hasProcessing = documents.some((doc) => doc.status === "processing");
+		if (!hasProcessing) return;
+
+		const interval = window.setInterval(() => {
+			void loadDocuments().catch(() => {});
+		}, 3_000);
+
+		return () => window.clearInterval(interval);
+	}, [documents, loadDocuments, selectedId, workspaceId]);
 
 	async function createBase() {
 		if (!workspaceId || !baseForm.name.trim()) return;
@@ -151,32 +192,7 @@ export default function KnowledgePage() {
 	}
 
 	async function ingestDocument() {
-		if (
-			!workspaceId ||
-			!selectedId ||
-			!docForm.title.trim() ||
-			!docForm.content.trim()
-		)
-			return;
-		const res = await fetch(
-			`/api/workspace/knowledge-bases/${selectedId}/documents`,
-			{
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					workspaceId,
-					title: docForm.title.trim(),
-					content: docForm.content,
-				}),
-			},
-		);
-		if (!res.ok) return toast.error("Failed to ingest document");
-		setDocForm({ title: "", content: "" });
-		const docs = await fetch(
-			`/api/workspace/knowledge-bases/${selectedId}/documents?workspaceId=${workspaceId}`,
-		);
-		if (docs.ok) setDocuments(await docs.json());
-		toast.success("Document indexed");
+		await ingestFromContent(docForm.title, docForm.content);
 	}
 
 	async function search() {
@@ -193,16 +209,61 @@ export default function KnowledgePage() {
 		setResults(await res.json());
 	}
 
+	async function updateBase() {
+		if (!workspaceId || !editingBase) return;
+		const res = await fetch(
+			`/api/workspace/knowledge-bases/${editingBase.id}`,
+			{
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					workspaceId,
+					name: editBaseForm.name.trim(),
+					description: editBaseForm.description.trim() || undefined,
+				}),
+			},
+		);
+		if (!res.ok) return toast.error("Failed to update knowledge base");
+		setEditingBase(null);
+		await loadBases();
+		toast.success("Knowledge base updated");
+	}
+
+	async function deleteBase(baseId: string) {
+		if (!workspaceId) return;
+		const res = await fetch(
+			`/api/workspace/knowledge-bases/${baseId}?workspaceId=${workspaceId}`,
+			{ method: "DELETE" },
+		);
+		if (!res.ok) return toast.error("Failed to remove knowledge base");
+		await loadBases();
+		toast.success("Knowledge base removed");
+	}
+
+	async function deleteDocument(documentId: string) {
+		if (!workspaceId || !selectedId) return;
+		const res = await fetch(
+			`/api/workspace/knowledge-bases/${selectedId}/documents/${documentId}?workspaceId=${workspaceId}`,
+			{ method: "DELETE" },
+		);
+		if (!res.ok) return toast.error("Failed to remove document");
+		await loadDocuments();
+		toast.success("Document removed");
+	}
+
+	if (workspaceLoading || !workspaceId) {
+		return <PageLoading label="Loading workspace" />;
+	}
+
 	return (
-		<div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[20rem_1fr]">
+		<WorkspacePage
+			kicker="Configuration"
+			title="Knowledge bases"
+			description="Encrypted chunks, workspace isolation, and citation-ready retrieval."
+			width="wide"
+		>
+			<div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
 			<section className="flex flex-col gap-4">
-				<div>
-					<div className="section-kicker">Knowledge</div>
-					<h1 className="text-2xl font-semibold">Knowledge bases</h1>
-					<p className="text-sm text-muted-foreground">
-						Encrypted chunks, workspace isolation, and citation-ready retrieval.
-					</p>
-				</div>
 				<Card>
 					<CardHeader>
 						<CardTitle>Create base</CardTitle>
@@ -222,7 +283,7 @@ export default function KnowledgePage() {
 								setBaseForm({ ...baseForm, description: e.target.value })
 							}
 						/>
-						<Button onClick={createBase}>
+						<Button onClick={() => void createBase()}>
 							<PlusIcon data-icon="inline-start" />
 							Create
 						</Button>
@@ -232,17 +293,45 @@ export default function KnowledgePage() {
 					<Loader2 className="animate-spin" />
 				) : (
 					bases.map((base) => (
-						<button
+						<div
 							key={base.id}
-							type="button"
-							onClick={() => setSelectedId(base.id)}
 							className={`rounded-xl border p-3 text-left text-sm ${selectedId === base.id ? "border-primary bg-primary/5" : "border-border"}`}
 						>
-							<span className="font-medium">{base.name}</span>
-							{base.description ? (
-								<p className="text-muted-foreground">{base.description}</p>
-							) : null}
-						</button>
+							<button
+								type="button"
+								onClick={() => setSelectedId(base.id)}
+								className="w-full text-left"
+							>
+								<span className="font-medium">{base.name}</span>
+								{base.description ? (
+									<p className="text-muted-foreground">{base.description}</p>
+								) : null}
+							</button>
+							<div className="mt-2 flex gap-1">
+								<Button
+									type="button"
+									size="icon-sm"
+									variant="ghost"
+									onClick={() => {
+										setEditingBase(base);
+										setEditBaseForm({
+											name: base.name,
+											description: base.description ?? "",
+										});
+									}}
+								>
+									<PencilIcon className="size-4" />
+								</Button>
+								<Button
+									type="button"
+									size="icon-sm"
+									variant="ghost"
+									onClick={() => void deleteBase(base.id)}
+								>
+									<Trash2Icon className="size-4" />
+								</Button>
+							</div>
+						</div>
 					))
 				)}
 			</section>
@@ -254,11 +343,25 @@ export default function KnowledgePage() {
 							Documents
 						</CardTitle>
 						<CardDescription>
-							Paste text to index it immediately. A worker can replace this
-							synchronous path later.
+							Paste text to index. Processing documents refresh automatically.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="grid gap-3">
+						<div
+							className={`rounded-xl border border-dashed p-6 text-center text-sm transition-colors ${
+								dragActive
+									? "border-primary bg-primary/5"
+									: "border-border text-muted-foreground"
+							}`}
+							onDragOver={(event) => {
+								event.preventDefault();
+								setDragActive(true);
+							}}
+							onDragLeave={() => setDragActive(false)}
+							onDrop={handleFileDrop}
+						>
+							Drag and drop a text file here to ingest
+						</div>
 						<Input
 							placeholder="Document title"
 							value={docForm.title}
@@ -266,15 +369,15 @@ export default function KnowledgePage() {
 								setDocForm({ ...docForm, title: e.target.value })
 							}
 						/>
-						<textarea
-							className="min-h-40 rounded-xl border bg-background p-3 text-sm"
+						<Textarea
+							className="min-h-40"
 							placeholder="Document content"
 							value={docForm.content}
 							onChange={(e) =>
 								setDocForm({ ...docForm, content: e.target.value })
 							}
 						/>
-						<Button onClick={ingestDocument} disabled={!selectedId}>
+						<Button onClick={() => void ingestDocument()} disabled={!selectedId}>
 							Ingest document
 						</Button>
 					</CardContent>
@@ -282,9 +385,19 @@ export default function KnowledgePage() {
 				<div className="grid gap-2">
 					{documents.map((doc) => (
 						<Card key={doc.id}>
-							<CardContent className="flex items-center justify-between p-4">
+							<CardContent className="flex items-center justify-between gap-2 p-4">
 								<span className="font-medium">{doc.title}</span>
-								<Badge variant="outline">{doc.status}</Badge>
+								<div className="flex items-center gap-2">
+									<Badge variant={statusVariant(doc.status)}>{doc.status}</Badge>
+									<Button
+										type="button"
+										size="icon-sm"
+										variant="ghost"
+										onClick={() => void deleteDocument(doc.id)}
+									>
+										<Trash2Icon className="size-4" />
+									</Button>
+								</div>
 							</CardContent>
 						</Card>
 					))}
@@ -300,7 +413,7 @@ export default function KnowledgePage() {
 								onChange={(e) => setQuery(e.target.value)}
 								placeholder="Search indexed text"
 							/>
-							<Button onClick={search}>
+							<Button onClick={() => void search()}>
 								<SearchIcon data-icon="inline-start" />
 								Search
 							</Button>
@@ -319,6 +432,39 @@ export default function KnowledgePage() {
 					</CardContent>
 				</Card>
 			</section>
-		</div>
+			<Dialog open={Boolean(editingBase)} onOpenChange={() => setEditingBase(null)}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Edit knowledge base</DialogTitle>
+					</DialogHeader>
+					<div className="grid gap-3">
+						<Label>Name</Label>
+						<Input
+							value={editBaseForm.name}
+							onChange={(e) =>
+								setEditBaseForm({ ...editBaseForm, name: e.target.value })
+							}
+						/>
+						<Label>Description</Label>
+						<Input
+							value={editBaseForm.description}
+							onChange={(e) =>
+								setEditBaseForm({
+									...editBaseForm,
+									description: e.target.value,
+								})
+							}
+						/>
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setEditingBase(null)}>
+							Cancel
+						</Button>
+						<Button onClick={() => void updateBase()}>Save</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+			</div>
+		</WorkspacePage>
 	);
 }

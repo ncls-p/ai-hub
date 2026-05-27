@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { decryptValue, encryptValue } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
-import { getSession } from "@/modules/auth/session";
+import { getActorUserId, resolveAuthContext } from "@/modules/auth/resolve-auth";
 import {
 	canUseAgent,
 	getActiveVersion,
@@ -12,9 +12,13 @@ import {
 	resolveProviderForVersion,
 } from "@/modules/agent/use-cases";
 import { isAdminRole } from "@/modules/admin/use-cases";
+import { searchBoundKnowledgeBases } from "@/modules/knowledge/use-cases";
+import { executeMcpTool } from "@/modules/mcp/executor";
+import { assertWorkspaceWithinTokenQuota } from "@/modules/usage/quota";
 import { getBuiltInTool, requiresApproval } from "@/modules/tool/builtin-tools";
 import {
 	canExecuteRestrictedTool,
+	getMcpBindingContext,
 	getToolBindingsForVersion,
 	logToolInvocation,
 } from "@/modules/tool/use-cases";
@@ -30,6 +34,7 @@ import {
 import { getAdapter } from "@/server/infrastructure/providers";
 import {
 	extractReasoningMiddleware,
+	jsonSchema,
 	stepCountIs,
 	streamText,
 	wrapLanguageModel,
@@ -42,17 +47,121 @@ const chatRequestSchema = z.object({
 	conversationId: z.uuid().optional(),
 });
 
+type ToolApprovalRequiredEvent = {
+	invocationId: string;
+	toolName: string;
+	input: unknown;
+};
+
 async function buildBoundTools(input: {
 	agentVersionId: string;
 	workspaceId: string;
 	conversationId: string;
 	messageId: string;
 	userId: string;
+	emitEvent?: (event: Record<string, unknown>) => void;
+	onApprovalRequired?: (event: ToolApprovalRequiredEvent) => void;
 }) {
 	const bindings = await getToolBindingsForVersion(input.agentVersionId);
 	const tools: ToolSet = {};
 
 	for (const binding of bindings) {
+		if (binding.toolSource === "mcp") {
+			const mcpContext = await getMcpBindingContext(
+				input.agentVersionId,
+				binding.toolId,
+			);
+			if (!mcpContext) continue;
+			const mcpTool = mcpContext.tool;
+
+			const toolKey = `mcp_${mcpTool.name.replace(/[^a-zA-Z0-9_]/g, "_")}`;
+			const schema =
+				(mcpTool.inputSchemaJson as Record<string, unknown> | null) ?? {
+					type: "object",
+					properties: {},
+				};
+
+			tools[toolKey] = {
+				description:
+					mcpTool.description ??
+					`MCP tool ${mcpTool.name} from connected server.`,
+				inputSchema: jsonSchema(schema),
+				execute: async (toolInput: unknown) => {
+					const startedAt = Date.now();
+					if (binding.requireApproval) {
+						const invocation = await logToolInvocation({
+							workspaceId: input.workspaceId,
+							conversationId: input.conversationId,
+							messageId: input.messageId,
+							toolSource: "mcp",
+							toolId: mcpTool.id,
+							toolName: mcpTool.name,
+							riskLevel: binding.riskLevel,
+							input: toolInput,
+							status: "awaiting_approval",
+							latencyMs: Date.now() - startedAt,
+						});
+
+						input.onApprovalRequired?.({
+							invocationId: invocation.id,
+							toolName: mcpTool.name,
+							input: toolInput,
+						});
+
+						const approvalResult = await waitForApproval(invocation.id);
+						if (approvalResult.status !== "success") {
+							return {
+								denied: true,
+								message:
+									approvalResult.error ?? "Tool invocation was not approved.",
+							};
+						}
+						return approvalResult.output;
+					}
+
+					try {
+						const output = await executeMcpTool({
+							serverId: mcpTool.mcpServerId,
+							toolId: mcpTool.id,
+							workspaceId: input.workspaceId,
+							toolInput,
+						});
+						await logToolInvocation({
+							workspaceId: input.workspaceId,
+							conversationId: input.conversationId,
+							messageId: input.messageId,
+							toolSource: "mcp",
+							toolId: mcpTool.id,
+							toolName: mcpTool.name,
+							riskLevel: binding.riskLevel,
+							input: toolInput,
+							output,
+							status: "success",
+							latencyMs: Date.now() - startedAt,
+						});
+						return output;
+					} catch (error) {
+						await logToolInvocation({
+							workspaceId: input.workspaceId,
+							conversationId: input.conversationId,
+							messageId: input.messageId,
+							toolSource: "mcp",
+							toolId: mcpTool.id,
+							toolName: mcpTool.name,
+							riskLevel: binding.riskLevel,
+							input: toolInput,
+							status: "failed",
+							latencyMs: Date.now() - startedAt,
+							errorMessage:
+								error instanceof Error ? error.message : String(error),
+						});
+						throw error;
+					}
+				},
+			};
+			continue;
+		}
+
 		if (binding.toolSource !== "builtin") continue;
 		const definition = getBuiltInTool(binding.toolId);
 		if (!definition) continue;
@@ -103,6 +212,12 @@ async function buildBoundTools(input: {
 						input: toolInput,
 						status: "awaiting_approval",
 						latencyMs: Date.now() - startedAt,
+					});
+
+					input.onApprovalRequired?.({
+						invocationId: invocation.id,
+						toolName: definition.name,
+						input: toolInput,
 					});
 
 					// Block until approval is granted or denied
@@ -221,10 +336,11 @@ export async function POST(
 	let assistantMessageId: string | undefined;
 
 	try {
-		const session = await getSession();
-		if (!session) {
+		const auth = await resolveAuthContext();
+		if (!auth) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
+		const actorUserId = getActorUserId(auth);
 
 		const { agentId } = await params;
 		const parsed = chatRequestSchema.safeParse(await req.json());
@@ -247,14 +363,17 @@ export async function POST(
 			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 		}
 		if (
-			!isAdminRole(session.user.role) &&
-			!canUseAgent(agent, session.user.id)
+			!isAdminRole(auth.type === "user" ? auth.role : null) &&
+			!canUseAgent(agent, actorUserId)
 		) {
 			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 		}
+		if (auth.type === "api_key" && auth.workspaceId !== agent.workspaceId) {
+			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		}
 
 		const permission = await authorization.requirePermission(
-			{ principalType: "user", principalId: session.user.id },
+			{ principalType: "user", principalId: actorUserId },
 			"agents.chat",
 			"workspace",
 			agent.workspaceId,
@@ -264,6 +383,14 @@ export async function POST(
 			return NextResponse.json(
 				{ error: "Forbidden", reason: permission.reason },
 				{ status: 403 },
+			);
+		}
+
+		const quota = await assertWorkspaceWithinTokenQuota(agent.workspaceId);
+		if (!quota.allowed) {
+			return NextResponse.json(
+				{ error: quota.message, code: "quota_exceeded", used: quota.used, limit: quota.limit },
+				{ status: 429 },
 			);
 		}
 
@@ -277,7 +404,7 @@ export async function POST(
 						eq(conversations.id, existingConversationId),
 						eq(conversations.agentId, agentId),
 						eq(conversations.workspaceId, agent.workspaceId),
-						eq(conversations.userId, session.user.id),
+						eq(conversations.userId, actorUserId),
 						eq(conversations.status, "active"),
 					),
 				)
@@ -311,7 +438,7 @@ export async function POST(
 					workspaceId: agent.workspaceId,
 					agentId,
 					agentVersionId: version.id,
-					userId: session.user.id,
+					userId: actorUserId,
 					title: content.slice(0, 100),
 					status: "active",
 				})
@@ -367,12 +494,78 @@ export async function POST(
 			middleware: extractReasoningMiddleware({ tagName: "think" }),
 		});
 		const history = await loadConversationHistory(conversation.id);
+
+		const encoder = new TextEncoder();
+		let streamController: ReadableStreamDefaultController<Uint8Array> | null =
+			null;
+		const eventBuffer: Array<Record<string, unknown>> = [];
+
+		const emitSse = (event: Record<string, unknown>) => {
+			const chunk = encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
+			if (streamController) {
+				try {
+					streamController.enqueue(chunk);
+					return;
+				} catch {
+					// fall through to buffering on closed/erroring streams
+				}
+			}
+			eventBuffer.push(event);
+		};
+		const enqueueEvent = (event: Record<string, unknown>) => emitSse(event);
+
+		const ragHits = await searchBoundKnowledgeBases({
+			agentVersionId: version.id,
+			workspaceId: agent.workspaceId,
+			query: content,
+			limit: 5,
+		});
+
+		const citations = ragHits.map((hit) => ({
+			chunkId: hit.chunkId,
+			documentId: hit.documentId,
+			documentTitle: hit.documentTitle,
+			content: hit.content.slice(0, 500),
+			score: hit.score,
+			knowledgeBaseId: hit.knowledgeBaseId,
+			knowledgeBaseName: hit.knowledgeBaseName,
+		}));
+
+		if (citations.length > 0) {
+			enqueueEvent({ type: "citations", citations });
+		}
+
+		const ragContext = ragHits
+			.map(
+				(hit, index) =>
+					`[${index + 1}] ${hit.documentTitle} (${hit.knowledgeBaseName}): ${hit.content}`,
+			)
+			.join("\n\n");
+
+		const systemPrompt = [
+			version.systemPrompt || "You are a helpful assistant.",
+			ragContext
+				? `Use the following knowledge base excerpts when relevant:\n\n${ragContext}`
+				: null,
+		]
+			.filter(Boolean)
+			.join("\n\n");
+
 		const tools = await buildBoundTools({
 			agentVersionId: version.id,
 			workspaceId: agent.workspaceId,
 			conversationId: conversation.id,
 			messageId: assistantMessage.id,
-			userId: session.user.id,
+			userId: actorUserId,
+			emitEvent: enqueueEvent,
+			onApprovalRequired: (event) => {
+				enqueueEvent({
+					type: "tool_approval_required",
+					invocationId: event.invocationId,
+					toolName: event.toolName,
+					input: event.input,
+				});
+			},
 		});
 		const startedAt = Date.now();
 		let assistantText = "";
@@ -380,7 +573,7 @@ export async function POST(
 
 		const result = streamText({
 			model,
-			system: version.systemPrompt || "You are a helpful assistant.",
+			system: systemPrompt,
 			messages: history,
 			temperature: version.temperature
 				? Number.parseFloat(version.temperature)
@@ -453,7 +646,7 @@ export async function POST(
 
 				await recordUsageEvent({
 					workspaceId: agent.workspaceId,
-					userId: session.user.id,
+					userId: actorUserId,
 					providerId: providerConfig.providerId,
 					modelId: providerConfig.modelRecordId,
 					agentId,
@@ -474,7 +667,7 @@ export async function POST(
 
 				await recordUsageEvent({
 					workspaceId: agent.workspaceId,
-					userId: session.user.id,
+					userId: actorUserId,
 					providerId: providerConfig.providerId,
 					modelId: providerConfig.modelRecordId,
 					agentId,
@@ -486,25 +679,33 @@ export async function POST(
 			},
 		});
 
-		const encoder = new TextEncoder();
-		const stream = new ReadableStream({
+		const stream = new ReadableStream<Uint8Array>({
 			async start(controller) {
-				function enqueue(event: Record<string, unknown>) {
-					controller.enqueue(
-						encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
-					);
-				}
+				streamController = controller;
+				for (const buffered of eventBuffer.splice(0)) emitSse(buffered);
 
 				try {
 					for await (const part of result.fullStream) {
 						if (part.type === "text-delta") {
-							enqueue({ type: "text", delta: part.text });
-						}
-						if (part.type === "reasoning-delta") {
-							enqueue({ type: "reasoning", delta: part.text });
-						}
-						if (part.type === "error") {
-							enqueue({
+							emitSse({ type: "text", delta: part.text });
+						} else if (part.type === "reasoning-delta") {
+							emitSse({ type: "reasoning", delta: part.text });
+						} else if (part.type === "tool-call") {
+							emitSse({
+								type: "tool_call",
+								toolCallId: part.toolCallId,
+								toolName: part.toolName,
+								input: part.input,
+							});
+						} else if (part.type === "tool-result") {
+							emitSse({
+								type: "tool_result",
+								toolCallId: part.toolCallId,
+								toolName: part.toolName,
+								output: part.output,
+							});
+						} else if (part.type === "error") {
+							emitSse({
 								type: "error",
 								error:
 									part.error instanceof Error
@@ -514,11 +715,12 @@ export async function POST(
 						}
 					}
 				} catch (error) {
-					enqueue({
+					emitSse({
 						type: "error",
 						error: error instanceof Error ? error.message : String(error),
 					});
 				} finally {
+					streamController = null;
 					controller.close();
 				}
 			},

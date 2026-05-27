@@ -20,7 +20,16 @@ import {
 	FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 type ManagedUser = {
 	id: string;
@@ -37,6 +46,7 @@ const emptyForm = {
 	email: "",
 	password: "",
 	role: "user" as "user" | "admin",
+	addToWorkspace: true,
 };
 
 export function UserManagement({
@@ -46,6 +56,7 @@ export function UserManagement({
 	initialUsers: ManagedUser[];
 	currentUserId: string;
 }) {
+	const { workspaceId } = useWorkspace();
 	const [users, setUsers] = useState(initialUsers);
 	const [form, setForm] = useState(emptyForm);
 	const [creating, setCreating] = useState(false);
@@ -70,7 +81,10 @@ export function UserManagement({
 			const res = await fetch("/api/admin/users", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(form),
+				body: JSON.stringify({
+					...form,
+					workspaceId: form.addToWorkspace ? workspaceId : undefined,
+				}),
 			});
 			if (!res.ok) {
 				throw new Error(
@@ -180,21 +194,44 @@ export function UserManagement({
 							<Field>
 								<FieldLabel htmlFor="new-user-role">Role</FieldLabel>
 								<FieldContent>
-									<select
-										id="new-user-role"
-										className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+									<Select
 										value={form.role}
-										onChange={(event) =>
+										onValueChange={(value) =>
 											setForm({
 												...form,
-												role: event.target.value as "user" | "admin",
+												role: value as "user" | "admin",
 											})
 										}
 									>
-										<option value="user">User</option>
-										<option value="admin">Admin</option>
-									</select>
+										<SelectTrigger id="new-user-role" className="w-full">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="user">User</SelectItem>
+											<SelectItem value="admin">Admin</SelectItem>
+										</SelectContent>
+									</Select>
 								</FieldContent>
+							</Field>
+							<Field>
+								<div className="flex items-center gap-2">
+									<Checkbox
+										id="new-user-workspace"
+										checked={form.addToWorkspace}
+										onCheckedChange={(checked) =>
+											setForm({
+												...form,
+												addToWorkspace: checked === true,
+											})
+										}
+									/>
+									<label
+										htmlFor="new-user-workspace"
+										className="text-sm leading-none"
+									>
+										Add to current workspace
+									</label>
+								</div>
 							</Field>
 							<Button type="submit" disabled={creating}>
 								{creating ? (

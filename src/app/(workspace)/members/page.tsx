@@ -1,6 +1,8 @@
 import { ShieldAlertIcon } from "lucide-react";
 
+import { WorkspacePage } from "@/components/workspace-page";
 import { UserManagement } from "@/components/admin/user-management";
+import { WorkspaceMemberManagement } from "@/components/workspace-member-management";
 import {
 	Empty,
 	EmptyDescription,
@@ -21,40 +23,50 @@ export default async function MembersPage() {
 	const isAdmin =
 		isAdminRole(session?.user.role) || bootstrappedAdminId === session?.user.id;
 
-	if (!session || !isAdmin) {
+	if (!session) {
 		return (
-			<div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-6 sm:px-6 sm:py-8">
+			<WorkspacePage title="Team" width="default">
 				<Empty className="min-h-80 border border-border/70 bg-background/55">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
 							<ShieldAlertIcon aria-hidden="true" />
 						</EmptyMedia>
-						<EmptyTitle>Admin access required</EmptyTitle>
+						<EmptyTitle>Sign in required</EmptyTitle>
 						<EmptyDescription>
-							Only admins can create users, promote admins, or suspend access.
+							Sign in to manage workspace members.
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
-			</div>
+			</WorkspacePage>
 		);
 	}
 
-	const users = await listAdminUsers();
+	const users = isAdmin ? await listAdminUsers() : [];
 
 	return (
-		<div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
-			<div className="flex flex-col gap-2">
-				<div className="section-kicker">Team</div>
-				<h1 className="text-2xl font-semibold sm:text-3xl">Accounts</h1>
-				<p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-					Manage who can sign in. Admin actions here take effect immediately.
-				</p>
-			</div>
+		<WorkspacePage
+			kicker="Team"
+			title="Team"
+			description="Invite colleagues to your workspace or manage platform accounts."
+			width="default"
+		>
+			<WorkspaceMemberManagement currentUserId={session.user.id} />
 
-			<UserManagement
-				initialUsers={JSON.parse(JSON.stringify(users))}
-				currentUserId={session.user.id}
-			/>
-		</div>
+			{isAdmin ? (
+				<div className="flex flex-col gap-3">
+					<div>
+						<h2 className="text-lg font-semibold">Platform accounts</h2>
+						<p className="text-sm text-muted-foreground">
+							Create sign-in accounts. New users can be added to this workspace
+							automatically.
+						</p>
+					</div>
+					<UserManagement
+						initialUsers={JSON.parse(JSON.stringify(users))}
+						currentUserId={session.user.id}
+					/>
+				</div>
+			) : null}
+		</WorkspacePage>
 	);
 }

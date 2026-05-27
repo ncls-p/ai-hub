@@ -19,6 +19,10 @@ import type {
 import { audit } from "@/server/domain/services/audit";
 import { logger } from "@/lib/logger";
 import {
+	cloneKnowledgeBindings,
+	replaceKnowledgeBindingsForVersion,
+} from "@/modules/knowledge/use-cases";
+import {
 	cloneToolBindings,
 	insertToolBindingsForVersion,
 	type ToolBindingInput,
@@ -47,6 +51,7 @@ export interface CreateAgentInput {
 	topP?: string;
 	maxOutputTokens?: number;
 	toolBindings?: ToolBindingInput[];
+	knowledgeBindings?: string[];
 	sharingMode?: AgentSharingMode;
 	shareTargetEmail?: string;
 	isGlobal?: boolean;
@@ -69,6 +74,7 @@ export interface UpdateAgentInput {
 	topP?: string;
 	maxOutputTokens?: number;
 	toolBindings?: ToolBindingInput[];
+	knowledgeBindings?: string[];
 	sharingMode?: AgentSharingMode;
 	shareTargetEmail?: string | null;
 	isGlobal?: boolean;
@@ -123,6 +129,7 @@ export async function createAgent(input: CreateAgentInput) {
 		topP,
 		maxOutputTokens,
 		toolBindings,
+		knowledgeBindings,
 		sharingMode = "personal",
 		shareTargetEmail,
 		isGlobal,
@@ -232,6 +239,10 @@ export async function createAgent(input: CreateAgentInput) {
 	});
 
 	await insertToolBindingsForVersion(version.id, toolBindings ?? []);
+	await replaceKnowledgeBindingsForVersion(
+		version.id,
+		knowledgeBindings ?? [],
+	);
 
 	logger.info("Agent created", { agentId: agent.id, userId });
 	return { agent, version };
@@ -336,6 +347,7 @@ export async function updateAgent(input: UpdateAgentInput) {
 		topP,
 		maxOutputTokens,
 		toolBindings,
+		knowledgeBindings,
 		sharingMode,
 		shareTargetEmail,
 		isGlobal,
@@ -506,6 +518,12 @@ export async function updateAgent(input: UpdateAgentInput) {
 		await insertToolBindingsForVersion(version.id, toolBindings);
 	} else {
 		await cloneToolBindings(existing.activeVersionId, version.id);
+	}
+
+	if (knowledgeBindings) {
+		await replaceKnowledgeBindingsForVersion(version.id, knowledgeBindings);
+	} else {
+		await cloneKnowledgeBindings(existing.activeVersionId, version.id);
 	}
 
 	logger.info("Agent updated", {

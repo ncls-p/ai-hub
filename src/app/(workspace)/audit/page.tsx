@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ClipboardListIcon, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ClipboardListIcon } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoading, ListSkeleton } from "@/components/page-loading";
+import { WorkspacePage } from "@/components/workspace-page";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -11,6 +14,23 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 interface AuditEvent {
 	id: string;
@@ -18,102 +38,190 @@ interface AuditEvent {
 	resourceType: string | null;
 	outcome: string;
 	actorPrincipalId: string | null;
+	actorName: string | null;
+	actorEmail: string | null;
 	createdAt: string;
-}
-function getBrowserWorkspaceId() {
-	return typeof window === "undefined"
-		? null
-		: window.sessionStorage.getItem("active_workspace_id");
 }
 
 export default function AuditPage() {
-	const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
-		getBrowserWorkspaceId(),
-	);
+	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
 	const [events, setEvents] = useState<AuditEvent[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [actionFilter, setActionFilter] = useState("");
+	const [outcomeFilter, setOutcomeFilter] = useState("all");
+	const [fromDate, setFromDate] = useState("");
+	const [toDate, setToDate] = useState("");
 
-	useEffect(() => {
-		if (workspaceId) return;
-		let cancelled = false;
-		async function run() {
-			const res = await fetch("/api/workspaces");
-			const rows = await res.json();
-			if (cancelled || !Array.isArray(rows)) return;
-			const id = rows[0]?.workspace?.id || rows[0]?.id;
-			if (id) {
-				setWorkspaceId(id);
-				window.sessionStorage.setItem("active_workspace_id", id);
-			}
-		}
-		void run().catch(() => toast.error("Unable to load workspace"));
-		return () => {
-			cancelled = true;
-		};
-	}, [workspaceId]);
+	const loadEvents = useCallback(async () => {
+		if (!workspaceId) return;
+		const params = new URLSearchParams({ workspaceId, limit: "100" });
+		if (actionFilter.trim()) params.set("action", actionFilter.trim());
+		if (outcomeFilter !== "all") params.set("outcome", outcomeFilter);
+		if (fromDate) params.set("from", new Date(fromDate).toISOString());
+		if (toDate) params.set("to", new Date(`${toDate}T23:59:59`).toISOString());
+		const res = await fetch(`/api/workspace/audit?${params.toString()}`);
+		if (!res.ok) throw new Error("Failed to load audit log");
+		setEvents(await res.json());
+	}, [actionFilter, fromDate, outcomeFilter, toDate, workspaceId]);
+
+	function exportCsv() {
+		if (events.length === 0) return;
+		const header = ["createdAt", "action", "resourceType", "outcome", "actor"];
+		const rows = events.map((event) =>
+			[
+				event.createdAt,
+				event.action,
+				event.resourceType ?? "",
+				event.outcome,
+				event.actorName ?? event.actorEmail ?? event.actorPrincipalId ?? "",
+			]
+				.map((value) => `"${String(value).replace(/"/g, '""')}"`)
+				.join(","),
+		);
+		const blob = new Blob([[header.join(","), ...rows].join("\n")], {
+			type: "text/csv;charset=utf-8;",
+		});
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.href = url;
+		link.download = `audit-${workspaceId?.slice(0, 8) ?? "export"}.csv`;
+		link.click();
+		URL.revokeObjectURL(url);
+	}
 
 	useEffect(() => {
 		if (!workspaceId) return;
 		let cancelled = false;
 		async function run() {
-			const res = await fetch(
-				`/api/workspace/audit?workspaceId=${workspaceId}`,
-			);
-			if (!res.ok) throw new Error("Failed to load audit log");
-			if (!cancelled) setEvents(await res.json());
-		}
-		void run()
-			.catch(
-				(error) =>
-					!cancelled &&
+			try {
+				await loadEvents();
+			} catch (error) {
+				if (!cancelled)
 					toast.error(
 						error instanceof Error ? error.message : "Failed to load audit log",
-					),
-			)
-			.finally(() => !cancelled && setLoading(false));
+					);
+			} finally {
+				if (!cancelled) setLoading(false);
+			}
+		}
+		void run();
 		return () => {
 			cancelled = true;
 		};
-	}, [workspaceId]);
+	}, [loadEvents, workspaceId]);
+
+	if (workspaceLoading || !workspaceId) {
+		return <PageLoading label="Loading workspace" />;
+	}
 
 	return (
-		<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-			<div className="flex flex-col gap-2">
-				<div className="section-kicker">Audit</div>
-				<h1 className="text-2xl font-semibold sm:text-3xl">Audit log</h1>
-				<p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-					Security-sensitive actions are recorded with actor, resource, outcome,
-					and timestamp.
-				</p>
-			</div>
+		<WorkspacePage
+			kicker="Governance"
+			title="Activity log"
+			description="Security-sensitive actions are recorded with actor, resource, outcome, and timestamp."
+			width="default"
+		>
+			<Card>
+				<CardContent className="flex flex-wrap items-end gap-3 p-4">
+					<div className="grid min-w-[12rem] flex-1 gap-2">
+						<Label htmlFor="audit-action-filter">Action contains</Label>
+						<Input
+							id="audit-action-filter"
+							placeholder="agent.created"
+							value={actionFilter}
+							onChange={(e) => setActionFilter(e.target.value)}
+						/>
+					</div>
+					<div className="grid min-w-[10rem] gap-2">
+						<Label>Outcome</Label>
+						<Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
+							<SelectTrigger>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All</SelectItem>
+								<SelectItem value="success">Success</SelectItem>
+								<SelectItem value="failed">Failed</SelectItem>
+								<SelectItem value="denied">Denied</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+					<div className="grid min-w-[10rem] gap-2">
+						<Label htmlFor="audit-from">From</Label>
+						<Input
+							id="audit-from"
+							type="date"
+							value={fromDate}
+							onChange={(e) => setFromDate(e.target.value)}
+						/>
+					</div>
+					<div className="grid min-w-[10rem] gap-2">
+						<Label htmlFor="audit-to">To</Label>
+						<Input
+							id="audit-to"
+							type="date"
+							value={toDate}
+							onChange={(e) => setToDate(e.target.value)}
+						/>
+					</div>
+					<Button onClick={() => void loadEvents()}>Apply filters</Button>
+					<Button variant="outline" onClick={exportCsv} disabled={events.length === 0}>
+						Export CSV
+					</Button>
+				</CardContent>
+			</Card>
+
 			<Card>
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<ClipboardListIcon className="size-5" />
 						Recent events
 					</CardTitle>
-					<CardDescription>Newest workspace audit events.</CardDescription>
+					<CardDescription>Filtered workspace audit events.</CardDescription>
 				</CardHeader>
 				<CardContent className="grid gap-2">
 					{loading ? (
-						<Loader2 className="animate-spin" />
+						<ListSkeleton rows={5} />
+					) : events.length === 0 ? (
+						<Empty className="border border-dashed border-border/70 py-8">
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<ClipboardListIcon aria-hidden="true" />
+								</EmptyMedia>
+								<EmptyTitle>No events match</EmptyTitle>
+								<EmptyDescription>
+									Try adjusting filters or check back after activity in this
+									workspace.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
 					) : (
 						events.map((event) => (
 							<div
 								key={event.id}
 								className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-sm"
 							>
-								<div className="flex items-center gap-2">
-									<Badge
-										variant={
-											event.outcome === "success" ? "secondary" : "destructive"
-										}
+								<div className="flex min-w-0 flex-col gap-1">
+									<div className="flex flex-wrap items-center gap-2">
+										<Badge
+											variant={
+												event.outcome === "success"
+													? "secondary"
+													: "destructive"
+											}
+										>
+											{event.outcome}
+										</Badge>
+										<span className="font-medium">{event.action}</span>
+										<span className="text-muted-foreground">
+											{event.resourceType}
+										</span>
+									</div>
+									<span
+										className="text-xs text-muted-foreground"
+										title={event.actorPrincipalId ?? undefined}
 									>
-										{event.outcome}
-									</Badge>
-									<span className="font-medium">{event.action}</span>
-									<span className="text-muted-foreground">
-										{event.resourceType}
+										{event.actorName ?? event.actorEmail ?? "System"}
 									</span>
 								</div>
 								<span className="text-muted-foreground">
@@ -122,13 +230,8 @@ export default function AuditPage() {
 							</div>
 						))
 					)}
-					{!loading && events.length === 0 ? (
-						<p className="text-sm text-muted-foreground">
-							No audit events yet.
-						</p>
-					) : null}
 				</CardContent>
 			</Card>
-		</div>
+		</WorkspacePage>
 	);
 }

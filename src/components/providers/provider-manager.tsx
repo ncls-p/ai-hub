@@ -16,6 +16,23 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
 	Card,
 	CardContent,
 	CardDescription,
@@ -33,6 +50,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 type ProviderKind =
@@ -229,6 +254,7 @@ export function ProviderManager({
 	const [loadingModels, setLoadingModels] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const [showProviderForm, setShowProviderForm] = useState(false);
+	const [simpleProviderMode, setSimpleProviderMode] = useState(true);
 
 	const [kind, setKind] = useState<ProviderKind>("openai-compatible");
 	const [authType, setAuthType] = useState<ProviderAuthType>(
@@ -242,6 +268,14 @@ export function ProviderManager({
 
 	const [manualModelId, setManualModelId] = useState("");
 	const [manualModelName, setManualModelName] = useState("");
+	const [editingProvider, setEditingProvider] = useState<SafeProvider | null>(
+		null,
+	);
+	const [editName, setEditName] = useState("");
+	const [editBaseUrl, setEditBaseUrl] = useState("");
+	const [editApiKey, setEditApiKey] = useState("");
+	const [deleteProviderId, setDeleteProviderId] = useState<string | null>(null);
+	const [deleteModelId, setDeleteModelId] = useState<string | null>(null);
 
 	const selectedProvider = useMemo(
 		() =>
@@ -315,7 +349,10 @@ export function ProviderManager({
 
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({}));
-				throw new Error(data.error || "Failed to create provider");
+				throw new Error(
+					data.error ||
+						"Unable to connect to the AI service. Check the URL and API key.",
+				);
 			}
 
 			const provider = (await res.json()) as SafeProvider;
@@ -377,13 +414,36 @@ export function ProviderManager({
 		}
 	}
 
+	async function saveProviderEdit() {
+		if (!editingProvider) return;
+		setBusy(true);
+		try {
+			const res = await fetch(
+				`/api/workspace/providers/${editingProvider.id}`,
+				{
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						workspaceId,
+						name: editName.trim(),
+						baseUrl: editBaseUrl.trim() || "",
+						...(editApiKey.trim() ? { apiKey: editApiKey.trim() } : {}),
+					}),
+				},
+			);
+			if (!res.ok) throw new Error((await res.json()).error || "Failed");
+			setEditingProvider(null);
+			setEditApiKey("");
+			await loadProviders();
+			toast.success("Connection updated");
+		} catch (error) {
+			toast.error((error as Error).message);
+		} finally {
+			setBusy(false);
+		}
+	}
+
 	async function deleteProvider(providerId: string) {
-		if (
-			!window.confirm(
-				"Archive this provider? Existing agent versions may keep references.",
-			)
-		)
-			return;
 		setBusy(true);
 		try {
 			const res = await fetch(
@@ -393,6 +453,7 @@ export function ProviderManager({
 			if (!res.ok) throw new Error("Failed to archive provider");
 			setProviders((prev) => prev.filter((p) => p.id !== providerId));
 			if (selectedProviderId === providerId) setSelectedProviderId(null);
+			setDeleteProviderId(null);
 			toast.success("Provider archived");
 		} catch (error) {
 			toast.error((error as Error).message);
@@ -475,6 +536,7 @@ export function ProviderManager({
 				{ method: "DELETE" },
 			);
 			if (!res.ok) throw new Error("Failed to delete model");
+			setDeleteModelId(null);
 			toast.success("Model removed");
 			await loadModelsForProvider(selectedProviderId);
 		} catch (error) {
@@ -511,98 +573,121 @@ export function ProviderManager({
 					<CardContent className="flex flex-col gap-4 pt-5">
 						{showProviderForm ? (
 							<div className="grid gap-3 rounded-2xl border border-border/70 bg-background/70 p-4">
-								<div className="grid gap-3 sm:grid-cols-2">
-									<div className="grid gap-2">
-										<Label htmlFor="provider-kind">Provider type</Label>
-										<select
-											id="provider-kind"
-											value={kind}
-											onChange={(event) => {
-												const nextKind = event.target.value as ProviderKind;
-												setKind(nextKind);
-												setAuthType(defaultAuthType(nextKind));
-											}}
-											className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-										>
-											{Object.entries(KIND_LABELS).map(([value, label]) => (
-												<option key={value} value={value}>
-													{label}
-												</option>
-											))}
-										</select>
-									</div>
-									<div className="grid gap-2">
-										<Label htmlFor="provider-name">Name</Label>
-										<Input
-											id="provider-name"
-											value={name}
-											onChange={(e) => setName(e.target.value)}
-											placeholder="Production OpenAI"
-										/>
-									</div>
+								<div className="flex items-center justify-between gap-2">
+									<p className="text-sm font-medium">New AI connection</p>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										onClick={() => setSimpleProviderMode((value) => !value)}
+									>
+										{simpleProviderMode ? "Advanced" : "Simple mode"}
+									</Button>
 								</div>
 								<div className="grid gap-2">
-									<Label htmlFor="provider-base-url">Base URL</Label>
+									<Label htmlFor="provider-name">Name</Label>
+									<Input
+										id="provider-name"
+										value={name}
+										onChange={(e) => setName(e.target.value)}
+										placeholder="Production OpenAI"
+									/>
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor="provider-base-url">Service URL</Label>
 									<Input
 										id="provider-base-url"
 										value={baseUrl}
 										onChange={(e) => setBaseUrl(e.target.value)}
-										placeholder="https://api.openai.com"
+										placeholder="https://api.openai.com/v1"
 									/>
 								</div>
-								<div className="grid gap-3 sm:grid-cols-2">
-									<div className="grid gap-2">
-										<Label htmlFor="provider-auth-type">Authentication</Label>
-										<select
-											id="provider-auth-type"
-											value={authType}
-											onChange={(event) =>
-												setAuthType(event.target.value as ProviderAuthType)
-											}
-											className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-										>
-											{Object.entries(AUTH_TYPE_LABELS).map(
-												([value, label]) => (
-													<option key={value} value={value}>
-														{label}
-													</option>
-												),
-											)}
-										</select>
-									</div>
-									<div className="grid gap-2">
-										<Label htmlFor="provider-api-key">API key</Label>
-										<Input
-											id="provider-api-key"
-											type="password"
-											value={apiKey}
-											onChange={(e) => setApiKey(e.target.value)}
-											placeholder="Stored encrypted at rest"
-										/>
-									</div>
+								<div className="grid gap-2">
+									<Label htmlFor="provider-api-key">API key</Label>
+									<Input
+										id="provider-api-key"
+										type="password"
+										value={apiKey}
+										onChange={(e) => setApiKey(e.target.value)}
+									/>
 								</div>
-								<div className="grid gap-3 sm:grid-cols-2">
-									<div className="grid gap-2">
-										<Label htmlFor="provider-headers">Custom headers</Label>
-										<textarea
-											id="provider-headers"
-											value={customHeaders}
-											onChange={(e) => setCustomHeaders(e.target.value)}
-											placeholder="X-Team=ai-platform"
-											className="min-h-20 rounded-xl border border-input bg-background px-3 py-2 text-sm"
-										/>
-									</div>
-									<div className="grid gap-2">
-										<Label htmlFor="provider-query">Query params</Label>
-										<textarea
-											id="provider-query"
-											value={queryParams}
-											onChange={(e) => setQueryParams(e.target.value)}
-											placeholder="api-version=2024-10-21"
-											className="min-h-20 rounded-xl border border-input bg-background px-3 py-2 text-sm"
-										/>
-									</div>
-								</div>
+								{!simpleProviderMode ? (
+									<>
+										<div className="grid gap-3 sm:grid-cols-2">
+											<div className="grid gap-2">
+												<Label htmlFor="provider-kind">Provider type</Label>
+												<Select
+													value={kind}
+													onValueChange={(value) => {
+														const nextKind = value as ProviderKind;
+														setKind(nextKind);
+														setAuthType(defaultAuthType(nextKind));
+													}}
+												>
+													<SelectTrigger id="provider-kind" className="w-full">
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														{Object.entries(KIND_LABELS).map(
+															([value, label]) => (
+																<SelectItem key={value} value={value}>
+																	{label}
+																</SelectItem>
+															),
+														)}
+													</SelectContent>
+												</Select>
+											</div>
+											<div className="grid gap-2">
+												<Label htmlFor="provider-auth-type">Authentication</Label>
+												<Select
+													value={authType}
+													onValueChange={(value) =>
+														setAuthType(value as ProviderAuthType)
+													}
+												>
+													<SelectTrigger
+														id="provider-auth-type"
+														className="w-full"
+													>
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														{Object.entries(AUTH_TYPE_LABELS).map(
+															([value, label]) => (
+																<SelectItem key={value} value={value}>
+																	{label}
+																</SelectItem>
+															),
+														)}
+													</SelectContent>
+												</Select>
+											</div>
+										</div>
+										<div className="grid gap-3 sm:grid-cols-2">
+											<div className="grid gap-2">
+												<Label htmlFor="provider-headers">Custom headers</Label>
+												<Textarea
+													id="provider-headers"
+													value={customHeaders}
+													onChange={(e) => setCustomHeaders(e.target.value)}
+													placeholder="X-Team=ai-platform"
+													className="min-h-20"
+												/>
+											</div>
+											<div className="grid gap-2">
+												<Label htmlFor="provider-query">Query params</Label>
+												<Textarea
+													id="provider-query"
+													value={queryParams}
+													onChange={(e) => setQueryParams(e.target.value)}
+													placeholder="api-version=2024-10-21"
+													className="min-h-20"
+												/>
+											</div>
+										</div>
+									</>
+								) : null}
 								<div className="flex justify-end gap-2">
 									<Button
 										variant="ghost"
@@ -693,6 +778,19 @@ export function ProviderManager({
 													size="xs"
 													variant="outline"
 													disabled={busy}
+													onClick={() => {
+														setEditingProvider(provider);
+														setEditName(provider.name);
+														setEditBaseUrl(provider.baseUrl ?? "");
+														setEditApiKey("");
+													}}
+												>
+													Edit
+												</Button>
+												<Button
+													size="xs"
+													variant="outline"
+													disabled={busy}
 													onClick={() => testProvider(provider.id)}
 												>
 													<RefreshCwIcon /> Test
@@ -709,7 +807,7 @@ export function ProviderManager({
 													size="xs"
 													variant="destructive"
 													disabled={busy}
-													onClick={() => deleteProvider(provider.id)}
+													onClick={() => setDeleteProviderId(provider.id)}
 												>
 													<Trash2Icon /> Archive
 												</Button>
@@ -859,7 +957,7 @@ export function ProviderManager({
 												size="icon-xs"
 												variant="ghost"
 												aria-label="Remove model"
-												onClick={() => deleteModel(model.id)}
+												onClick={() => setDeleteModelId(model.id)}
 											>
 												<Trash2Icon />
 											</Button>
@@ -903,6 +1001,99 @@ export function ProviderManager({
 					</CardContent>
 				</Card>
 			</div>
+
+			<Dialog
+				open={Boolean(editingProvider)}
+				onOpenChange={() => setEditingProvider(null)}
+			>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Edit AI connection</DialogTitle>
+					</DialogHeader>
+					<div className="grid gap-3">
+						<div className="grid gap-2">
+							<Label>Name</Label>
+							<Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+						</div>
+						<div className="grid gap-2">
+							<Label>Service URL</Label>
+							<Input
+								value={editBaseUrl}
+								onChange={(e) => setEditBaseUrl(e.target.value)}
+							/>
+						</div>
+						<div className="grid gap-2">
+							<Label>New API key (optional)</Label>
+							<Input
+								type="password"
+								value={editApiKey}
+								onChange={(e) => setEditApiKey(e.target.value)}
+								placeholder="Leave blank to keep current key"
+							/>
+						</div>
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setEditingProvider(null)}>
+							Cancel
+						</Button>
+						<Button disabled={busy} onClick={() => void saveProviderEdit()}>
+							Save
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<AlertDialog
+				open={Boolean(deleteProviderId)}
+				onOpenChange={() => setDeleteProviderId(null)}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Archive this connection?</AlertDialogTitle>
+						<AlertDialogDescription>
+							The provider will be archived. Existing agent versions may keep
+							references to its models.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							disabled={busy}
+							onClick={() =>
+								deleteProviderId && void deleteProvider(deleteProviderId)
+							}
+						>
+							Archive
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog
+				open={Boolean(deleteModelId)}
+				onOpenChange={() => setDeleteModelId(null)}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Remove this model?</AlertDialogTitle>
+						<AlertDialogDescription>
+							The model will be removed from this provider. Assistants already
+							bound to it may need reconfiguration.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							disabled={busy}
+							onClick={() => deleteModelId && void deleteModel(deleteModelId)}
+						>
+							Remove
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }

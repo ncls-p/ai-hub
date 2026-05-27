@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { BarChart3Icon, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { BarChart3Icon } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoading, ListSkeleton } from "@/components/page-loading";
+import { WorkspacePage } from "@/components/workspace-page";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -11,6 +14,9 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 interface UsageEvent {
 	id: string;
@@ -24,77 +30,138 @@ interface UsageEvent {
 interface UsageResponse {
 	totals: { inputTokens: number; outputTokens: number; events: number };
 	events: UsageEvent[];
-}
-function getBrowserWorkspaceId() {
-	return typeof window === "undefined"
-		? null
-		: window.sessionStorage.getItem("active_workspace_id");
+	quota: {
+		limit: number;
+		used: number;
+		remaining: number;
+	} | null;
 }
 
 export default function UsagePage() {
-	const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
-		getBrowserWorkspaceId(),
-	);
+	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
 	const [data, setData] = useState<UsageResponse | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [operationFilter, setOperationFilter] = useState("");
+	const [fromDate, setFromDate] = useState("");
+	const [toDate, setToDate] = useState("");
 
-	useEffect(() => {
-		if (workspaceId) return;
-		let cancelled = false;
-		async function run() {
-			const res = await fetch("/api/workspaces");
-			const rows = await res.json();
-			if (cancelled || !Array.isArray(rows)) return;
-			const id = rows[0]?.workspace?.id || rows[0]?.id;
-			if (id) {
-				setWorkspaceId(id);
-				window.sessionStorage.setItem("active_workspace_id", id);
-			}
+	const loadUsage = useCallback(async () => {
+		if (!workspaceId) return;
+		const params = new URLSearchParams({ workspaceId, limit: "100" });
+		if (operationFilter.trim()) {
+			params.set("operation", operationFilter.trim());
 		}
-		void run().catch(() => toast.error("Unable to load workspace"));
-		return () => {
-			cancelled = true;
-		};
-	}, [workspaceId]);
+		if (fromDate) params.set("from", new Date(fromDate).toISOString());
+		if (toDate) params.set("to", new Date(`${toDate}T23:59:59`).toISOString());
+		const res = await fetch(`/api/workspace/usage?${params.toString()}`);
+		if (!res.ok) throw new Error("Failed to load usage");
+		setData(await res.json());
+	}, [fromDate, operationFilter, toDate, workspaceId]);
+
+	const chartMaxTokens = Math.max(
+		...(data?.events.map(
+			(event) => (event.inputTokens ?? 0) + (event.outputTokens ?? 0),
+		) ?? [1]),
+		1,
+	);
 
 	useEffect(() => {
 		if (!workspaceId) return;
 		let cancelled = false;
 		async function run() {
-			const res = await fetch(
-				`/api/workspace/usage?workspaceId=${workspaceId}`,
-			);
-			if (!res.ok) throw new Error("Failed to load usage");
-			if (!cancelled) setData(await res.json());
-		}
-		void run()
-			.catch(
-				(error) =>
-					!cancelled &&
+			try {
+				await loadUsage();
+			} catch (error) {
+				if (!cancelled)
 					toast.error(
 						error instanceof Error ? error.message : "Failed to load usage",
-					),
-			)
-			.finally(() => !cancelled && setLoading(false));
+					);
+			} finally {
+				if (!cancelled) setLoading(false);
+			}
+		}
+		void run();
 		return () => {
 			cancelled = true;
 		};
-	}, [workspaceId]);
+	}, [loadUsage, workspaceId]);
+
+	if (workspaceLoading || !workspaceId) {
+		return <PageLoading label="Loading workspace" />;
+	}
 
 	return (
-		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-			<div className="flex flex-col gap-2">
-				<div className="section-kicker">Usage</div>
-				<h1 className="text-2xl font-semibold sm:text-3xl">Usage and quotas</h1>
-				<p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-					Billing-ready usage events for chat, tools, embeddings, ingestion, and
-					MCP calls.
-				</p>
-			</div>
+		<WorkspacePage
+			kicker="Governance"
+			title="Usage"
+			description="Track token consumption across chat, tools, embeddings, and integrations."
+			width="wide"
+		>
+			{data?.quota ? (
+				<Card>
+					<CardHeader>
+						<CardTitle>Monthly tokens</CardTitle>
+						<CardDescription>
+							{data.quota.used.toLocaleString()} / {data.quota.limit.toLocaleString()} tokens this month
+						</CardDescription>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-2">
+						<div className="h-2 overflow-hidden rounded-full bg-muted">
+							<div
+								className={`h-full rounded-full ${
+									data.quota.used / data.quota.limit >= 0.8
+										? "bg-amber-500"
+										: "bg-primary"
+								}`}
+								style={{
+									width: `${Math.min(100, Math.round((data.quota.used / data.quota.limit) * 100))}%`,
+								}}
+							/>
+						</div>
+						{data.quota.used / data.quota.limit >= 0.8 ? (
+							<p className="text-sm text-amber-700 dark:text-amber-300">
+								Approaching or exceeding the configured monthly limit.
+							</p>
+						) : null}
+					</CardContent>
+				</Card>
+			) : null}
+
+			<Card>
+				<CardContent className="flex flex-wrap items-end gap-3 p-4">
+					<div className="grid flex-1 gap-2">
+						<Label htmlFor="usage-operation-filter">Operation filter</Label>
+						<Input
+							id="usage-operation-filter"
+							placeholder="e.g. chat"
+							value={operationFilter}
+							onChange={(e) => setOperationFilter(e.target.value)}
+						/>
+					</div>
+					<div className="grid min-w-[10rem] gap-2">
+						<Label htmlFor="usage-from">From</Label>
+						<Input
+							id="usage-from"
+							type="date"
+							value={fromDate}
+							onChange={(e) => setFromDate(e.target.value)}
+						/>
+					</div>
+					<div className="grid min-w-[10rem] gap-2">
+						<Label htmlFor="usage-to">To</Label>
+						<Input
+							id="usage-to"
+							type="date"
+							value={toDate}
+							onChange={(e) => setToDate(e.target.value)}
+						/>
+					</div>
+					<Button onClick={() => void loadUsage()}>Apply filter</Button>
+				</CardContent>
+			</Card>
+
 			{loading ? (
-				<div className="flex justify-center py-12">
-					<Loader2 className="animate-spin" />
-				</div>
+				<ListSkeleton rows={4} />
 			) : (
 				<>
 					<div className="grid gap-4 sm:grid-cols-3">
@@ -125,6 +192,38 @@ export default function UsagePage() {
 					</div>
 					<Card>
 						<CardHeader>
+							<CardTitle>Token chart</CardTitle>
+							<CardDescription>
+								Relative token totals for recent usage events.
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="flex h-40 items-end gap-1">
+							{data?.events.slice(0, 24).map((event) => {
+								const total =
+									(event.inputTokens ?? 0) + (event.outputTokens ?? 0);
+								const height = Math.max(8, (total / chartMaxTokens) * 100);
+								return (
+									<div
+										key={event.id}
+										className="flex min-w-0 flex-1 flex-col items-center gap-1"
+										title={`${event.operation}: ${total} tokens`}
+									>
+										<div
+											className="w-full rounded-t bg-primary/70"
+											style={{ height: `${height}%` }}
+										/>
+									</div>
+								);
+							})}
+							{data?.events.length === 0 ? (
+								<p className="text-sm text-muted-foreground">
+									No usage to chart yet.
+								</p>
+							) : null}
+						</CardContent>
+					</Card>
+					<Card>
+						<CardHeader>
 							<CardTitle className="flex items-center gap-2">
 								<BarChart3Icon className="size-5" />
 								Recent usage
@@ -141,6 +240,9 @@ export default function UsagePage() {
 								>
 									<div className="flex items-center gap-2">
 										<Badge variant="outline">{event.operation}</Badge>
+										{event.status ? (
+											<Badge variant="secondary">{event.status}</Badge>
+										) : null}
 										<span>{new Date(event.createdAt).toLocaleString()}</span>
 									</div>
 									<span className="text-muted-foreground">
@@ -158,6 +260,6 @@ export default function UsagePage() {
 					</Card>
 				</>
 			)}
-		</div>
+		</WorkspacePage>
 	);
 }

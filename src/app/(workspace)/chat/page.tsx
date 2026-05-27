@@ -2,27 +2,21 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-	BotIcon,
-	Loader2,
-	MessageSquareIcon,
-	PlusIcon,
-	SendIcon,
-	SparklesIcon,
-} from "lucide-react";
-import { Streamdown } from "streamdown";
-import { code } from "@streamdown/code";
+import { BotIcon, Loader2, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
+import { ChatComposer } from "@/components/chat/chat-composer";
+import { ChatLayout } from "@/components/chat/chat-layout";
+import { ChatMessageList } from "@/components/chat/chat-message-list";
+import { QuotaBanner } from "@/components/chat/quota-banner";
+import { ToolApprovalBanner } from "@/components/chat/tool-approval-banner";
+import type {
+	AgentVersion,
+	ChatAgent,
+	ChatConversation,
+	ChatMessage,
+} from "@/components/chat/chat-types";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import {
 	Empty,
 	EmptyDescription,
@@ -30,142 +24,28 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { cn } from "@/lib/utils";
-
-interface Agent {
-	id: string;
-	name: string;
-	description: string | null;
-	activeVersionId: string | null;
-}
-
-interface Conversation {
-	id: string;
-	title: string;
-	agentId: string;
-	updatedAt: string;
-}
-
-interface AgentVersion {
-	id: string;
-	providerId: string | null;
-	modelId: string | null;
-	isActive: boolean;
-}
-
-interface ChatMessage {
-	id: string;
-	role: "user" | "assistant" | "system" | "tool";
-	status?: string;
-	parts: Array<{ type: string; content: string }>;
-	createdAt?: string;
-}
-
-function getBrowserWorkspaceId() {
-	if (typeof window === "undefined") return null;
-	return window.sessionStorage.getItem("active_workspace_id");
-}
-
-function textFromMessage(message: ChatMessage) {
-	return message.parts
-		.filter((part) => part.type === "text")
-		.map((part) => part.content)
-		.join("\n");
-}
-
-function reasoningFromMessage(message: ChatMessage) {
-	return message.parts
-		.filter((part) => part.type === "reasoning")
-		.map((part) => part.content)
-		.join("\n");
-}
-
-function toolPartsFromMessage(message: ChatMessage) {
-	return message.parts.filter(
-		(part) => part.type === "tool-call" || part.type === "tool-result",
-	);
-}
-
-function summarizeToolPart(content: string) {
-	try {
-		const parsed = JSON.parse(content) as {
-			toolName?: string;
-			output?: unknown;
-		};
-		return (
-			parsed.toolName ?? JSON.stringify(parsed.output ?? parsed).slice(0, 120)
-		);
-	} catch {
-		return content.slice(0, 120);
-	}
-}
-
-function createLocalMessage(
-	role: "user" | "assistant",
-	content: string,
-): ChatMessage {
-	return {
-		id:
-			typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-				? crypto.randomUUID()
-				: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-		role,
-		status: role === "assistant" ? "streaming" : "completed",
-		parts: [{ type: "text", content }],
-	};
-}
-
-type ChatStreamEvent =
-	| { type: "text" | "reasoning"; delta: string }
-	| { type: "error"; error: string };
-
-function appendMessagePart(
-	parts: ChatMessage["parts"],
-	type: "text" | "reasoning",
-	delta: string,
-) {
-	const nextParts = [...parts];
-	const existingIndex = nextParts.findIndex((part) => part.type === type);
-
-	if (existingIndex === -1) {
-		return [...nextParts, { type, content: delta }];
-	}
-
-	nextParts[existingIndex] = {
-		...nextParts[existingIndex],
-		content: `${nextParts[existingIndex].content}${delta}`,
-	};
-	return nextParts;
-}
-
-function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
-	if (typeof value !== "object" || value === null || !("type" in value)) {
-		return false;
-	}
-
-	const event = value as { type?: unknown; delta?: unknown; error?: unknown };
-	return (
-		((event.type === "text" || event.type === "reasoning") &&
-			typeof event.delta === "string") ||
-		(event.type === "error" && typeof event.error === "string")
-	);
-}
+import { useChatStream } from "@/hooks/use-chat-stream";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { fetchJson } from "@/lib/api-client";
 
 export default function ChatPage() {
-	const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
-		getBrowserWorkspaceId(),
-	);
-	const [agents, setAgents] = useState<Agent[]>([]);
+	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
+	const [agents, setAgents] = useState<ChatAgent[]>([]);
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-	const [conversations, setConversations] = useState<Conversation[]>([]);
-	const [activeVersion, setActiveVersion] = useState<AgentVersion | null>(null);
+	const [conversations, setConversations] = useState<ChatConversation[]>([]);
+	const [activeVersion, setActiveVersion] = useState<AgentVersion | null>(
+		null,
+	);
 	const [activeConversationId, setActiveConversationId] = useState<
 		string | null
 	>(null);
-	const [messages, setMessages] = useState<ChatMessage[]>([]);
+	const [loadingAgents, setLoadingAgents] = useState(true);
+	const [loadingContext, setLoadingContext] = useState(false);
+	const [loadingMessages, setLoadingMessages] = useState(false);
 	const [input, setInput] = useState("");
-	const [loading, setLoading] = useState(true);
-	const [sending, setSending] = useState(false);
+	const [quota, setQuota] = useState<{ used: number; limit: number } | null>(
+		null,
+	);
 	const bottomRef = useRef<HTMLDivElement | null>(null);
 
 	const selectedAgent = useMemo(
@@ -174,31 +54,29 @@ export default function ChatPage() {
 	);
 	const canChat = Boolean(activeVersion?.providerId && activeVersion?.modelId);
 
-	useEffect(() => {
-		if (workspaceId) return;
-		let cancelled = false;
+	const refreshConversations = async (agentId: string) => {
+		const data = await fetchJson<ChatConversation[]>(
+			`/api/workspace/conversations?agentId=${agentId}`,
+		);
+		setConversations(data);
+	};
 
-		async function loadWorkspace() {
-			try {
-				const res = await fetch("/api/workspaces");
-				const data = await res.json();
-				if (cancelled || !Array.isArray(data) || data.length === 0) return;
-
-				const id = data[0].workspace?.id || data[0].id;
-				if (id) {
-					setWorkspaceId(id);
-					window.sessionStorage.setItem("active_workspace_id", id);
-				}
-			} catch {
-				toast.error("Unable to load workspace");
-			}
-		}
-
-		void loadWorkspace();
-		return () => {
-			cancelled = true;
-		};
-	}, [workspaceId]);
+	const {
+		messages,
+		setMessages,
+		sending,
+		pendingApproval,
+		handleSubmit,
+		resolveApproval,
+	} = useChatStream({
+		agentId: selectedAgentId,
+		conversationId: activeConversationId,
+		canChat,
+		onConversationCreated: setActiveConversationId,
+		onConversationsRefresh: async () => {
+			if (selectedAgentId) await refreshConversations(selectedAgentId);
+		},
+	});
 
 	useEffect(() => {
 		if (!workspaceId) return;
@@ -207,35 +85,34 @@ export default function ChatPage() {
 
 		async function loadAgents() {
 			try {
-				const res = await fetch(
+				const response = await fetchJson<{ agents?: ChatAgent[] } | ChatAgent[]>(
 					`/api/workspace/agents?workspaceId=${workspaceId}`,
-					{
-						signal: controller.signal,
-					},
+					{ signal: controller.signal },
 				);
-				if (!res.ok) throw new Error("Failed to load agents");
-				const response = await res.json();
 				const data = (
-					Array.isArray(response) ? response : response.agents
-				) as Agent[];
+					Array.isArray(response) ? response : (response.agents ?? [])
+				) as ChatAgent[];
 				if (cancelled) return;
 
 				setAgents(data);
-				const requestedAgentId = new URL(window.location.href).searchParams.get(
-					"agentId",
-				);
+				const params = new URL(window.location.href).searchParams;
+				const requestedAgentId = params.get("agentId");
+				const requestedConversationId = params.get("conversationId");
 				setSelectedAgentId(
 					requestedAgentId &&
 						data.some((agent) => agent.id === requestedAgentId)
 						? requestedAgentId
 						: (data[0]?.id ?? null),
 				);
+				if (requestedConversationId) {
+					setActiveConversationId(requestedConversationId);
+				}
 			} catch (err) {
 				if (err instanceof Error && err.name !== "AbortError") {
 					toast.error(err.message);
 				}
 			} finally {
-				if (!cancelled) setLoading(false);
+				if (!cancelled) setLoadingAgents(false);
 			}
 		}
 
@@ -250,27 +127,20 @@ export default function ChatPage() {
 		if (!selectedAgentId || !workspaceId) return;
 		let cancelled = false;
 		const controller = new AbortController();
+		queueMicrotask(() => setLoadingContext(true));
 
 		async function loadAgentChatContext() {
 			try {
-				const [conversationRes, versionRes] = await Promise.all([
-					fetch(`/api/workspace/conversations?agentId=${selectedAgentId}`, {
-						signal: controller.signal,
-					}),
-					fetch(
+				const [conversationData, versionData] = await Promise.all([
+					fetchJson<ChatConversation[]>(
+						`/api/workspace/conversations?agentId=${selectedAgentId}`,
+						{ signal: controller.signal },
+					),
+					fetchJson<AgentVersion[]>(
 						`/api/workspace/agents/${selectedAgentId}/versions?workspaceId=${workspaceId}`,
-						{
-							signal: controller.signal,
-						},
+						{ signal: controller.signal },
 					),
 				]);
-				if (!conversationRes.ok)
-					throw new Error("Failed to load conversations");
-				if (!versionRes.ok) throw new Error("Failed to load agent version");
-
-				const conversationData =
-					(await conversationRes.json()) as Conversation[];
-				const versionData = (await versionRes.json()) as AgentVersion[];
 				if (cancelled) return;
 				setConversations(conversationData);
 				setActiveVersion(
@@ -280,6 +150,8 @@ export default function ChatPage() {
 				if (err instanceof Error && err.name !== "AbortError") {
 					toast.error(err.message);
 				}
+			} finally {
+				if (!cancelled) setLoadingContext(false);
 			}
 		}
 
@@ -291,25 +163,52 @@ export default function ChatPage() {
 	}, [selectedAgentId, workspaceId]);
 
 	useEffect(() => {
-		if (!activeConversationId) return;
+		if (!workspaceId) return;
+		let cancelled = false;
+		async function loadQuota() {
+			try {
+				const data = await fetchJson<{
+					quota: { used: number; limit: number } | null;
+				}>(`/api/workspace/usage?workspaceId=${workspaceId}&limit=1`);
+				if (!cancelled && data.quota) setQuota(data.quota);
+			} catch {
+				if (!cancelled) setQuota(null);
+			}
+		}
+		void loadQuota();
+		return () => {
+			cancelled = true;
+		};
+	}, [workspaceId]);
+
+	useEffect(() => {
+		if (!activeConversationId) {
+			setMessages([]);
+			return;
+		}
 		let cancelled = false;
 		const controller = new AbortController();
+		queueMicrotask(() => setLoadingMessages(true));
 
 		async function loadMessages() {
 			try {
-				const res = await fetch(
-					`/api/workspace/conversations/${activeConversationId}`,
-					{
-						signal: controller.signal,
-					},
-				);
-				if (!res.ok) throw new Error("Failed to load conversation");
-				const data = await res.json();
-				if (!cancelled) setMessages(data.messages ?? []);
+				const data = await fetchJson<{
+					conversation?: { agentId?: string };
+					messages?: ChatMessage[];
+				}>(`/api/workspace/conversations/${activeConversationId}`, {
+					signal: controller.signal,
+				});
+				if (cancelled) return;
+				if (data.conversation?.agentId) {
+					setSelectedAgentId(data.conversation.agentId);
+				}
+				setMessages(data.messages ?? []);
 			} catch (err) {
 				if (err instanceof Error && err.name !== "AbortError") {
 					toast.error(err.message);
 				}
+			} finally {
+				if (!cancelled) setLoadingMessages(false);
 			}
 		}
 
@@ -318,16 +217,11 @@ export default function ChatPage() {
 			cancelled = true;
 			controller.abort();
 		};
-	}, [activeConversationId]);
+	}, [activeConversationId, setMessages]);
 
 	useEffect(() => {
 		bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [messages]);
-
-	async function refreshConversations(agentId: string) {
-		const res = await fetch(`/api/workspace/conversations?agentId=${agentId}`);
-		if (res.ok) setConversations((await res.json()) as Conversation[]);
-	}
+	}, [messages, pendingApproval]);
 
 	function selectAgent(agentId: string) {
 		setSelectedAgentId(agentId);
@@ -342,124 +236,26 @@ export default function ChatPage() {
 		setMessages([]);
 	}
 
-	async function handleSubmit(event: { preventDefault: () => void }) {
-		event.preventDefault();
-		const content = input.trim();
-		if (!content || !selectedAgentId || !canChat || sending) return;
-
-		const userMessage = createLocalMessage("user", content);
-		const assistantMessage = createLocalMessage("assistant", "");
-		setMessages((current) => [...current, userMessage, assistantMessage]);
-		setInput("");
-		setSending(true);
-
-		let newConversationId: string | null = null;
-
+	async function reloadAgentContext() {
+		if (!selectedAgentId || !workspaceId) return;
+		setLoadingContext(true);
 		try {
-			const res = await fetch(`/api/workspace/${selectedAgentId}/chat`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					content,
-					conversationId: activeConversationId ?? undefined,
-				}),
-			});
-
-			if (!res.ok || !res.body) {
-				const error = await res.json().catch(() => null);
-				throw new Error(error?.error || "Chat request failed");
-			}
-
-			const conversationId = res.headers.get("X-Conversation-Id");
-			if (conversationId && !activeConversationId) {
-				newConversationId = conversationId;
-			}
-
-			const reader = res.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = "";
-
-			function handleStreamEvent(eventText: string) {
-				if (!eventText.trim()) return;
-
-				const data = eventText
-					.split("\n")
-					.map((line) => line.trimEnd())
-					.filter((line) => line.startsWith("data:"))
-					.map((line) => line.slice("data:".length).trimStart())
-					.join("\n");
-				const payload = data || eventText.trim();
-				const parsed = JSON.parse(payload) as unknown;
-				if (!isChatStreamEvent(parsed)) return;
-
-				if (parsed.type === "error") {
-					throw new Error(parsed.error);
-				}
-
-				setMessages((current) =>
-					current.map((message) =>
-						message.id === assistantMessage.id
-							? {
-									...message,
-									parts: appendMessagePart(
-										message.parts,
-										parsed.type,
-										parsed.delta,
-									),
-								}
-							: message,
-					),
-				);
-			}
-
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-
-				buffer += decoder.decode(value, { stream: true });
-				const events = buffer.split("\n\n");
-				buffer = events.pop() ?? "";
-				for (const streamEvent of events) {
-					handleStreamEvent(streamEvent);
-				}
-			}
-
-			buffer += decoder.decode();
-			if (buffer.trim()) handleStreamEvent(buffer);
-
-			setMessages((current) =>
-				current.map((message) =>
-					message.id === assistantMessage.id
-						? { ...message, status: "completed" }
-						: message,
-				),
+			const versionData = await fetchJson<AgentVersion[]>(
+				`/api/workspace/agents/${selectedAgentId}/versions?workspaceId=${workspaceId}`,
 			);
-
-			await refreshConversations(selectedAgentId);
-			if (newConversationId) {
-				setActiveConversationId(newConversationId);
-			}
-		} catch (err) {
-			toast.error(err instanceof Error ? err.message : "Chat request failed");
-			setMessages((current) =>
-				current.map((message) =>
-					message.id === assistantMessage.id
-						? {
-								...message,
-								status: "failed",
-								parts: [
-									{ type: "text", content: "The assistant failed to respond." },
-								],
-							}
-						: message,
-				),
+			setActiveVersion(
+				versionData.find((version) => version.isActive) ?? null,
+			);
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to reload assistant",
 			);
 		} finally {
-			setSending(false);
+			setLoadingContext(false);
 		}
 	}
 
-	if (loading) {
+	if (workspaceLoading || loadingAgents) {
 		return (
 			<div className="flex h-full items-center justify-center">
 				<Loader2
@@ -483,266 +279,62 @@ export default function ChatPage() {
 							Create and configure an agent before starting a chat.
 						</EmptyDescription>
 					</EmptyHeader>
-					<Button asChild>
-						<Link href="/agents">
-							<PlusIcon data-icon="inline-start" aria-hidden="true" />
-							Create agent
-						</Link>
-					</Button>
+					<div className="flex flex-wrap gap-2">
+						<Button asChild>
+							<Link href="/agents">
+								<PlusIcon data-icon="inline-start" aria-hidden="true" />
+								Create agent
+							</Link>
+						</Button>
+						<Button asChild variant="outline">
+							<Link href="/providers">Add provider</Link>
+						</Button>
+					</div>
 				</Empty>
 			</div>
 		);
 	}
 
 	return (
-		<div className="grid h-full min-h-0 bg-background lg:grid-cols-[18rem_1fr]">
-			<aside className="hidden min-h-0 border-r border-border/70 bg-card/40 lg:flex lg:flex-col">
-				<div className="flex items-center justify-between border-b border-border/70 p-3">
-					<div className="flex items-center gap-2 text-sm font-medium">
-						<SparklesIcon aria-hidden="true" />
-						Chat
-					</div>
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={startNewConversation}
-					>
-						<PlusIcon data-icon="inline-start" aria-hidden="true" />
-						New
-					</Button>
-				</div>
-
-				<div className="flex flex-col gap-3 overflow-y-auto p-3">
-					<div className="flex flex-col gap-2">
-						<div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-							Agents
-						</div>
-						{agents.map((agent) => (
-							<button
-								key={agent.id}
-								type="button"
-								onClick={() => selectAgent(agent.id)}
-								className={cn(
-									"rounded-xl border border-transparent px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
-									selectedAgentId === agent.id &&
-										"border-border bg-card shadow-sm",
-								)}
-							>
-								<span className="block font-medium">{agent.name}</span>
-								<span className="block truncate text-xs text-muted-foreground">
-									{agent.id === selectedAgentId && !canChat
-										? "Needs configuration"
-										: "Agent workspace"}
-								</span>
-							</button>
-						))}
-					</div>
-
-					<div className="flex flex-col gap-2">
-						<div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-							Conversations
-						</div>
-						{conversations.length === 0 ? (
-							<p className="rounded-xl border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
-								No conversations yet.
-							</p>
-						) : (
-							conversations.map((conversation) => (
-								<button
-									key={conversation.id}
-									type="button"
-									onClick={() => setActiveConversationId(conversation.id)}
-									className={cn(
-										"rounded-xl border border-transparent px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
-										activeConversationId === conversation.id &&
-											"border-border bg-card shadow-sm",
-									)}
-								>
-									<span className="block truncate font-medium">
-										{conversation.title}
-									</span>
-									<span className="block text-xs text-muted-foreground">
-										{new Date(conversation.updatedAt).toLocaleDateString()}
-									</span>
-								</button>
-							))
-						)}
-					</div>
-				</div>
-			</aside>
-
-			<main className="flex min-h-0 flex-col">
-				<header className="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
-					<div className="min-w-0">
-						<div className="flex items-center gap-2">
-							<h1 className="truncate font-semibold">
-								{selectedAgent?.name ?? "Chat"}
-							</h1>
-							{canChat ? (
-								<Badge variant="secondary">configured</Badge>
-							) : (
-								<Badge variant="outline">needs setup</Badge>
-							)}
-						</div>
-						<p className="truncate text-xs text-muted-foreground">
-							{selectedAgent?.description ||
-								"Ask your configured agent anything."}
-						</p>
-					</div>
-					<Button asChild variant="outline" size="sm">
-						<Link href="/agents">Agents</Link>
-					</Button>
-				</header>
-
-				<section className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
-					<div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-						{messages.length === 0 ? (
-							<Card className="border-dashed bg-card/55">
-								<CardHeader>
-									<CardTitle className="flex items-center gap-2">
-										<MessageSquareIcon aria-hidden="true" />
-										Start a new conversation
-									</CardTitle>
-									<CardDescription>
-										Messages are streamed live and stored encrypted in the
-										workspace database.
-									</CardDescription>
-								</CardHeader>
-								<CardContent className="flex flex-wrap gap-2">
-									{[
-										"Draft a system prompt",
-										"Compare model options",
-										"Write a support reply",
-									].map((prompt) => (
-										<Button
-											key={prompt}
-											type="button"
-											variant="outline"
-											size="sm"
-											onClick={() => setInput(prompt)}
-										>
-											{prompt}
-										</Button>
-									))}
-								</CardContent>
-							</Card>
-						) : (
-							messages.map((message, index) => {
-								const content = textFromMessage(message);
-								const reasoning = reasoningFromMessage(message);
-								const isAssistant = message.role === "assistant";
-								return (
-									<article
-										key={message.id}
-										className={cn(
-											"flex",
-											message.role === "user" ? "justify-end" : "justify-start",
-										)}
-									>
-										<div
-											className={cn(
-												"max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6",
-												message.role === "user"
-													? "bg-primary text-primary-foreground"
-													: "border border-border/70 bg-card",
-											)}
-										>
-											{isAssistant ? (
-												<div className="flex flex-col gap-2">
-													{reasoning ? (
-														<div className="rounded-lg border border-border/70 bg-muted/35 px-3 py-2 text-xs">
-															<div className="font-medium text-muted-foreground">
-																Thinking
-															</div>
-															<Streamdown
-																plugins={{ code }}
-																className="mt-2 text-xs leading-5 text-muted-foreground"
-															>
-																{reasoning}
-															</Streamdown>
-														</div>
-													) : null}
-													{toolPartsFromMessage(message).map(
-														(part, partIndex) => (
-															<div
-																key={`${message.id}-${part.type}-${partIndex}`}
-																className="rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground"
-															>
-																<span className="font-medium text-foreground">
-																	{part.type === "tool-call"
-																		? "Tool call"
-																		: "Tool result"}
-																</span>{" "}
-																{summarizeToolPart(part.content)}
-															</div>
-														),
-													)}
-													{content || !reasoning ? (
-														<Streamdown
-															plugins={{ code }}
-															caret="block"
-															isAnimating={
-																sending &&
-																index === messages.length - 1 &&
-																message.status === "streaming"
-															}
-															className="text-sm"
-														>
-															{content || "Thinking..."}
-														</Streamdown>
-													) : null}
-												</div>
-											) : (
-												content
-											)}
-										</div>
-									</article>
-								);
-							})
-						)}
-						<div ref={bottomRef} />
-					</div>
-				</section>
-
-				<form
-					onSubmit={handleSubmit}
-					className="shrink-0 border-t border-border/70 p-3 sm:p-4"
-				>
-					<div className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-3xl border border-border/70 bg-card/90 p-2 shadow-lg shadow-foreground/5">
-						<textarea
-							aria-label="Message"
-							value={input}
-							onChange={(event) => setInput(event.target.value)}
-							onKeyDown={(event) => {
-								if (event.key === "Enter" && !event.shiftKey) {
-									event.preventDefault();
-									event.currentTarget.form?.requestSubmit();
-								}
-							}}
-							placeholder={
-								canChat
-									? "Message your agent"
-									: "Configure this agent before chatting"
-							}
-							disabled={sending || !canChat}
-							className="max-h-40 min-h-12 flex-1 resize-none bg-transparent px-3 py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-70"
+		<ChatLayout
+			agents={agents}
+			conversations={conversations}
+			selectedAgent={selectedAgent}
+			selectedAgentId={selectedAgentId}
+			activeConversationId={activeConversationId}
+			canChat={canChat}
+			loadingSidebar={loadingContext}
+			onSelectAgent={selectAgent}
+			onSelectConversation={setActiveConversationId}
+			onNewConversation={startNewConversation}
+			onSetupComplete={() => void reloadAgentContext()}
+		>
+			{quota ? <QuotaBanner used={quota.used} limit={quota.limit} /> : null}
+			<section className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
+				{pendingApproval ? (
+					<div className="mb-4">
+						<ToolApprovalBanner
+							approval={pendingApproval}
+							onApprove={() => void resolveApproval("approve")}
+							onReject={() => void resolveApproval("reject")}
 						/>
-						<Button
-							type="submit"
-							size="icon"
-							disabled={sending || !input.trim() || !canChat}
-							aria-label="Send message"
-						>
-							{sending ? (
-								<Loader2 className="animate-spin" aria-hidden="true" />
-							) : (
-								<SendIcon aria-hidden="true" />
-							)}
-						</Button>
 					</div>
-				</form>
-			</main>
-		</div>
+				) : null}
+				<ChatMessageList
+					messages={messages}
+					sending={sending}
+					loading={loadingMessages}
+					bottomRef={bottomRef}
+				/>
+			</section>
+			<ChatComposer
+				input={input}
+				canChat={canChat}
+				sending={sending}
+				hasMessages={messages.length > 0}
+				onInputChange={setInput}
+				onSubmit={() => void handleSubmit(input.trim())}
+			/>
+		</ChatLayout>
 	);
 }

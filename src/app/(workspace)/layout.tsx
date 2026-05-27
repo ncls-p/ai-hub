@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { OnboardingRedirect } from "@/components/onboarding-redirect";
+import { WorkspaceProvider } from "@/components/workspace-provider";
 import { ensureBootstrapAdmin, isAdminRole } from "@/modules/admin/use-cases";
 import { getSession } from "@/modules/auth/session";
 import {
 	createWorkspace,
+	countWorkspaces,
 	getWorkspacesByUserId,
 } from "@/modules/workspace/use-cases";
 
@@ -31,6 +34,12 @@ async function ensureDefaultWorkspace(user: {
 }) {
 	const existingWorkspaces = await getWorkspacesByUserId(user.id);
 	if (existingWorkspaces.length > 0) return;
+
+	const allowPersonal =
+		process.env.ALLOW_PERSONAL_WORKSPACES !== "false";
+	const totalWorkspaces = await countWorkspaces();
+
+	if (!allowPersonal && totalWorkspaces > 0) return;
 
 	const displayName = user.name?.trim() || user.email?.split("@")[0] || "User";
 	const uniqueSuffix = user.id.replace(/-/g, "").slice(0, 10);
@@ -66,8 +75,11 @@ export default async function WorkspaceLayout({
 		isAdminRole(session.user.role) || bootstrappedAdminId === session.user.id;
 
 	return (
-		<AppShell displayName={displayName} isAdmin={isAdmin}>
-			{children}
-		</AppShell>
+		<WorkspaceProvider>
+			<OnboardingRedirect />
+			<AppShell displayName={displayName} isAdmin={isAdmin}>
+				{children}
+			</AppShell>
+		</WorkspaceProvider>
 	);
 }

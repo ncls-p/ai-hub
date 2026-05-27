@@ -10,8 +10,21 @@ import {
 	Loader2,
 } from "lucide-react";
 
+import { PageLoading } from "@/components/page-loading";
+import { WorkspacePage } from "@/components/workspace-page";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Card,
 	CardContent,
@@ -27,8 +40,25 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { toast } from "sonner";
 
 interface Agent {
@@ -45,42 +75,31 @@ interface Agent {
 	updatedAt: string;
 }
 
-function getBrowserWorkspaceId() {
-	if (typeof window === "undefined") return null;
-	return window.sessionStorage.getItem("active_workspace_id");
-}
+type AgentBindingSummary = {
+	toolCount: number;
+	knowledgeCount: number;
+	mcpCount: number;
+};
 
-function useWorkspaceId() {
-	const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
-		getBrowserWorkspaceId(),
+function slugifyAgentName(value: string) {
+	return (
+		value
+			.toLowerCase()
+			.trim()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 64) || "assistant"
 	);
-
-	useEffect(() => {
-		if (workspaceId) return;
-		fetch("/api/workspaces")
-			.then((res) => res.json())
-			.then((data) => {
-				if (Array.isArray(data) && data.length > 0) {
-					const wsId = data[0].workspace?.id || data[0].id;
-					if (wsId) {
-						setWorkspaceId(wsId);
-						window.sessionStorage.setItem("active_workspace_id", wsId);
-					}
-				}
-			})
-			.catch(() => {});
-	}, [workspaceId]);
-
-	return workspaceId;
 }
 
 export default function AgentsPage() {
 	const router = useRouter();
-	const workspaceId = useWorkspaceId();
+	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
 	const [agents, setAgents] = useState<Agent[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [canAdminCurate, setCanAdminCurate] = useState(false);
 	const [showCreateDialog, setShowCreateDialog] = useState(false);
+	const [showAdvancedCreate, setShowAdvancedCreate] = useState(false);
 	const [creating, setCreating] = useState(false);
 	const [form, setForm] = useState({
 		name: "",
@@ -92,7 +111,60 @@ export default function AgentsPage() {
 		isRecommended: false,
 		curationLabel: "none",
 	});
+	const [deleteAgentId, setDeleteAgentId] = useState<string | null>(null);
+	const [deleting, setDeleting] = useState(false);
+	const [bindingSummaries, setBindingSummaries] = useState<
+		Record<string, AgentBindingSummary>
+	>({});
 	const abortRef = useRef<AbortController | null>(null);
+
+	const loadBindingSummaries = async (
+		agentList: Agent[],
+		currentWorkspaceId: string,
+	) => {
+		const summaries = await Promise.all(
+			agentList.map(async (agent) => {
+				const [toolsRes, knowledgeRes] = await Promise.all([
+					fetch(
+						`/api/workspace/agents/${agent.id}/tools?workspaceId=${currentWorkspaceId}`,
+					),
+					fetch(
+						`/api/workspace/agents/${agent.id}/knowledge?workspaceId=${currentWorkspaceId}`,
+					),
+				]);
+				const tools = toolsRes.ok ? await toolsRes.json() : [];
+				const knowledge = knowledgeRes.ok
+					? ((await knowledgeRes.json()) as { bindings?: unknown[] }).bindings
+					: [];
+				const toolList = Array.isArray(tools) ? tools : [];
+				const mcpCount = toolList.filter(
+					(tool) =>
+						typeof tool === "object" &&
+						tool !== null &&
+						"toolSource" in tool &&
+						(tool as { toolSource: string }).toolSource === "mcp",
+				).length;
+				return {
+					agentId: agent.id,
+					toolCount: toolList.length,
+					knowledgeCount: Array.isArray(knowledge) ? knowledge.length : 0,
+					mcpCount,
+				};
+			}),
+		);
+		setBindingSummaries(
+			Object.fromEntries(
+				summaries.map((summary) => [
+					summary.agentId,
+					{
+						toolCount: summary.toolCount,
+						knowledgeCount: summary.knowledgeCount,
+						mcpCount: summary.mcpCount,
+					},
+				]),
+			),
+		);
+	};
 
 	const refreshAgents = async () => {
 		if (!workspaceId) return;
@@ -104,8 +176,10 @@ export default function AgentsPage() {
 			});
 			if (!res.ok) throw new Error("Failed to fetch agents");
 			const data = await res.json();
-			setAgents(Array.isArray(data) ? data : data.agents);
+			const nextAgents = Array.isArray(data) ? data : data.agents;
+			setAgents(nextAgents);
 			setCanAdminCurate(Boolean(data.canAdminCurate));
+			void loadBindingSummaries(nextAgents, workspaceId);
 		} catch (err) {
 			if (err instanceof Error && err.name !== "AbortError") {
 				console.error("Failed to load agents", err);
@@ -130,8 +204,10 @@ export default function AgentsPage() {
 				if (!res.ok) throw new Error("Failed to load agents");
 				const data = await res.json();
 				if (!cancelled) {
-					setAgents(Array.isArray(data) ? data : data.agents);
+					const nextAgents = Array.isArray(data) ? data : data.agents;
+					setAgents(nextAgents);
 					setCanAdminCurate(Boolean(data.canAdminCurate));
+					void loadBindingSummaries(nextAgents, currentWorkspaceId);
 				}
 			} catch (err) {
 				if (err instanceof Error && err.name !== "AbortError") {
@@ -150,7 +226,8 @@ export default function AgentsPage() {
 	}, [workspaceId]);
 
 	const handleCreate = async () => {
-		if (!workspaceId || !form.name.trim() || !form.slug.trim()) return;
+		if (!workspaceId || !form.name.trim()) return;
+		const slug = form.slug.trim() || slugifyAgentName(form.name);
 		setCreating(true);
 		try {
 			const res = await fetch("/api/workspace/agents", {
@@ -158,10 +235,7 @@ export default function AgentsPage() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					name: form.name.trim(),
-					slug: form.slug
-						.trim()
-						.toLowerCase()
-						.replace(/[^a-z0-9-]/g, "-"),
+					slug,
 					description: form.description.trim() || undefined,
 					workspaceId,
 					sharingMode: form.sharingMode,
@@ -202,12 +276,12 @@ export default function AgentsPage() {
 		}
 	};
 
-	const handleDelete = async (agentId: string) => {
-		if (!workspaceId) return;
-		if (!confirm("Are you sure you want to delete this agent?")) return;
+	const handleDelete = async () => {
+		if (!workspaceId || !deleteAgentId) return;
+		setDeleting(true);
 		try {
 			const res = await fetch(
-				`/api/workspace/agents/${agentId}?workspaceId=${workspaceId}`,
+				`/api/workspace/agents/${deleteAgentId}?workspaceId=${workspaceId}`,
 				{
 					method: "DELETE",
 				},
@@ -219,200 +293,236 @@ export default function AgentsPage() {
 			}
 
 			toast.success("Agent deleted");
+			setDeleteAgentId(null);
 			await refreshAgents();
 		} catch (err) {
 			toast.error(
 				err instanceof Error ? err.message : "Failed to delete agent",
 			);
+		} finally {
+			setDeleting(false);
 		}
 	};
 
-	if (!workspaceId) {
-		return (
-			<div className="flex items-center justify-center h-full">
-				<Loader2 className="size-6 animate-spin text-muted-foreground" />
-			</div>
-		);
+	if (workspaceLoading || !workspaceId) {
+		return <PageLoading label="Loading workspace" />;
 	}
 
 	return (
-		<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-			<div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-				<div className="flex flex-col gap-2">
-					<div className="section-kicker">Agents</div>
-					<h1 className="text-2xl font-semibold sm:text-3xl">
-						Versioned agent workspace
-					</h1>
-					<p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-						Design assistants with model settings, tools, knowledge, and
-						deployment-safe configuration versions.
-					</p>
-				</div>
+		<WorkspacePage
+			kicker="Configuration"
+			title="Your assistants"
+			description="Create and configure assistants with models, tools, knowledge, and integrations."
+			width="default"
+			actions={
 				<Button type="button" onClick={() => setShowCreateDialog(true)}>
 					<PlusIcon data-icon="inline-start" aria-hidden="true" />
-					New agent
+					New assistant
 				</Button>
-			</div>
-
-			{showCreateDialog && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-					<Card className="w-full max-w-md mx-4">
-						<CardHeader>
-							<CardTitle>Create new agent</CardTitle>
-							<CardDescription>
-								Give your agent a name and optional description.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="flex flex-col gap-4">
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="agent-name">Name</Label>
-								<Input
-									id="agent-name"
-									placeholder="My Assistant"
-									value={form.name}
-									onChange={(e) =>
-										setForm({
-											...form,
-											name: e.target.value,
-										})
-									}
-									autoFocus
-								/>
-							</div>
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="agent-slug">Slug</Label>
-								<Input
-									id="agent-slug"
-									placeholder="my-assistant"
-									value={form.slug}
-									onChange={(e) =>
-										setForm({
-											...form,
-											slug: e.target.value,
-										})
-									}
-								/>
-							</div>
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="agent-description">
-									Description (optional)
-								</Label>
-								<Input
-									id="agent-description"
-									placeholder="A helpful assistant for..."
-									value={form.description}
-									onChange={(e) =>
-										setForm({
-											...form,
-											description: e.target.value,
-										})
-									}
-								/>
-							</div>
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="agent-sharing">Access</Label>
-								<select
-									id="agent-sharing"
-									className="h-11 rounded-xl border border-input bg-background px-3 text-sm"
-									value={form.sharingMode}
-									onChange={(e) =>
-										setForm({
-											...form,
-											sharingMode: e.target.value as Agent["sharingMode"],
-										})
-									}
-								>
-									<option value="personal">Personal</option>
-									<option value="marketplace">Marketplace</option>
-									<option value="specific_user">Specific user</option>
-								</select>
-							</div>
-							{form.sharingMode === "specific_user" ? (
+			}
+		>
+			<Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Create assistant</DialogTitle>
+						<DialogDescription>
+							Give your assistant a name. You can bind a model after creation.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="flex flex-col gap-4">
+						<div className="flex flex-col gap-2">
+							<Label htmlFor="agent-name">Name</Label>
+							<Input
+								id="agent-name"
+								placeholder="My Assistant"
+								value={form.name}
+								onChange={(e) =>
+									setForm({
+										...form,
+										name: e.target.value,
+										slug: slugifyAgentName(e.target.value),
+									})
+								}
+								autoFocus
+							/>
+						</div>
+						<div className="flex flex-col gap-2">
+							<Label htmlFor="agent-description">Description (optional)</Label>
+							<Textarea
+								id="agent-description"
+								placeholder="A helpful assistant for..."
+								value={form.description}
+								onChange={(e) =>
+									setForm({
+										...form,
+										description: e.target.value,
+									})
+								}
+							/>
+						</div>
+						<Button
+							type="button"
+							variant="ghost"
+							className="justify-start px-0"
+							onClick={() => setShowAdvancedCreate((value) => !value)}
+						>
+							{showAdvancedCreate ? "Hide advanced settings" : "Advanced settings"}
+						</Button>
+						{showAdvancedCreate ? (
+							<>
 								<div className="flex flex-col gap-2">
-									<Label htmlFor="agent-share-email">User email</Label>
+									<Label htmlFor="agent-slug">Slug</Label>
 									<Input
-										id="agent-share-email"
-										type="email"
-										value={form.shareTargetEmail}
+										id="agent-slug"
+										placeholder="my-assistant"
+										value={form.slug}
 										onChange={(e) =>
-											setForm({ ...form, shareTargetEmail: e.target.value })
+											setForm({
+												...form,
+												slug: e.target.value,
+											})
 										}
 									/>
 								</div>
-							) : null}
-							{canAdminCurate ? (
-								<div className="rounded-xl border border-border/70 p-3">
-									<div className="flex flex-col gap-2 text-sm">
-										<label className="flex items-center gap-2">
-											<input
-												type="checkbox"
-												checked={form.isGlobal}
-												onChange={(e) =>
-													setForm({ ...form, isGlobal: e.target.checked })
-												}
-											/>
-											Global
-										</label>
-										<label className="flex items-center gap-2">
-											<input
-												type="checkbox"
-												checked={form.isRecommended}
-												onChange={(e) =>
-													setForm({
-														...form,
-														isRecommended: e.target.checked,
-													})
-												}
-											/>
-											Recommended
-										</label>
-										<select
-											className="h-10 rounded-xl border border-input bg-background px-3"
-											value={form.curationLabel}
-											onChange={(e) =>
-												setForm({ ...form, curationLabel: e.target.value })
-											}
-										>
-											<option value="none">No label</option>
-											<option value="recommended">Recommended</option>
-											<option value="organization_created">
-												Organization created
-											</option>
-										</select>
-									</div>
+								<div className="flex flex-col gap-2">
+									<Label htmlFor="agent-sharing">Access</Label>
+									<Select
+										value={form.sharingMode}
+										onValueChange={(value) =>
+											setForm({
+												...form,
+												sharingMode: value as Agent["sharingMode"],
+											})
+										}
+									>
+										<SelectTrigger id="agent-sharing" className="w-full">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="personal">Personal</SelectItem>
+											<SelectItem value="marketplace">Share with workspace</SelectItem>
+											<SelectItem value="specific_user">Specific user</SelectItem>
+										</SelectContent>
+									</Select>
 								</div>
-							) : null}
-							<div className="flex justify-end gap-2 pt-2">
-								<Button
-									variant="outline"
-									onClick={() => setShowCreateDialog(false)}
-								>
-									Cancel
-								</Button>
-								<Button
-									onClick={handleCreate}
-									disabled={
-										creating ||
-										!form.name.trim() ||
-										!form.slug.trim() ||
-										(form.sharingMode === "specific_user" &&
-											!form.shareTargetEmail.trim())
-									}
-								>
-									{creating ? (
-										<>
-											<Loader2 className="size-4 animate-spin" />
-											Creating...
-										</>
-									) : (
-										"Create agent"
-									)}
-								</Button>
+								{form.sharingMode === "specific_user" ? (
+									<div className="flex flex-col gap-2">
+										<Label htmlFor="agent-share-email">User email</Label>
+										<Input
+											id="agent-share-email"
+											type="email"
+											value={form.shareTargetEmail}
+											onChange={(e) =>
+												setForm({ ...form, shareTargetEmail: e.target.value })
+											}
+										/>
+									</div>
+								) : null}
+								{canAdminCurate ? (
+									<div className="rounded-xl border border-border/70 p-3">
+										<div className="flex flex-col gap-3 text-sm">
+											<div className="flex items-center gap-2">
+												<Checkbox
+													id="agent-global"
+													checked={form.isGlobal}
+													onCheckedChange={(checked) =>
+														setForm({ ...form, isGlobal: checked === true })
+													}
+												/>
+												<label htmlFor="agent-global">Global</label>
+											</div>
+											<div className="flex items-center gap-2">
+												<Checkbox
+													id="agent-recommended"
+													checked={form.isRecommended}
+													onCheckedChange={(checked) =>
+														setForm({
+															...form,
+															isRecommended: checked === true,
+														})
+													}
+												/>
+												<label htmlFor="agent-recommended">Recommended</label>
+											</div>
+									<Select
+										value={form.curationLabel}
+										onValueChange={(value) =>
+											setForm({ ...form, curationLabel: value })
+										}
+									>
+										<SelectTrigger className="w-full">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="none">No label</SelectItem>
+											<SelectItem value="recommended">Recommended</SelectItem>
+											<SelectItem value="organization_created">
+												Organization created
+											</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
 							</div>
-						</CardContent>
-					</Card>
-				</div>
-			)}
+						) : null}
+							</>
+						) : null}
+					</div>
+					<DialogFooter>
+						<Button
+							variant="outline"
+							onClick={() => setShowCreateDialog(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={handleCreate}
+							disabled={
+								creating ||
+								!form.name.trim() ||
+								!form.slug.trim() ||
+								(form.sharingMode === "specific_user" &&
+									!form.shareTargetEmail.trim())
+							}
+						>
+							{creating ? (
+								<>
+									<Loader2 className="size-4 animate-spin" />
+									Creating...
+								</>
+							) : (
+								"Create agent"
+							)}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<AlertDialog
+				open={deleteAgentId !== null}
+				onOpenChange={(open) => {
+					if (!open) setDeleteAgentId(null);
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete agent?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This permanently removes the agent and its configuration versions.
+							This action cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							disabled={deleting}
+							onClick={() => void handleDelete()}
+						>
+							{deleting ? "Deleting..." : "Delete agent"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			{loading ? (
 				<div className="flex items-center justify-center py-20">
@@ -462,7 +572,7 @@ export default function AgentsPage() {
 										variant="ghost"
 										size="icon"
 										className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"
-										onClick={() => handleDelete(agent.id)}
+										onClick={() => setDeleteAgentId(agent.id)}
 										aria-label={`Delete ${agent.name}`}
 									>
 										<TrashIcon className="size-4 text-destructive" />
@@ -488,6 +598,21 @@ export default function AgentsPage() {
 									{agent.curationLabel === "organization_created" ? (
 										<Badge variant="secondary">Organization created</Badge>
 									) : null}
+									{bindingSummaries[agent.id]?.toolCount ? (
+										<Badge variant="outline">
+											{bindingSummaries[agent.id].toolCount} tools
+										</Badge>
+									) : null}
+									{bindingSummaries[agent.id]?.knowledgeCount ? (
+										<Badge variant="outline">
+											{bindingSummaries[agent.id].knowledgeCount} knowledge
+										</Badge>
+									) : null}
+									{bindingSummaries[agent.id]?.mcpCount ? (
+										<Badge variant="outline">
+											{bindingSummaries[agent.id].mcpCount} MCP
+										</Badge>
+									) : null}
 								</div>
 							</CardHeader>
 							<CardContent>
@@ -499,6 +624,16 @@ export default function AgentsPage() {
 									</span>
 									<span>{new Date(agent.updatedAt).toLocaleDateString()}</span>
 								</div>
+								{!agent.activeVersionId ? (
+									<Button
+										variant="secondary"
+										size="sm"
+										className="mt-3 w-full"
+										onClick={() => router.push(`/agents/${agent.id}`)}
+									>
+										Finish setup
+									</Button>
+								) : null}
 								<div className="mt-3 flex gap-2">
 									<Button
 										variant="outline"
@@ -523,6 +658,6 @@ export default function AgentsPage() {
 					))}
 				</div>
 			)}
-		</div>
+		</WorkspacePage>
 	);
 }

@@ -679,6 +679,35 @@ export const mcpTools = pgTable(
 	}),
 );
 
+export const workspaceApiKeys = pgTable(
+	"workspace_api_keys",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		workspaceId: uuid("workspace_id")
+			.notNull()
+			.references(() => workspaces.id, { onDelete: "cascade" }),
+		name: varchar("name", { length: 255 }).notNull(),
+		keyPrefix: varchar("key_prefix", { length: 16 }).notNull(),
+		keyHash: text("key_hash").notNull(),
+		createdById: uuid("created_by_user_id")
+			.notNull()
+			.references(() => users.id),
+		lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+		expiresAt: timestamp("expires_at", { withTimezone: true }),
+		revokedAt: timestamp("revoked_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => ({
+		workspace: index("workspace_api_keys_workspace").on(t.workspaceId),
+		keyHashUnique: uniqueIndex("workspace_api_keys_hash_unique").on(t.keyHash),
+	}),
+);
+
 export const agentToolBindings = pgTable(
 	"agent_tool_bindings",
 	{

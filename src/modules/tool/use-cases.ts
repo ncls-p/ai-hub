@@ -6,6 +6,7 @@ import { db } from "@/server/infrastructure/db";
 import {
 	agentToolBindings,
 	agentVersions,
+	mcpTools,
 	toolInvocations,
 } from "@/server/infrastructure/db/schema";
 import {
@@ -14,11 +15,19 @@ import {
 	requiresApproval,
 } from "./builtin-tools";
 
-export const toolBindingInputSchema = z.object({
-	toolSource: z.literal("builtin").default("builtin"),
-	toolId: z.uuid(),
-	requireApproval: z.boolean().optional(),
-});
+export const toolBindingInputSchema = z.discriminatedUnion("toolSource", [
+	z.object({
+		toolSource: z.literal("builtin"),
+		toolId: z.uuid(),
+		requireApproval: z.boolean().optional(),
+	}),
+	z.object({
+		toolSource: z.literal("mcp"),
+		toolId: z.uuid(),
+		mcpServerId: z.uuid(),
+		requireApproval: z.boolean().optional(),
+	}),
+]);
 
 export type ToolBindingInput = z.infer<typeof toolBindingInputSchema>;
 
@@ -49,19 +58,43 @@ export async function insertToolBindingsForVersion(
 ) {
 	if (bindings.length === 0) return;
 
-	const values = bindings.map((binding) => {
-		const tool = getBuiltInTool(binding.toolId);
-		if (!tool) throw new Error("Tool not found");
+	const values = await Promise.all(
+		bindings.map(async (binding) => {
+			if (binding.toolSource === "mcp") {
+				const [tool] = await db
+					.select()
+					.from(mcpTools)
+					.where(
+						and(
+							eq(mcpTools.id, binding.toolId),
+							eq(mcpTools.mcpServerId, binding.mcpServerId),
+						),
+					)
+					.limit(1);
+				if (!tool) throw new Error("MCP tool not found");
 
-		return {
-			agentVersionId,
-			toolSource: "builtin",
-			toolId: binding.toolId,
-			requireApproval:
-				binding.requireApproval ?? requiresApproval(tool.riskLevel),
-			riskLevel: tool.riskLevel,
-		};
-	});
+				return {
+					agentVersionId,
+					toolSource: "mcp" as const,
+					toolId: binding.toolId,
+					requireApproval: binding.requireApproval ?? false,
+					riskLevel: "medium",
+				};
+			}
+
+			const tool = getBuiltInTool(binding.toolId);
+			if (!tool) throw new Error("Tool not found");
+
+			return {
+				agentVersionId,
+				toolSource: "builtin" as const,
+				toolId: binding.toolId,
+				requireApproval:
+					binding.requireApproval ?? requiresApproval(tool.riskLevel),
+				riskLevel: tool.riskLevel,
+			};
+		}),
+	);
 
 	await db.insert(agentToolBindings).values(values).onConflictDoNothing();
 }
@@ -72,14 +105,60 @@ export async function cloneToolBindings(
 ) {
 	if (!fromAgentVersionId) return;
 	const existing = await getToolBindingsForVersion(fromAgentVersionId);
-	await insertToolBindingsForVersion(
-		toAgentVersionId,
-		existing.map((binding) => ({
-			toolSource: "builtin" as const,
+	const inputs: ToolBindingInput[] = [];
+
+	for (const binding of existing) {
+		if (binding.toolSource === "mcp") {
+			const [tool] = await db
+				.select({ mcpServerId: mcpTools.mcpServerId })
+				.from(mcpTools)
+				.where(eq(mcpTools.id, binding.toolId))
+				.limit(1);
+			if (!tool) continue;
+			inputs.push({
+				toolSource: "mcp",
+				toolId: binding.toolId,
+				mcpServerId: tool.mcpServerId,
+				requireApproval: binding.requireApproval,
+			});
+			continue;
+		}
+
+		inputs.push({
+			toolSource: "builtin",
 			toolId: binding.toolId,
 			requireApproval: binding.requireApproval,
-		})),
-	);
+		});
+	}
+
+	await insertToolBindingsForVersion(toAgentVersionId, inputs);
+}
+
+export async function getMcpBindingContext(
+	agentVersionId: string,
+	toolId: string,
+) {
+	const [binding] = await db
+		.select()
+		.from(agentToolBindings)
+		.where(
+			and(
+				eq(agentToolBindings.agentVersionId, agentVersionId),
+				eq(agentToolBindings.toolId, toolId),
+				eq(agentToolBindings.toolSource, "mcp"),
+			),
+		)
+		.limit(1);
+
+	if (!binding) return null;
+
+	const [tool] = await db
+		.select()
+		.from(mcpTools)
+		.where(eq(mcpTools.id, toolId))
+		.limit(1);
+
+	return tool ? { binding, tool } : null;
 }
 
 export async function logToolInvocation(input: {
