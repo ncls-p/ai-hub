@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
 	ActivityIcon,
 	BookOpenIcon,
@@ -20,6 +20,7 @@ import {
 	UsersIcon,
 	WrenchIcon,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { DeodisLogo } from "@/components/deodis-logo";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -27,19 +28,22 @@ import { ThemeToggleButton } from "@/components/theme-toggle-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-	SheetTrigger,
-} from "@/components/ui/sheet";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { fetchJson, fetchPendingToolCount } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -53,28 +57,38 @@ interface AppShellProps {
 type NavItem = {
 	href: string;
 	label: string;
-	icon: typeof MessageSquareIcon;
+	icon: LucideIcon;
 	badge?: number;
 };
 
-const primaryNavItems: NavItem[] = [
+type WorkspacePermissions = {
+	canViewUsage: boolean;
+	canViewAudit: boolean;
+};
+
+type WorkspaceShellState = {
+	displayName?: string;
+	isAdmin?: boolean;
+	pendingToolCount: number;
+	permissions: WorkspacePermissions;
+};
+
+const WorkspaceShellContext = createContext<WorkspaceShellState | null>(null);
+
+const workNavItems: NavItem[] = [
 	{ href: "/chat", label: "Chat", icon: MessageSquareIcon },
+	{ href: "/agents", label: "Assistants", icon: BotIcon },
+];
+
+const resourceNavItems: NavItem[] = [
+	{ href: "/knowledge", label: "Knowledge", icon: BookOpenIcon },
+	{ href: "/marketplace", label: "Catalog", icon: StoreIcon },
 ];
 
 const configurationNavItems: NavItem[] = [
-	{ href: "/agents", label: "Assistants", icon: BotIcon },
 	{ href: "/providers", label: "AI Connections", icon: PlugZapIcon },
+	{ href: "/mcp", label: "MCP", icon: ServerIcon },
 	{ href: "/api-keys", label: "API keys", icon: KeyRoundIcon },
-	{ href: "/knowledge", label: "Knowledge", icon: BookOpenIcon },
-	{ href: "/mcp", label: "Integrations", icon: ServerIcon },
-];
-
-const activityNavItems: NavItem[] = [
-	{ href: "/tools", label: "Approvals", icon: WrenchIcon },
-];
-
-const discoverNavItems: NavItem[] = [
-	{ href: "/marketplace", label: "Catalog", icon: StoreIcon },
 ];
 
 const governanceNavItems: NavItem[] = [
@@ -82,53 +96,61 @@ const governanceNavItems: NavItem[] = [
 	{ href: "/audit", label: "Activity log", icon: ScrollTextIcon },
 ];
 
-const adminNavItems: NavItem[] = [
-	{ href: "/members", label: "Team", icon: UsersIcon },
-	{ href: "/settings", label: "Settings", icon: SettingsIcon },
-];
-
-type WorkspacePermissions = {
-	canViewUsage: boolean;
-	canViewAudit: boolean;
+const routeTitles: Record<string, string> = {
+	"/agents": "Assistants",
+	"/providers": "AI Connections",
+	"/knowledge": "Knowledge",
+	"/mcp": "MCP",
+	"/tools": "Approvals",
+	"/marketplace": "Catalog",
+	"/api-keys": "API keys",
+	"/usage": "Usage",
+	"/audit": "Activity log",
+	"/members": "Team",
+	"/settings": "Settings",
+	"/setup": "Setup",
 };
 
-function NavLink({ href, label, icon: Icon, badge }: NavItem) {
-	const pathname = usePathname();
-	const isActive = pathname === href || pathname.startsWith(`${href}/`);
-
-	return (
-		<Link
-			href={href}
-			className={cn(
-				"flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-				isActive
-					? "bg-primary/10 text-foreground"
-					: "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-			)}
-		>
-			<Icon className="size-4 shrink-0" aria-hidden="true" />
-			<span className="min-w-0 flex-1 truncate">{label}</span>
-			{badge && badge > 0 ? (
-				<Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-[10px]">
-					{badge}
-				</Badge>
-			) : null}
-		</Link>
-	);
+function useWorkspaceShell() {
+	const value = useContext(WorkspaceShellContext);
+	if (!value) {
+		throw new Error("Workspace menu must be rendered inside AppShell");
+	}
+	return value;
 }
 
-function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
-	if (items.length === 0) return null;
-	return (
-		<div className="flex flex-col gap-1">
-			<div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-				{title}
-			</div>
-			{items.map((item) => (
-				<NavLink key={item.href} {...item} />
-			))}
-		</div>
-	);
+function buildMenuGroups({
+	isAdmin,
+	pendingToolCount,
+	permissions,
+}: WorkspaceShellState) {
+	const approvalsItem: NavItem = {
+		href: "/tools",
+		label: "Approvals",
+		icon: WrenchIcon,
+		badge: pendingToolCount,
+	};
+	const governanceItems = governanceNavItems.filter((item) => {
+		if (item.href === "/usage") return permissions.canViewUsage;
+		if (item.href === "/audit") return permissions.canViewAudit;
+		return false;
+	});
+	const teamItems: NavItem[] = [
+		{ href: "/members", label: "Team", icon: UsersIcon },
+		...(isAdmin
+			? [{ href: "/settings", label: "Settings", icon: SettingsIcon }]
+			: []),
+	];
+
+	return [
+		[...workNavItems, ...(pendingToolCount > 0 ? [approvalsItem] : [])],
+		resourceNavItems,
+		[
+			...(pendingToolCount > 0 ? [] : [approvalsItem]),
+			...configurationNavItems,
+		],
+		[...governanceItems, ...teamItems],
+	].filter((group) => group.length > 0);
 }
 
 function WorkspaceSwitcher() {
@@ -140,7 +162,7 @@ function WorkspaceSwitcher() {
 
 	if (workspaces.length <= 1) {
 		return (
-			<div className="rounded-xl bg-muted/60 px-3 py-2 text-sm">
+			<div className="rounded-xl border border-border/60 bg-card/80 px-3 py-2 text-sm shadow-sm">
 				<p className="truncate font-medium text-foreground">
 					{activeWorkspace?.name ?? "Workspace"}
 				</p>
@@ -160,102 +182,122 @@ function WorkspaceSwitcher() {
 					router.refresh();
 				}}
 			>
-				<SelectTrigger className="w-full rounded-xl">
+				<SelectTrigger className="h-10 w-full rounded-xl border-border/60 bg-card/80 shadow-sm">
 					<SelectValue placeholder="Select workspace" />
 				</SelectTrigger>
 				<SelectContent>
-					{workspaces.map((workspace) => (
-						<SelectItem key={workspace.id} value={workspace.id}>
-							{workspace.name}
-						</SelectItem>
-					))}
+					<SelectGroup>
+						{workspaces.map((workspace) => (
+							<SelectItem key={workspace.id} value={workspace.id}>
+								{workspace.name}
+							</SelectItem>
+						))}
+					</SelectGroup>
 				</SelectContent>
 			</Select>
-			<p className="px-1 text-xs text-muted-foreground">
+			<p className="truncate px-1 text-xs text-muted-foreground">
 				{activeWorkspace?.organizationName}
 			</p>
 		</div>
 	);
 }
 
-function SidebarContent({
-	displayName,
-	isAdmin,
-	pendingToolCount,
-	permissions,
-}: {
-	displayName?: string;
-	isAdmin?: boolean;
-	pendingToolCount: number;
-	permissions: WorkspacePermissions;
-}) {
-	const activityItems = activityNavItems.map((item) =>
-		item.href === "/tools" ? { ...item, badge: pendingToolCount } : item,
-	);
-
-	const governanceItems = governanceNavItems.filter((item) => {
-		if (item.href === "/usage") return permissions.canViewUsage;
-		if (item.href === "/audit") return permissions.canViewAudit;
-		return false;
-	});
+function WorkspaceMenuLink({ item }: { item: NavItem }) {
+	const pathname = usePathname();
+	const Icon = item.icon;
+	const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
 	return (
-		<div className="flex h-full flex-col gap-3 p-3">
-			<div className="flex items-center justify-between gap-2 px-1 py-1">
-				<DeodisLogo href="/chat" className="h-7" />
-			</div>
-
-			<Button
-				asChild
-				className="h-10 justify-start rounded-xl"
-				variant="outline"
-			>
-				<Link href="/chat">
-					<MessageSquarePlusIcon data-icon="inline-start" aria-hidden="true" />
-					New chat
-				</Link>
-			</Button>
-
-			<nav
-				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto"
-				aria-label="Main navigation"
-			>
-				<NavGroup title="Home" items={primaryNavItems} />
-				<NavGroup title="Configuration" items={configurationNavItems} />
-				<NavGroup title="Activity" items={activityItems} />
-				<NavGroup title="Discover" items={discoverNavItems} />
-				{governanceItems.length > 0 ? (
-					<NavGroup title="Governance" items={governanceItems} />
+		<DropdownMenuItem
+			asChild
+			className={cn("h-9 rounded-xl px-2", active && "bg-accent text-accent-foreground")}
+		>
+			<Link href={item.href}>
+				<Icon aria-hidden="true" />
+				<span className="min-w-0 flex-1 truncate">{item.label}</span>
+				{item.badge && item.badge > 0 ? (
+					<Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1.5 text-[10px]">
+						{item.badge}
+					</Badge>
 				) : null}
-				{isAdmin ? (
-					<NavGroup title="Admin" items={adminNavItems} />
-				) : (
-					<NavGroup title="Team" items={[{ href: "/members", label: "Team", icon: UsersIcon }]} />
-				)}
-			</nav>
+			</Link>
+		</DropdownMenuItem>
+	);
+}
 
-			<div className="flex flex-col gap-2 border-t border-border/70 pt-3">
-				<ThemeToggleButton className="inline-flex w-full justify-start lg:hidden" />
-				<ThemeToggleButton className="hidden lg:inline-flex" />
-				{displayName ? (
-					<>
-						<WorkspaceSwitcher />
-						<div className="rounded-xl px-3 py-1 text-xs text-muted-foreground">
-							Signed in as{" "}
-							<span className="font-medium text-foreground">{displayName}</span>
-						</div>
-						<SignOutButton />
-					</>
-				) : (
-					<Button asChild size="sm" className="justify-start rounded-xl">
-						<Link href="/auth/signin">
-							<LogInIcon data-icon="inline-start" aria-hidden="true" />
-							Sign in
-						</Link>
-					</Button>
-				)}
-			</div>
-		</div>
+export function WorkspaceMenuButton({
+	align = "end",
+	className,
+	showLabel = false,
+}: {
+	align?: "start" | "center" | "end";
+	className?: string;
+	showLabel?: boolean;
+}) {
+	const shell = useWorkspaceShell();
+	const groups = buildMenuGroups(shell);
+	const hasPendingTools = shell.pendingToolCount > 0;
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button
+					type="button"
+					variant="ghost"
+					size={showLabel ? "sm" : "icon"}
+					className={cn(
+						"relative rounded-full border border-border/60 bg-background/80 shadow-sm backdrop-blur-xl hover:bg-muted/80",
+						className,
+					)}
+					aria-label="Open workspace menu"
+				>
+					<MenuIcon data-icon={showLabel ? "inline-start" : undefined} aria-hidden="true" />
+					{showLabel ? "Workspace" : <span className="sr-only">Workspace</span>}
+					{hasPendingTools && !showLabel ? (
+						<Badge
+							variant="destructive"
+							className="absolute -right-1 -top-1 h-5 min-w-5 px-1 text-[10px]"
+						>
+							{shell.pendingToolCount}
+						</Badge>
+					) : null}
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align={align}
+				className="w-80 rounded-2xl border-border/70 bg-popover/95 p-2 shadow-2xl shadow-foreground/10 backdrop-blur-xl"
+			>
+				<div className="p-1.5">
+					<WorkspaceSwitcher />
+				</div>
+				<DropdownMenuSeparator />
+				{groups.map((group, index) => (
+					<DropdownMenuGroup key={group.map((item) => item.href).join(":")}>
+						{index > 0 ? <DropdownMenuSeparator /> : null}
+						{group.map((item) => (
+							<WorkspaceMenuLink key={item.href} item={item} />
+						))}
+					</DropdownMenuGroup>
+				))}
+				<DropdownMenuSeparator />
+				<DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">
+					{shell.displayName ? `Signed in as ${shell.displayName}` : "Account"}
+				</DropdownMenuLabel>
+				<div className="flex items-center gap-2 p-1.5">
+					<ThemeToggleButton className="flex-1 justify-start rounded-xl" />
+					{shell.displayName ? (
+						<SignOutButton className="flex-1 justify-start rounded-xl" />
+					) : (
+						<Button asChild size="sm" className="flex-1 justify-start rounded-xl">
+							<Link href="/auth/signin">
+								<LogInIcon data-icon="inline-start" aria-hidden="true" />
+								Sign in
+							</Link>
+						</Button>
+					)}
+				</div>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 
@@ -263,6 +305,11 @@ export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
 	const pathname = usePathname();
 	const { workspaceId } = useWorkspace();
 	const isChatRoute = pathname === "/chat" || pathname.startsWith("/chat/");
+	const currentTitle =
+		Object.entries(routeTitles)
+			.sort((a, b) => b[0].length - a[0].length)
+			.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ??
+		"Workspace";
 	const [pendingToolCount, setPendingToolCount] = useState(0);
 	const [permissions, setPermissions] = useState<WorkspacePermissions>({
 		canViewUsage: false,
@@ -315,49 +362,56 @@ export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
 		};
 	}, [workspaceId]);
 
-	const sidebar = (
-		<SidebarContent
-			displayName={displayName}
-			isAdmin={isAdmin}
-			pendingToolCount={pendingToolCount}
-			permissions={permissions}
-		/>
+	const shellValue = useMemo(
+		() => ({
+			displayName,
+			isAdmin,
+			pendingToolCount,
+			permissions,
+		}),
+		[displayName, isAdmin, pendingToolCount, permissions],
 	);
 
 	return (
-		<div
-			data-page="app-shell"
-			className="flex h-svh min-h-svh bg-background text-foreground"
-		>
-			<aside className="hidden w-56 shrink-0 border-r border-border/70 bg-card/45 backdrop-blur-xl lg:block">
-				{sidebar}
-			</aside>
-
-			<div className="flex min-w-0 flex-1 flex-col">
+		<WorkspaceShellContext.Provider value={shellValue}>
+			<div
+				data-page="app-shell"
+				className="flex h-svh min-h-svh flex-col bg-muted/20 text-foreground"
+			>
 				{!isChatRoute ? (
-					<header className="flex h-14 shrink-0 items-center justify-between border-b border-border/60 bg-background/80 px-3 backdrop-blur-xl lg:hidden">
-						<Sheet>
-							<SheetTrigger asChild>
-								<Button variant="ghost" size="icon-sm" aria-label="Open menu">
-									<MenuIcon aria-hidden="true" />
-								</Button>
-							</SheetTrigger>
-							<SheetContent side="left" className="w-[min(100vw-2rem,18rem)] p-0">
-								<SheetHeader className="sr-only">
-									<SheetTitle>Navigation</SheetTitle>
-								</SheetHeader>
-								{sidebar}
-							</SheetContent>
-						</Sheet>
-						<DeodisLogo href="/chat" className="h-6" />
-						<Button asChild variant="ghost" size="icon-sm" aria-label="New chat">
-							<Link href="/chat">
-								<MessageSquarePlusIcon aria-hidden="true" />
-							</Link>
-						</Button>
+					<header className="flex h-16 shrink-0 items-center justify-between border-b border-border/60 bg-background/85 px-4 shadow-sm shadow-foreground/5 backdrop-blur-xl">
+						<div className="flex min-w-0 items-center gap-3">
+							<DeodisLogo href="/chat" className="h-6 shrink-0" />
+							<div className="hidden h-6 w-px bg-border/70 sm:block" />
+							<div className="min-w-0">
+								<p className="truncate text-sm font-semibold">{currentTitle}</p>
+								<p className="truncate text-xs text-muted-foreground">
+									Workspace
+								</p>
+							</div>
+						</div>
+						<div className="flex items-center gap-1">
+							<Button
+								asChild
+								variant="ghost"
+								size="sm"
+								className="hidden rounded-full border border-transparent sm:inline-flex"
+							>
+								<Link href="/chat">
+									<MessageSquareIcon data-icon="inline-start" aria-hidden="true" />
+									Chat
+								</Link>
+							</Button>
+							<Button asChild variant="outline" size="sm" className="rounded-full bg-background/80 shadow-sm">
+								<Link href="/chat">
+									<MessageSquarePlusIcon data-icon="inline-start" aria-hidden="true" />
+									New
+								</Link>
+							</Button>
+							<WorkspaceMenuButton />
+						</div>
 					</header>
 				) : null}
-
 				<main
 					className={cn(
 						"min-h-0 flex-1 overflow-y-auto",
@@ -367,6 +421,6 @@ export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
 					{children}
 				</main>
 			</div>
-		</div>
+		</WorkspaceShellContext.Provider>
 	);
 }

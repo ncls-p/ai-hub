@@ -89,6 +89,12 @@ export function reasoningFromMessage(message: ChatMessage) {
 		.join("\n");
 }
 
+export function renderablePartsFromMessage(message: ChatMessage) {
+	return message.parts.filter((part) =>
+		["text", "reasoning", "tool-call", "tool-result"].includes(part.type),
+	);
+}
+
 export function toolPartsFromMessage(message: ChatMessage) {
 	return message.parts.filter(
 		(part) => part.type === "tool-call" || part.type === "tool-result",
@@ -151,15 +157,15 @@ export function appendMessagePart(
 	delta: string,
 ) {
 	const nextParts = [...parts];
-	const existingIndex = nextParts.findIndex((part) => part.type === type);
+	const lastPart = nextParts.at(-1);
 
-	if (existingIndex === -1) {
+	if (lastPart?.type !== type) {
 		return [...nextParts, { type, content: delta }];
 	}
 
-	nextParts[existingIndex] = {
-		...nextParts[existingIndex],
-		content: `${nextParts[existingIndex].content}${delta}`,
+	nextParts[nextParts.length - 1] = {
+		...lastPart,
+		content: `${lastPart.content}${delta}`,
 	};
 	return nextParts;
 }

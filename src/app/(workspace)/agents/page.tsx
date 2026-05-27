@@ -311,8 +311,8 @@ export default function AgentsPage() {
 	return (
 		<WorkspacePage
 			kicker="Configuration"
-			title="Your assistants"
-			description="Create and configure assistants with models, tools, knowledge, and integrations."
+			title="Assistants"
+			description="Pick an assistant to chat, or open configuration when you need to change its model, tools, or knowledge."
 			width="default"
 			actions={
 				<Button type="button" onClick={() => setShowCreateDialog(true)}>
@@ -584,20 +584,11 @@ export default function AgentsPage() {
 									</CardDescription>
 								)}
 								<div className="mt-3 flex flex-wrap gap-2">
-									<Badge variant="outline">
-										{agent.sharingMode === "specific_user"
-											? "Shared"
-											: agent.sharingMode === "marketplace"
-												? "Marketplace"
-												: "Personal"}
+									<Badge
+										variant={agent.activeVersionId ? "secondary" : "outline"}
+									>
+										{agent.activeVersionId ? "Ready" : "Needs setup"}
 									</Badge>
-									{agent.isGlobal ? <Badge variant="secondary">Global</Badge> : null}
-									{agent.isRecommended ? (
-										<Badge variant="secondary">Recommended</Badge>
-									) : null}
-									{agent.curationLabel === "organization_created" ? (
-										<Badge variant="secondary">Organization created</Badge>
-									) : null}
 									{bindingSummaries[agent.id]?.toolCount ? (
 										<Badge variant="outline">
 											{bindingSummaries[agent.id].toolCount} tools
@@ -617,32 +608,24 @@ export default function AgentsPage() {
 							</CardHeader>
 							<CardContent>
 								<div className="flex items-center justify-between text-xs text-muted-foreground">
-									<span>
-										{agent.activeVersionId
-											? "Has active version"
-											: "No version configured"}
-									</span>
+									<span>{agent.slug}</span>
 									<span>{new Date(agent.updatedAt).toLocaleDateString()}</span>
 								</div>
-								{!agent.activeVersionId ? (
-									<Button
-										variant="secondary"
-										size="sm"
-										className="mt-3 w-full"
-										onClick={() => router.push(`/agents/${agent.id}`)}
-									>
-										Finish setup
-									</Button>
-								) : null}
 								<div className="mt-3 flex gap-2">
 									<Button
-										variant="outline"
+										variant={agent.activeVersionId ? "default" : "secondary"}
 										size="sm"
 										className="flex-1"
-										onClick={() => router.push(`/chat?agentId=${agent.id}`)}
+										onClick={() =>
+											router.push(
+												agent.activeVersionId
+													? `/chat?agentId=${agent.id}`
+													: `/agents/${agent.id}`,
+											)
+										}
 									>
-										Chat
-										<ChevronRightIcon className="size-3 ml-1" />
+										{agent.activeVersionId ? "Chat" : "Finish setup"}
+										<ChevronRightIcon className="ml-1 size-3" />
 									</Button>
 									<Button
 										variant="outline"

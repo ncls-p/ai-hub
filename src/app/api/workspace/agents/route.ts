@@ -26,6 +26,7 @@ const createAgentSchema = z.object({
 	temperature: z.string().optional(),
 	topP: z.string().optional(),
 	maxOutputTokens: z.number().int().positive().optional(),
+	maxToolCalls: z.number().int().min(0).max(20).optional(),
 	sharingMode: z
 		.enum(["personal", "marketplace", "specific_user"])
 		.default("personal"),

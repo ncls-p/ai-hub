@@ -31,15 +31,15 @@ export function WorkspacePage({
 	return (
 		<div
 			className={cn(
-				"mx-auto flex w-full flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8",
+				"mx-auto flex min-h-full w-full flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8",
 				widthClass[width],
 				className,
 			)}
 		>
-			<header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+			<header className="flex flex-col justify-between gap-4 border-b border-border/60 pb-5 sm:flex-row sm:items-end">
 				<div className="flex min-w-0 flex-col gap-2">
 					{kicker ? <div className="section-kicker">{kicker}</div> : null}
-					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+					<h1 className="text-2xl font-semibold tracking-tight">
 						{title}
 					</h1>
 					{description ? (

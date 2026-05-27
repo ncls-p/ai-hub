@@ -19,8 +19,14 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -28,19 +34,24 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { fetchJson } from "@/lib/api-client";
 
 const steps = [
-	{ id: "provider", label: "Provider", icon: PlugZapIcon },
-	{ id: "test", label: "Test", icon: CheckCircle2Icon },
-	{ id: "model", label: "Model", icon: BotIcon },
-	{ id: "agent", label: "Agent", icon: BotIcon },
-	{ id: "chat", label: "Chat", icon: MessageSquareIcon },
+	{ id: "provider", label: "Connect", icon: PlugZapIcon },
+	{ id: "model", label: "Model", icon: CheckCircle2Icon },
+	{ id: "agent", label: "Assistant", icon: BotIcon },
 ] as const;
 
 type StepId = (typeof steps)[number]["id"];
+type ProviderKind = "openai-compatible" | "dragonfly" | "vercel-ai-gateway";
+type ProviderAuthType = "bearer" | "x-api-key" | "gateway";
+
+type ProviderSummary = {
+	id: string;
+	name: string;
+	kind: ProviderKind;
+};
 
 type ProviderModel = {
 	id: string;
@@ -59,6 +70,12 @@ function slugify(value: string) {
 	);
 }
 
+function defaultAuthType(kind: ProviderKind): ProviderAuthType {
+	if (kind === "dragonfly") return "x-api-key";
+	if (kind === "vercel-ai-gateway") return "gateway";
+	return "bearer";
+}
+
 export type SetupWizardProps = {
 	mode?: "page" | "dialog";
 	initialAgentId?: string | null;
@@ -74,16 +91,22 @@ export function SetupWizard({
 }: SetupWizardProps) {
 	const { workspaceId } = useWorkspace();
 	const [step, setStep] = useState<StepId>("provider");
+	const [providers, setProviders] = useState<ProviderSummary[]>([]);
 	const [providerId, setProviderId] = useState<string | null>(null);
 	const [modelDbId, setModelDbId] = useState<string | null>(null);
 	const [agentId, setAgentId] = useState<string | null>(initialAgentId);
 	const [busy, setBusy] = useState(false);
+	const [loadingProviders, setLoadingProviders] = useState(true);
+	const [loadingModels, setLoadingModels] = useState(false);
 	const [models, setModels] = useState<ProviderModel[]>([]);
-	const [testMessage, setTestMessage] = useState("Hello! Please confirm you are ready.");
-	const [testSent, setTestSent] = useState(false);
-	const [providerForm, setProviderForm] = useState({
-		name: "OpenAI Compatible",
-		kind: "openai_compatible",
+	const [providerForm, setProviderForm] = useState<{
+		name: string;
+		kind: ProviderKind;
+		baseUrl: string;
+		apiKey: string;
+	}>({
+		name: "OpenAI connection",
+		kind: "openai-compatible",
 		baseUrl: "",
 		apiKey: "",
 	});
@@ -94,59 +117,86 @@ export function SetupWizard({
 
 	useEffect(() => {
 		if (!workspaceId) return;
-		fetch(`/api/workspace/providers?workspaceId=${workspaceId}`)
-			.then((res) => (res.ok ? res.json() : []))
-			.then((rows: Array<{ id: string }>) => {
-				if (Array.isArray(rows) && rows.length > 0) {
+		let cancelled = false;
+
+		async function loadProviders() {
+			setLoadingProviders(true);
+			try {
+				const rows = await fetchJson<ProviderSummary[]>(
+					`/api/workspace/providers?workspaceId=${workspaceId}`,
+				);
+				if (cancelled) return;
+				setProviders(rows);
+				if (rows[0]) {
 					setProviderId(rows[0].id);
 					setStep("model");
 				}
-			})
-			.catch(() => {});
+			} catch {
+				if (!cancelled) setProviders([]);
+			} finally {
+				if (!cancelled) setLoadingProviders(false);
+			}
+		}
+
+		void loadProviders();
+		return () => {
+			cancelled = true;
+		};
 	}, [workspaceId]);
 
 	useEffect(() => {
-		if (!workspaceId || !providerId || step !== "model") return;
+		if (!workspaceId || !providerId) return;
 		let cancelled = false;
+
 		async function loadModels() {
+			setLoadingModels(true);
 			try {
 				const rows = await fetchJson<ProviderModel[]>(
 					`/api/workspace/providers/${providerId}/models?workspaceId=${workspaceId}`,
 				);
-				if (!cancelled) {
-					setModels(rows);
-					if (rows[0]?.id) setModelDbId(rows[0].id);
-				}
+				if (cancelled) return;
+				setModels(rows);
+				setModelDbId((current) =>
+					current && rows.some((model) => model.id === current)
+						? current
+						: (rows[0]?.id ?? null),
+				);
 			} catch {
-				if (!cancelled) setModels([]);
+				if (!cancelled) {
+					setModels([]);
+					setModelDbId(null);
+				}
+			} finally {
+				if (!cancelled) setLoadingModels(false);
 			}
 		}
+
 		void loadModels();
 		return () => {
 			cancelled = true;
 		};
-	}, [workspaceId, providerId, step]);
+	}, [workspaceId, providerId]);
 
 	async function createProvider() {
 		if (!workspaceId) return;
 		setBusy(true);
 		try {
-			const res = await fetch("/api/workspace/providers", {
+			const provider = await fetchJson<ProviderSummary>("/api/workspace/providers", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					workspaceId,
 					name: providerForm.name,
 					kind: providerForm.kind,
+					authType: defaultAuthType(providerForm.kind),
 					baseUrl: providerForm.baseUrl || undefined,
 					apiKey: providerForm.apiKey || undefined,
 				}),
 			});
-			if (!res.ok) throw new Error((await res.json()).error || "Failed");
-			const provider = (await res.json()) as { id: string };
+			setProviders((current) => [provider, ...current]);
 			setProviderId(provider.id);
-			setStep("test");
-			toast.success("AI connection created");
+			setStep("model");
+			toast.success("AI connection saved");
 		} catch (error) {
 			toast.error(
 				error instanceof Error ? error.message : "Failed to create connection",
@@ -160,13 +210,19 @@ export function SetupWizard({
 		if (!workspaceId || !providerId) return;
 		setBusy(true);
 		try {
-			const res = await fetch(
-				`/api/workspace/providers/${providerId}/test?workspaceId=${workspaceId}`,
-				{ method: "POST" },
+			const data = await fetchJson<{ status?: string; message?: string }>(
+				`/api/workspace/providers/${providerId}/test`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ workspaceId }),
+				},
 			);
-			if (!res.ok) throw new Error((await res.json()).error || "Test failed");
-			toast.success("Connection verified");
-			setStep("model");
+			if (data.status === "healthy") {
+				toast.success(data.message || "Connection verified");
+			} else {
+				toast.error(data.message || "Connection test returned an issue");
+			}
 		} catch (error) {
 			toast.error(
 				error instanceof Error ? error.message : "Connection test failed",
@@ -180,8 +236,8 @@ export function SetupWizard({
 		if (!workspaceId || !providerId || !manualModelId.trim()) return;
 		setBusy(true);
 		try {
-			const res = await fetch(
-				`/api/workspace/providers/${providerId}/models?workspaceId=${workspaceId}`,
+			const model = await fetchJson<ProviderModel>(
+				`/api/workspace/providers/${providerId}/models`,
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
@@ -192,100 +248,61 @@ export function SetupWizard({
 					}),
 				},
 			);
-			if (!res.ok) throw new Error((await res.json()).error || "Failed");
-			const model = (await res.json()) as ProviderModel;
 			setModels((current) => [...current, model]);
 			setModelDbId(model.id);
 			setManualModelId("");
-			toast.success("Model registered");
+			toast.success("Model added");
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to register model",
+				error instanceof Error ? error.message : "Failed to add model",
 			);
 		} finally {
 			setBusy(false);
 		}
 	}
 
-	async function createOrUpdateAgent() {
+	async function finishSetup() {
 		if (!workspaceId || !providerId || !modelDbId) return;
 		setBusy(true);
 		try {
-			if (agentId) {
-				const res = await fetch(
-					`/api/workspace/agents/${agentId}?workspaceId=${workspaceId}`,
+			let completedAgentId = agentId;
+
+			if (completedAgentId) {
+				await fetchJson(`/api/workspace/agents/${completedAgentId}`, {
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						workspaceId,
+						providerId,
+						modelId: modelDbId,
+					}),
+				});
+			} else {
+				const data = await fetchJson<{ agent: { id: string } }>(
+					"/api/workspace/agents",
 					{
-						method: "PATCH",
+						method: "POST",
 						headers: { "Content-Type": "application/json" },
 						body: JSON.stringify({
 							workspaceId,
+							name: agentForm.name,
+							slug: slugify(agentForm.name),
+							systemPrompt: "You are a helpful assistant.",
 							providerId,
 							modelId: modelDbId,
 						}),
 					},
 				);
-				if (!res.ok) throw new Error((await res.json()).error || "Failed");
-			} else {
-				const res = await fetch("/api/workspace/agents", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						workspaceId,
-						name: agentForm.name,
-						slug: slugify(agentForm.name),
-						systemPrompt: "You are a helpful assistant.",
-						providerId,
-						modelId: modelDbId,
-					}),
-				});
-				if (!res.ok) throw new Error((await res.json()).error || "Failed");
-				const data = (await res.json()) as { agent: { id: string } };
-				setAgentId(data.agent.id);
+				completedAgentId = data.agent.id;
+				setAgentId(completedAgentId);
 			}
-			setStep("chat");
-			toast.success("Assistant configured");
-		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : "Failed to configure assistant",
-			);
-		} finally {
-			setBusy(false);
-		}
-	}
 
-	async function sendTestMessage() {
-		if (!agentId) return;
-		setBusy(true);
-		try {
-			const res = await fetch(`/api/workspace/${agentId}/chat`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ content: testMessage }),
-			});
-			if (!res.ok) {
-				const payload = await res.json().catch(() => null);
-				throw new Error(payload?.error || "Test message failed");
-			}
-			setTestSent(true);
-			toast.success("Test message sent");
-		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : "Test message failed",
-			);
-		} finally {
-			setBusy(false);
-		}
-	}
-
-	async function finish() {
-		if (!agentId || !testSent) return;
-		setBusy(true);
-		try {
 			await fetch("/api/onboarding", { method: "POST" });
-			onComplete?.(agentId);
+			toast.success("Assistant is ready");
+			if (completedAgentId) onComplete?.(completedAgentId);
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Unable to finish setup",
+				error instanceof Error ? error.message : "Failed to finish setup",
 			);
 		} finally {
 			setBusy(false);
@@ -301,252 +318,331 @@ export function SetupWizard({
 	}
 
 	const stepIndex = steps.findIndex((item) => item.id === step);
+	const selectedProvider = providers.find((provider) => provider.id === providerId);
 
 	return (
 		<div className={mode === "page" ? "flex flex-col gap-6" : "flex flex-col gap-4"}>
-			<div className="flex gap-2 overflow-x-auto">
-				{steps.map((item, index) => (
-					<div
-						key={item.id}
-						className={`min-w-[4.5rem] flex-1 rounded-lg border px-2 py-2 text-center text-xs ${
-							index <= stepIndex
-								? "border-primary/40 bg-primary/5"
-								: "border-border/60 text-muted-foreground"
-						}`}
-					>
-						{item.label}
-					</div>
-				))}
+			<div className="grid grid-cols-3 gap-2">
+				{steps.map((item, index) => {
+					const Icon = item.icon;
+					const isActive = item.id === step;
+					const isComplete = index < stepIndex;
+					return (
+						<div
+							key={item.id}
+							className={`flex min-h-16 flex-col justify-center rounded-lg border px-3 py-2 text-xs ${
+								isActive || isComplete
+									? "border-primary/40 bg-primary/5"
+									: "border-border/60 text-muted-foreground"
+							}`}
+						>
+							<div className="flex items-center gap-2 font-medium">
+								<Icon className="size-4" aria-hidden="true" />
+								{item.label}
+							</div>
+						</div>
+					);
+				})}
 			</div>
 
 			<Card>
 				<CardHeader>
 					<CardTitle>
-						{step === "provider" && "Add an AI connection"}
-						{step === "test" && "Test connection"}
-						{step === "model" && "Choose a model"}
+						{step === "provider" && "Connect an AI provider"}
+						{step === "model" && "Choose the model"}
 						{step === "agent" && "Create your assistant"}
-						{step === "chat" && "Send a test message"}
 					</CardTitle>
 					<CardDescription>
 						{step === "provider" &&
-							"Connect to OpenAI-compatible or gateway providers."}
-						{step === "test" && "Verify credentials before continuing."}
+							"Add one connection. Advanced routing and extra providers can wait."}
 						{step === "model" &&
-							"Pick a model from the provider or register one manually."}
+							"Use an existing model or add the model ID your provider supports."}
 						{step === "agent" &&
-							"Your assistant will use the selected model."}
-						{step === "chat" &&
-							"Confirm chat works before finishing setup."}
+							"Name the assistant. You can add tools and knowledge later."}
 					</CardDescription>
 				</CardHeader>
-				<CardContent className="flex flex-col gap-4">
+				<CardContent>
 					{step === "provider" ? (
-						<>
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="provider-name">Name</Label>
-								<Input
-									id="provider-name"
-									value={providerForm.name}
-									onChange={(event) =>
-										setProviderForm({
-											...providerForm,
-											name: event.target.value,
-										})
-									}
-								/>
-							</div>
-							<div className="flex flex-col gap-2">
-								<Label>Kind</Label>
-								<Select
-									value={providerForm.kind}
-									onValueChange={(value) =>
-										setProviderForm({ ...providerForm, kind: value })
-									}
+						<FieldGroup>
+							<Field>
+								<FieldLabel htmlFor="provider-name">Connection name</FieldLabel>
+								<FieldContent>
+									<Input
+										id="provider-name"
+										value={providerForm.name}
+										onChange={(event) =>
+											setProviderForm({
+												...providerForm,
+												name: event.target.value,
+											})
+										}
+									/>
+								</FieldContent>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="provider-kind">Provider type</FieldLabel>
+								<FieldContent>
+									<Select
+										value={providerForm.kind}
+										onValueChange={(value) =>
+											setProviderForm({
+												...providerForm,
+												kind: value as ProviderKind,
+											})
+										}
+									>
+										<SelectTrigger id="provider-kind" className="w-full">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="openai-compatible">
+												OpenAI-compatible
+											</SelectItem>
+											<SelectItem value="vercel-ai-gateway">
+												Vercel AI Gateway
+											</SelectItem>
+											<SelectItem value="dragonfly">Dragonfly</SelectItem>
+										</SelectContent>
+									</Select>
+								</FieldContent>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="base-url">Service URL</FieldLabel>
+								<FieldContent>
+									<Input
+										id="base-url"
+										placeholder="https://api.openai.com/v1"
+										value={providerForm.baseUrl}
+										onChange={(event) =>
+											setProviderForm({
+												...providerForm,
+												baseUrl: event.target.value,
+											})
+										}
+									/>
+									<FieldDescription>
+										Leave blank only if your selected provider has a default
+										endpoint.
+									</FieldDescription>
+								</FieldContent>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="api-key">API key</FieldLabel>
+								<FieldContent>
+									<Input
+										id="api-key"
+										type="password"
+										value={providerForm.apiKey}
+										onChange={(event) =>
+											setProviderForm({
+												...providerForm,
+												apiKey: event.target.value,
+											})
+										}
+									/>
+								</FieldContent>
+							</Field>
+							<div className="flex flex-wrap gap-2">
+								<Button
+									type="button"
+									onClick={() => void createProvider()}
+									disabled={busy || !providerForm.name.trim()}
 								>
-									<SelectTrigger>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="openai_compatible">
-											OpenAI compatible
-										</SelectItem>
-										<SelectItem value="vercel_ai_gateway">
-											Vercel AI Gateway
-										</SelectItem>
-									</SelectContent>
-								</Select>
+									{busy ? (
+										<Loader2 className="animate-spin" aria-hidden="true" />
+									) : (
+										<PlugZapIcon data-icon="inline-start" aria-hidden="true" />
+									)}
+									Save connection
+								</Button>
+								{providers.length > 0 ? (
+									<Button
+										type="button"
+										variant="outline"
+										disabled={loadingProviders}
+										onClick={() => setStep("model")}
+									>
+										Use existing
+									</Button>
+								) : null}
 							</div>
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="base-url">Base URL (optional)</Label>
-								<Input
-									id="base-url"
-									value={providerForm.baseUrl}
-									onChange={(event) =>
-										setProviderForm({
-											...providerForm,
-											baseUrl: event.target.value,
-										})
-									}
-								/>
-							</div>
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="api-key">API key</Label>
-								<Input
-									id="api-key"
-									type="password"
-									value={providerForm.apiKey}
-									onChange={(event) =>
-										setProviderForm({
-											...providerForm,
-											apiKey: event.target.value,
-										})
-									}
-								/>
-							</div>
-							<Button onClick={() => void createProvider()} disabled={busy}>
-								{busy ? <Loader2 className="animate-spin" /> : "Create connection"}
-							</Button>
-						</>
-					) : null}
-
-					{step === "test" ? (
-						<>
-							<Button onClick={() => void testProvider()} disabled={busy}>
-								{busy ? <Loader2 className="animate-spin" /> : "Run test"}
-							</Button>
-							<Button variant="outline" onClick={() => setStep("model")}>
-								Skip test
-							</Button>
-						</>
+						</FieldGroup>
 					) : null}
 
 					{step === "model" ? (
-						<>
-							{models.length > 0 ? (
-								<div className="flex flex-col gap-2">
-									<Label>Available models</Label>
+						<FieldGroup>
+							<Field>
+								<FieldLabel htmlFor="setup-provider">Connection</FieldLabel>
+								<FieldContent>
 									<Select
-										value={modelDbId ?? undefined}
-										onValueChange={setModelDbId}
+										value={providerId ?? undefined}
+										onValueChange={(value) => {
+											setProviderId(value);
+											setModelDbId(null);
+										}}
 									>
-										<SelectTrigger>
-											<SelectValue placeholder="Select a model" />
+										<SelectTrigger id="setup-provider" className="w-full">
+											<SelectValue placeholder="Select connection" />
 										</SelectTrigger>
 										<SelectContent>
-											{models.map((model) => (
-												<SelectItem key={model.id} value={model.id}>
-													{model.displayName ?? model.modelId}
+											{providers.map((provider) => (
+												<SelectItem key={provider.id} value={provider.id}>
+													{provider.name}
 												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>
-								</div>
-							) : (
-								<p className="text-sm text-muted-foreground">
-									No models found. Register one below.
-								</p>
-							)}
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="manual-model">Model ID</Label>
-								<div className="flex gap-2">
-									<Input
-										id="manual-model"
-										placeholder="gpt-4o-mini"
-										value={manualModelId}
-										onChange={(event) => setManualModelId(event.target.value)}
-									/>
-									<Button
-										type="button"
-										variant="outline"
-										disabled={busy || !manualModelId.trim()}
-										onClick={() => void registerModel()}
-									>
-										Register
-									</Button>
-								</div>
+									{selectedProvider ? (
+										<FieldDescription>
+											Using {selectedProvider.name}.
+										</FieldDescription>
+									) : null}
+								</FieldContent>
+							</Field>
+							<div className="flex flex-wrap gap-2">
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => void testProvider()}
+									disabled={busy || !providerId}
+								>
+									{busy ? (
+										<Loader2 className="animate-spin" aria-hidden="true" />
+									) : (
+										<CheckCircle2Icon
+											data-icon="inline-start"
+											aria-hidden="true"
+										/>
+									)}
+									Test connection
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									onClick={() => setStep("provider")}
+								>
+									Add another connection
+								</Button>
 							</div>
+							{models.length > 0 ? (
+								<Field>
+									<FieldLabel htmlFor="setup-model">Model</FieldLabel>
+									<FieldContent>
+										<Select
+											value={modelDbId ?? undefined}
+											onValueChange={setModelDbId}
+											disabled={loadingModels}
+										>
+											<SelectTrigger id="setup-model" className="w-full">
+												<SelectValue placeholder="Select model" />
+											</SelectTrigger>
+											<SelectContent>
+												{models.map((model) => (
+													<SelectItem key={model.id} value={model.id}>
+														{model.displayName ?? model.modelId}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</FieldContent>
+								</Field>
+							) : (
+								<FieldDescription>
+									No saved models yet. Add a model ID below.
+								</FieldDescription>
+							)}
+							<Field>
+								<FieldLabel htmlFor="manual-model">Add model ID</FieldLabel>
+								<FieldContent>
+									<div className="flex gap-2">
+										<Input
+											id="manual-model"
+											placeholder="gpt-4o-mini"
+											value={manualModelId}
+											onChange={(event) => setManualModelId(event.target.value)}
+										/>
+										<Button
+											type="button"
+											variant="outline"
+											disabled={busy || !providerId || !manualModelId.trim()}
+											onClick={() => void registerModel()}
+										>
+											Add
+										</Button>
+									</div>
+								</FieldContent>
+							</Field>
 							<Button
+								type="button"
 								onClick={() => setStep("agent")}
 								disabled={!modelDbId}
 							>
 								Continue
 							</Button>
-						</>
+						</FieldGroup>
 					) : null}
 
 					{step === "agent" ? (
-						<>
+						<FieldGroup>
 							{agentId ? (
-								<p className="text-sm text-muted-foreground">
-									Updating existing assistant with the selected model.
-								</p>
+								<FieldDescription>
+									This will attach the selected model to the current assistant.
+								</FieldDescription>
 							) : (
-								<div className="flex flex-col gap-2">
-									<Label htmlFor="agent-name">Assistant name</Label>
-									<Input
-										id="agent-name"
-										value={agentForm.name}
-										onChange={(event) =>
-											setAgentForm({ name: event.target.value })
-										}
-									/>
-								</div>
+								<Field>
+									<FieldLabel htmlFor="agent-name">Assistant name</FieldLabel>
+									<FieldContent>
+										<Input
+											id="agent-name"
+											value={agentForm.name}
+											onChange={(event) =>
+												setAgentForm({ name: event.target.value })
+											}
+										/>
+									</FieldContent>
+								</Field>
 							)}
-							<Button
-								onClick={() => void createOrUpdateAgent()}
-								disabled={busy || !modelDbId}
-							>
-								{busy ? (
-									<Loader2 className="animate-spin" />
-								) : agentId ? (
-									"Save model binding"
-								) : (
-									"Create assistant"
-								)}
-							</Button>
-						</>
-					) : null}
-
-					{step === "chat" ? (
-						<>
-							<div className="flex flex-col gap-2">
-								<Label htmlFor="test-message">Test message</Label>
-								<Textarea
-									id="test-message"
-									value={testMessage}
-									onChange={(event) => setTestMessage(event.target.value)}
-									rows={3}
-								/>
-							</div>
-							<Button
-								onClick={() => void sendTestMessage()}
-								disabled={busy || !testMessage.trim()}
-							>
-								{busy ? (
-									<Loader2 className="animate-spin" />
-								) : (
-									"Send test message"
-								)}
-							</Button>
-							<Button
-								onClick={() => void finish()}
-								disabled={busy || !testSent}
-							>
-								Finish setup
-							</Button>
-							{mode === "page" ? (
-								<Button variant="outline" asChild>
-									<Link href={agentId ? `/chat?agentId=${agentId}` : "/chat"}>
-										Go to chat
-									</Link>
+							<div className="flex flex-wrap gap-2">
+								<Button
+									type="button"
+									onClick={() => void finishSetup()}
+									disabled={busy || !modelDbId || (!agentId && !agentForm.name.trim())}
+								>
+									{busy ? (
+										<Loader2 className="animate-spin" aria-hidden="true" />
+									) : (
+										<MessageSquareIcon
+											data-icon="inline-start"
+											aria-hidden="true"
+										/>
+									)}
+									Finish and chat
 								</Button>
-							) : null}
-						</>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => setStep("model")}
+								>
+									Back
+								</Button>
+								{mode === "page" ? (
+									<Button variant="ghost" asChild>
+										<Link href={agentId ? `/chat?agentId=${agentId}` : "/chat"}>
+											Skip for now
+										</Link>
+									</Button>
+								) : null}
+							</div>
+						</FieldGroup>
 					) : null}
 
 					{onCancel ? (
-						<Button type="button" variant="ghost" onClick={onCancel}>
+						<Button
+							type="button"
+							variant="ghost"
+							className="mt-4"
+							onClick={onCancel}
+						>
 							Cancel
 						</Button>
 					) : null}

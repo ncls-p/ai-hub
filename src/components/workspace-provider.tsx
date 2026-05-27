@@ -14,11 +14,9 @@ import {
 } from "@/lib/api-client";
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
-	const [workspaceId, setWorkspaceIdState] = useState<string | null>(() =>
-		getStoredWorkspaceId(),
-	);
+	const [workspaceId, setWorkspaceIdState] = useState<string | null>(null);
 	const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
-	const [isLoading, setIsLoading] = useState(() => !getStoredWorkspaceId());
+	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
 	const setWorkspaceId = useCallback((nextWorkspaceId: string) => {

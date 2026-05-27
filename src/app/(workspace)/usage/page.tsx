@@ -110,7 +110,7 @@ export default function UsagePage() {
 							<div
 								className={`h-full rounded-full ${
 									data.quota.used / data.quota.limit >= 0.8
-										? "bg-amber-500"
+										? "bg-warning"
 										: "bg-primary"
 								}`}
 								style={{
@@ -119,7 +119,7 @@ export default function UsagePage() {
 							/>
 						</div>
 						{data.quota.used / data.quota.limit >= 0.8 ? (
-							<p className="text-sm text-amber-700 dark:text-amber-300">
+							<p className="text-sm text-warning">
 								Approaching or exceeding the configured monthly limit.
 							</p>
 						) : null}

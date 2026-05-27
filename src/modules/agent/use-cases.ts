@@ -50,6 +50,7 @@ export interface CreateAgentInput {
 	temperature?: string;
 	topP?: string;
 	maxOutputTokens?: number;
+	maxToolCalls?: number;
 	toolBindings?: ToolBindingInput[];
 	knowledgeBindings?: string[];
 	sharingMode?: AgentSharingMode;
@@ -73,6 +74,7 @@ export interface UpdateAgentInput {
 	temperature?: string;
 	topP?: string;
 	maxOutputTokens?: number;
+	maxToolCalls?: number;
 	toolBindings?: ToolBindingInput[];
 	knowledgeBindings?: string[];
 	sharingMode?: AgentSharingMode;
@@ -128,6 +130,7 @@ export async function createAgent(input: CreateAgentInput) {
 		temperature,
 		topP,
 		maxOutputTokens,
+		maxToolCalls,
 		toolBindings,
 		knowledgeBindings,
 		sharingMode = "personal",
@@ -215,6 +218,7 @@ export async function createAgent(input: CreateAgentInput) {
 				temperature: temperature || null,
 				topP: topP || null,
 				maxOutputTokens: maxOutputTokens || null,
+				maxToolCalls: maxToolCalls ?? 6,
 				createdById: userId,
 			})
 			.returning();
@@ -346,6 +350,7 @@ export async function updateAgent(input: UpdateAgentInput) {
 		temperature,
 		topP,
 		maxOutputTokens,
+		maxToolCalls,
 		toolBindings,
 		knowledgeBindings,
 		sharingMode,
@@ -482,6 +487,10 @@ export async function updateAgent(input: UpdateAgentInput) {
 					maxOutputTokens !== undefined
 						? maxOutputTokens
 						: (activeConfig?.maxOutputTokens ?? null),
+				maxToolCalls:
+					maxToolCalls !== undefined
+						? maxToolCalls
+						: (activeConfig?.maxToolCalls ?? 6),
 				createdById: userId,
 			})
 			.returning();

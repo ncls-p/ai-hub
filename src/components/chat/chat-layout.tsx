@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { PanelLeftIcon, Settings2Icon } from "lucide-react";
+import { PanelLeftIcon, PlusIcon, Settings2Icon } from "lucide-react";
 
+import { WorkspaceMenuButton } from "@/components/app-shell";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import type { ChatAgent, ChatConversation } from "@/components/chat/chat-types";
 import { SetupWizard } from "@/components/setup/setup-wizard";
@@ -23,6 +24,14 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 
 interface ChatLayoutProps {
 	agents: ChatAgent[];
@@ -35,6 +44,8 @@ interface ChatLayoutProps {
 	onSelectAgent: (agentId: string) => void;
 	onSelectConversation: (conversationId: string) => void;
 	onNewConversation: () => void;
+	onRenameConversation?: (conversationId: string, title: string) => void;
+	onDeleteConversation?: (conversationId: string) => void;
 	onSetupComplete?: () => void;
 	children: React.ReactNode;
 }
@@ -42,7 +53,6 @@ interface ChatLayoutProps {
 export function ChatLayout({
 	agents,
 	conversations,
-	selectedAgent,
 	selectedAgentId,
 	activeConversationId,
 	canChat,
@@ -50,6 +60,8 @@ export function ChatLayout({
 	onSelectAgent,
 	onSelectConversation,
 	onNewConversation,
+	onRenameConversation,
+	onDeleteConversation,
 	onSetupComplete,
 	children,
 }: ChatLayoutProps) {
@@ -58,61 +70,78 @@ export function ChatLayout({
 	const sidebarProps = {
 		agents,
 		conversations,
-		selectedAgentId,
 		activeConversationId,
-		canChat,
 		loading: loadingSidebar,
-		onSelectAgent,
 		onSelectConversation,
 		onNewConversation,
+		onRenameConversation,
+		onDeleteConversation,
+		collapsed: false,
+		onCollapsedChange: undefined,
 	};
 
 	return (
-		<div className="grid h-full min-h-0 bg-background lg:grid-cols-[18rem_1fr]">
-			<aside className="hidden min-h-0 border-r border-border/70 bg-card/40 lg:flex lg:flex-col">
-				<ChatSidebar {...sidebarProps} />
-			</aside>
-
-			<main className="flex min-h-0 flex-col">
-				<header className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
-					<div className="flex min-w-0 items-center gap-2">
+		<div className="flex h-full min-h-0 bg-muted/20">
+			<main className="flex min-h-0 flex-1 flex-col">
+				<header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-3 shadow-sm shadow-foreground/5 backdrop-blur-xl sm:px-4">
+					<div className="flex min-w-0 flex-1 items-center gap-2">
+						<WorkspaceMenuButton />
 						<Sheet>
 							<SheetTrigger asChild>
 								<Button
 									type="button"
-									variant="outline"
+									variant="ghost"
 									size="icon"
-									className="lg:hidden"
-									aria-label="Open chat sidebar"
+									className="rounded-full border border-border/60 bg-background/80 shadow-sm hover:bg-muted/80"
+									aria-label="Open conversations"
 								>
 									<PanelLeftIcon aria-hidden="true" />
 								</Button>
 							</SheetTrigger>
-							<SheetContent side="left" className="w-72 p-0">
+							<SheetContent side="left" className="w-[min(100vw-2rem,22rem)] p-0">
 								<SheetHeader className="sr-only">
-									<SheetTitle>Chat navigation</SheetTitle>
+									<SheetTitle>Conversations</SheetTitle>
 								</SheetHeader>
-								<ChatSidebar {...sidebarProps} showThemeToggle />
+								<ChatSidebar
+									{...sidebarProps}
+									showThemeToggle
+								/>
 							</SheetContent>
 						</Sheet>
-						<div className="min-w-0">
-							<div className="flex items-center gap-2">
-								<h1 className="truncate font-semibold">
-									{selectedAgent?.name ?? "Chat"}
-								</h1>
-								{canChat ? (
-									<Badge variant="secondary">configured</Badge>
-								) : (
-									<Badge variant="outline">needs setup</Badge>
-								)}
-							</div>
-							<p className="truncate text-xs text-muted-foreground">
-								{selectedAgent?.description ||
-									"Ask your configured assistant anything."}
-							</p>
-						</div>
+						<Select
+							value={selectedAgentId ?? undefined}
+							onValueChange={onSelectAgent}
+						>
+							<SelectTrigger
+								size="sm"
+								className="h-9 max-w-60 min-w-0 flex-1 rounded-full border-border/60 bg-background/80 px-3 font-semibold shadow-sm sm:min-w-44"
+								aria-label="Current assistant"
+							>
+								<SelectValue placeholder="Choose assistant" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectGroup>
+									{agents.map((agent) => (
+										<SelectItem key={agent.id} value={agent.id}>
+											{agent.name}
+										</SelectItem>
+									))}
+								</SelectGroup>
+							</SelectContent>
+						</Select>
+						{canChat ? null : <Badge variant="outline">needs setup</Badge>}
 					</div>
-					<div className="flex items-center gap-2">
+					<div className="flex shrink-0 items-center gap-1">
+						<Button
+							type="button"
+							size="icon"
+							variant="ghost"
+							className="rounded-full border border-transparent hover:border-border/60 hover:bg-background/80"
+							aria-label="New conversation"
+							onClick={onNewConversation}
+						>
+							<PlusIcon aria-hidden="true" />
+						</Button>
 						{!canChat ? (
 							<Button
 								type="button"
@@ -123,8 +152,16 @@ export function ChatLayout({
 								Finish setup
 							</Button>
 						) : null}
-						<Button asChild variant="outline" size="sm">
-							<Link href="/agents">Assistants</Link>
+						<Button
+							asChild
+							variant="ghost"
+							size="icon"
+							className="rounded-full border border-transparent hover:border-border/60 hover:bg-background/80"
+							aria-label="Configure assistant"
+						>
+							<Link href={selectedAgentId ? `/agents/${selectedAgentId}` : "/agents"}>
+								<Settings2Icon aria-hidden="true" />
+							</Link>
 						</Button>
 					</div>
 				</header>

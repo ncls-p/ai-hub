@@ -8,7 +8,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
-export function SignOutButton() {
+export function SignOutButton({
+	iconOnly = false,
+	className,
+}: {
+	iconOnly?: boolean;
+	className?: string;
+}) {
 	const router = useRouter();
 	const [pending, setPending] = useState(false);
 
@@ -38,17 +44,21 @@ export function SignOutButton() {
 		<Button
 			type="button"
 			variant="ghost"
-			size="sm"
-			className="justify-start rounded-xl"
+			size={iconOnly ? "icon" : "sm"}
+			className={className ?? "justify-start rounded-xl"}
 			onClick={signOut}
 			disabled={pending}
+			aria-label="Sign out"
 		>
 			{pending ? (
-				<Spinner data-icon="inline-start" />
+				<Spinner data-icon={iconOnly ? undefined : "inline-start"} />
 			) : (
-				<LogOutIcon data-icon="inline-start" aria-hidden="true" />
+				<LogOutIcon
+					data-icon={iconOnly ? undefined : "inline-start"}
+					aria-hidden="true"
+				/>
 			)}
-			Sign out
+			{iconOnly ? <span className="sr-only">Sign out</span> : "Sign out"}
 		</Button>
 	);
 }

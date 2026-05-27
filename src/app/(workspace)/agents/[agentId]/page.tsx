@@ -6,6 +6,7 @@ import { type SyntheticEvent, useCallback, useEffect, useState } from "react";
 import {
 	ArrowLeftIcon,
 	BookOpenIcon,
+	ChevronDownIcon,
 	SaveIcon,
 	ServerIcon,
 	WrenchIcon,
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 
 import { PageLoading } from "@/components/page-loading";
 import { WorkspacePage } from "@/components/workspace-page";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -22,6 +24,11 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
 	Field,
 	FieldContent,
@@ -107,6 +114,7 @@ export default function AgentConfigurePage() {
 		modelId: "",
 		temperature: "0.7",
 		maxOutputTokens: "1024",
+		maxToolCalls: "6",
 		sharingMode: "personal" as Agent["sharingMode"],
 		shareTargetEmail: "",
 		originalSharingMode: "personal" as Agent["sharingMode"],
@@ -119,6 +127,9 @@ export default function AgentConfigurePage() {
 	>({});
 	const [mcpBindings, setMcpBindings] = useState<
 		Record<string, { enabled: boolean; requireApproval: boolean }>
+	>({});
+	const [openMcpServerIds, setOpenMcpServerIds] = useState<
+		Record<string, boolean>
 	>({});
 	const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<string[]>(
 		[],
@@ -171,6 +182,7 @@ export default function AgentConfigurePage() {
 			modelId: string | null;
 			temperature: string | null;
 			maxOutputTokens: number | null;
+			maxToolCalls: number | null;
 		}>;
 		const providerRows = (await providersRes.json()) as Provider[];
 		const builtinRows = (await toolsRes.json()) as BuiltinTool[];
@@ -222,6 +234,7 @@ export default function AgentConfigurePage() {
 			modelId: activeVersion?.modelId ?? "",
 			temperature: activeVersion?.temperature ?? "0.7",
 			maxOutputTokens: String(activeVersion?.maxOutputTokens ?? 1024),
+			maxToolCalls: String(activeVersion?.maxToolCalls ?? 6),
 			sharingMode: nextAgent.sharingMode,
 			shareTargetEmail: "",
 			originalSharingMode: nextAgent.sharingMode,
@@ -301,6 +314,7 @@ export default function AgentConfigurePage() {
 					modelId: form.modelId || undefined,
 					temperature: form.temperature,
 					maxOutputTokens: Number(form.maxOutputTokens) || undefined,
+					maxToolCalls: Number(form.maxToolCalls),
 					...(form.sharingMode !== form.originalSharingMode ||
 					form.shareTargetEmail.trim()
 						? {
@@ -360,7 +374,7 @@ export default function AgentConfigurePage() {
 						requireApproval: builtinBindings[tool.id]?.requireApproval,
 					})),
 				...mcpTools
-					.filter((tool) => mcpBindings[tool.id]?.enabled)
+					.filter((tool) => tool.enabled && mcpBindings[tool.id]?.enabled)
 					.map((tool) => ({
 						toolSource: "mcp" as const,
 						toolId: tool.id,
@@ -423,6 +437,92 @@ export default function AgentConfigurePage() {
 		}
 	}
 
+	function getServerTools(serverId: string) {
+		return mcpTools.filter((tool) => tool.mcpServerId === serverId);
+	}
+
+	function getBindableServerTools(serverId: string) {
+		return getServerTools(serverId).filter((tool) => tool.enabled);
+	}
+
+	function setMcpServerToolsEnabled(serverId: string, enabled: boolean) {
+		const serverTools = getServerTools(serverId);
+		setMcpBindings((current) => {
+			const next = { ...current };
+			for (const tool of serverTools) {
+				const currentBinding = current[tool.id];
+				next[tool.id] = {
+					enabled: enabled && tool.enabled,
+					requireApproval: currentBinding?.requireApproval ?? false,
+				};
+			}
+			return next;
+		});
+	}
+
+	function setMcpServerApproval(serverId: string, requireApproval: boolean) {
+		const serverTools = getBindableServerTools(serverId);
+		setMcpBindings((current) => {
+			const next = { ...current };
+			for (const tool of serverTools) {
+				const currentBinding = current[tool.id];
+				if (!currentBinding?.enabled) continue;
+				next[tool.id] = {
+					enabled: true,
+					requireApproval,
+				};
+			}
+			return next;
+		});
+	}
+
+	function setMcpToolEnabled(tool: McpTool, enabled: boolean) {
+		setMcpBindings((current) => ({
+			...current,
+			[tool.id]: {
+				enabled: enabled && tool.enabled,
+				requireApproval: current[tool.id]?.requireApproval ?? false,
+			},
+		}));
+	}
+
+	function setMcpToolApproval(tool: McpTool, requireApproval: boolean) {
+		setMcpBindings((current) => ({
+			...current,
+			[tool.id]: {
+				enabled: current[tool.id]?.enabled ?? false,
+				requireApproval: tool.enabled ? requireApproval : false,
+			},
+		}));
+	}
+
+	function getMcpServerState(serverId: string) {
+		const allTools = getServerTools(serverId);
+		const bindableTools = allTools.filter((tool) => tool.enabled);
+		const selectedTools = bindableTools.filter(
+			(tool) => mcpBindings[tool.id]?.enabled,
+		);
+		const selectedApprovalTools = selectedTools.filter(
+			(tool) => mcpBindings[tool.id]?.requireApproval,
+		);
+
+		return {
+			allTools,
+			bindableTools,
+			selectedCount: selectedTools.length,
+			allSelected:
+				bindableTools.length > 0 && selectedTools.length === bindableTools.length,
+			someSelected:
+				selectedTools.length > 0 && selectedTools.length < bindableTools.length,
+			allApproval:
+				selectedTools.length > 0 &&
+				selectedApprovalTools.length === selectedTools.length,
+			someApproval:
+				selectedApprovalTools.length > 0 &&
+				selectedApprovalTools.length < selectedTools.length,
+		};
+	}
+
 	if (workspaceLoading || !workspaceId || loading) {
 		return <PageLoading label="Loading assistant" />;
 	}
@@ -431,7 +531,7 @@ export default function AgentConfigurePage() {
 		<WorkspacePage
 			kicker="Configuration"
 			title={agent?.name ?? "Assistant"}
-			description="Configure model behavior, tools, knowledge, and MCP integrations."
+			description="Configure model behavior, tools, knowledge, and MCP access."
 			width="default"
 			actions={
 				<Button asChild variant="outline" size="sm">
@@ -444,11 +544,10 @@ export default function AgentConfigurePage() {
 		>
 			<Tabs defaultValue="general">
 				<TabsList className="w-full flex-wrap">
-					<TabsTrigger value="general">General</TabsTrigger>
+					<TabsTrigger value="general">Basics</TabsTrigger>
 					<TabsTrigger value="model">Model</TabsTrigger>
 					<TabsTrigger value="tools">Tools</TabsTrigger>
 					<TabsTrigger value="knowledge">Knowledge</TabsTrigger>
-					<TabsTrigger value="mcp">MCP</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="general" className="mt-4">
@@ -628,7 +727,7 @@ export default function AgentConfigurePage() {
 											/>
 										</FieldContent>
 									</Field>
-									<div className="grid gap-4 sm:grid-cols-2">
+									<div className="grid gap-4 sm:grid-cols-3">
 										<Field>
 											<FieldLabel htmlFor="agent-temperature">
 												Temperature
@@ -662,6 +761,26 @@ export default function AgentConfigurePage() {
 												/>
 											</FieldContent>
 										</Field>
+										<Field>
+											<FieldLabel htmlFor="agent-max-tool-calls">
+												Max tool uses
+											</FieldLabel>
+											<FieldContent>
+												<Input
+													id="agent-max-tool-calls"
+													type="number"
+													min={0}
+													max={20}
+													value={form.maxToolCalls}
+													onChange={(e) =>
+														setForm({
+															...form,
+															maxToolCalls: e.target.value,
+														})
+													}
+												/>
+											</FieldContent>
+										</Field>
 									</div>
 									<Button type="submit" disabled={saving}>
 										{saving ? (
@@ -682,13 +801,16 @@ export default function AgentConfigurePage() {
 						<CardHeader>
 							<CardTitle className="flex items-center gap-2">
 								<WrenchIcon className="size-5" />
-								Built-in tools
+								Tools
 							</CardTitle>
 							<CardDescription>
-								Enable workspace built-in tools for this agent version.
+								Enable built-in tools and synced MCP tools for this
+								assistant.
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="flex flex-col gap-3">
+							<div className="flex flex-col gap-2">
+								<p className="text-sm font-semibold">Built-in</p>
 							{builtinTools.map((tool) => (
 								<div
 									key={tool.id}
@@ -735,6 +857,171 @@ export default function AgentConfigurePage() {
 									</div>
 								</div>
 							))}
+							</div>
+							<div className="flex flex-col gap-2 border-t border-border/70 pt-3">
+								<p className="flex items-center gap-2 text-sm font-semibold">
+									<ServerIcon className="size-4" aria-hidden="true" />
+									MCP tools
+								</p>
+								{mcpServers.length === 0 ? (
+									<p className="text-sm text-muted-foreground">
+										No MCP servers yet.{" "}
+										<Link href="/mcp" className="underline">
+											Add an MCP server
+										</Link>
+										.
+									</p>
+								) : (
+									mcpServers.map((server) => {
+										const serverState = getMcpServerState(server.id);
+										const serverOpen =
+											openMcpServerIds[server.id] ??
+											serverState.selectedCount > 0;
+										return (
+											<Collapsible
+												key={server.id}
+												open={serverOpen}
+												onOpenChange={(open) =>
+													setOpenMcpServerIds((current) => ({
+														...current,
+														[server.id]: open,
+													}))
+												}
+												className="flex flex-col gap-3 rounded-xl border p-3"
+											>
+												<div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+													<div className="flex min-w-0 gap-2">
+														<CollapsibleTrigger asChild>
+															<Button
+																type="button"
+																variant="ghost"
+																size="icon"
+																aria-label={
+																	serverOpen
+																		? `Collapse ${server.name}`
+																		: `Expand ${server.name}`
+																}
+																className="shrink-0"
+															>
+																<ChevronDownIcon
+																	data-icon="inline-start"
+																	className={
+																		serverOpen ? "rotate-180 transition-transform" : "transition-transform"
+																	}
+																	aria-hidden="true"
+																/>
+															</Button>
+														</CollapsibleTrigger>
+														<div className="min-w-0">
+															<div className="flex flex-wrap items-center gap-2">
+																<p className="font-medium">{server.name}</p>
+																<Badge variant="secondary">
+																	{serverState.selectedCount}/
+																	{serverState.bindableTools.length} selected
+																</Badge>
+																{serverState.someSelected ? (
+																	<Badge variant="outline">Partial</Badge>
+																) : null}
+																{serverState.someApproval ? (
+																	<Badge variant="outline">Mixed approval</Badge>
+																) : null}
+															</div>
+															<p className="mt-1 text-xs text-muted-foreground">
+																Select every enabled tool from this MCP server, then
+																set approval at MCP scope or override individual
+																tools.
+															</p>
+														</div>
+													</div>
+													<div className="flex flex-wrap items-center gap-4 text-xs">
+														<label className="flex items-center gap-2">
+															All tools
+															<Switch
+																checked={serverState.allSelected}
+																disabled={serverState.bindableTools.length === 0}
+																onCheckedChange={(checked) =>
+																	setMcpServerToolsEnabled(server.id, checked)
+																}
+															/>
+														</label>
+														<label className="flex items-center gap-2">
+															Approval for selected
+															<Switch
+																checked={serverState.allApproval}
+																disabled={serverState.selectedCount === 0}
+																onCheckedChange={(checked) =>
+																	setMcpServerApproval(server.id, checked)
+																}
+															/>
+														</label>
+													</div>
+												</div>
+												<CollapsibleContent className="flex flex-col gap-2">
+													{serverState.allTools.length === 0 ? (
+														<p className="text-sm text-muted-foreground">
+															No tools synced yet. Sync this MCP server before binding
+															it to an assistant.
+														</p>
+													) : (
+														serverState.allTools.map((tool) => {
+																const binding = mcpBindings[tool.id];
+																const toolSelected =
+																	tool.enabled && Boolean(binding?.enabled);
+																return (
+																	<div
+																		key={tool.id}
+																		className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+																	>
+																		<div className="min-w-0">
+																			<div className="flex flex-wrap items-center gap-2">
+																				<p className="font-medium">{tool.name}</p>
+																				{!tool.enabled ? (
+																					<Badge variant="outline">
+																						Disabled in MCP
+																					</Badge>
+																				) : null}
+																			</div>
+																			{tool.description ? (
+																				<p className="mt-1 text-xs text-muted-foreground">
+																					{tool.description}
+																				</p>
+																			) : null}
+																		</div>
+																		<div className="flex flex-wrap items-center gap-4 text-xs">
+																			<label className="flex items-center gap-2">
+																				Approval
+																				<Switch
+																					checked={
+																						tool.enabled &&
+																						Boolean(binding?.requireApproval)
+																					}
+																					disabled={!toolSelected}
+																					onCheckedChange={(checked) =>
+																						setMcpToolApproval(tool, checked)
+																					}
+																				/>
+																			</label>
+																			<label className="flex items-center gap-2">
+																				Use
+																				<Switch
+																					checked={toolSelected}
+																					disabled={!tool.enabled}
+																					onCheckedChange={(checked) =>
+																						setMcpToolEnabled(tool, checked)
+																					}
+																				/>
+																			</label>
+																		</div>
+																	</div>
+																);
+															})
+													)}
+												</CollapsibleContent>
+											</Collapsible>
+										);
+									})
+								)}
+							</div>
 							<Button onClick={() => void saveToolBindings()} disabled={saving}>
 								{saving ? <Spinner data-icon="inline-start" /> : null}
 								Save tools
@@ -794,92 +1081,6 @@ export default function AgentConfigurePage() {
 					</Card>
 				</TabsContent>
 
-				<TabsContent value="mcp" className="mt-4">
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<ServerIcon className="size-5" />
-								MCP tools
-							</CardTitle>
-							<CardDescription>
-								Bind tools from connected MCP servers.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="flex flex-col gap-4">
-							{mcpServers.length === 0 ? (
-								<p className="text-sm text-muted-foreground">
-									No MCP servers.{" "}
-									<Link href="/mcp" className="underline">
-										Add a server
-									</Link>
-									.
-								</p>
-							) : (
-								mcpServers.map((server) => (
-									<div key={server.id} className="flex flex-col gap-2">
-										<p className="text-sm font-semibold">{server.name}</p>
-										{mcpTools
-											.filter((tool) => tool.mcpServerId === server.id)
-											.map((tool) => (
-												<div
-													key={tool.id}
-													className="flex items-center justify-between rounded-xl border p-3"
-												>
-													<div>
-														<p className="font-medium">{tool.name}</p>
-														{tool.description ? (
-															<p className="text-xs text-muted-foreground">
-																{tool.description}
-															</p>
-														) : null}
-													</div>
-													<div className="flex items-center gap-4">
-														<label className="flex items-center gap-2 text-xs">
-															Approval
-															<Switch
-																checked={
-																	mcpBindings[tool.id]?.requireApproval ?? false
-																}
-																disabled={!mcpBindings[tool.id]?.enabled}
-																onCheckedChange={(checked) =>
-																	setMcpBindings((current) => ({
-																		...current,
-																		[tool.id]: {
-																			enabled:
-																				current[tool.id]?.enabled ?? false,
-																			requireApproval: checked,
-																		},
-																	}))
-																}
-															/>
-														</label>
-														<Switch
-															checked={mcpBindings[tool.id]?.enabled ?? false}
-															onCheckedChange={(checked) =>
-																setMcpBindings((current) => ({
-																	...current,
-																	[tool.id]: {
-																		enabled: checked,
-																		requireApproval:
-																			current[tool.id]?.requireApproval ??
-																			false,
-																	},
-																}))
-															}
-														/>
-													</div>
-												</div>
-											))}
-									</div>
-								))
-							)}
-							<Button onClick={() => void saveToolBindings()} disabled={saving}>
-								{saving ? <Spinner data-icon="inline-start" /> : null}
-								Save MCP bindings
-							</Button>
-						</CardContent>
-					</Card>
-				</TabsContent>
 			</Tabs>
 		</WorkspacePage>
 	);

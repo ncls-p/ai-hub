@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BotIcon, Loader2, PlusIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	BotIcon,
+	ChevronDownIcon,
+	Loader2,
+	PlusIcon,
+	ShieldAlertIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatComposer } from "@/components/chat/chat-composer";
@@ -10,23 +16,123 @@ import { ChatLayout } from "@/components/chat/chat-layout";
 import { ChatMessageList } from "@/components/chat/chat-message-list";
 import { QuotaBanner } from "@/components/chat/quota-banner";
 import { ToolApprovalBanner } from "@/components/chat/tool-approval-banner";
+import { textFromMessage } from "@/components/chat/chat-types";
 import type {
 	AgentVersion,
 	ChatAgent,
 	ChatConversation,
 	ChatMessage,
 } from "@/components/chat/chat-types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import { Separator } from "@/components/ui/separator";
 import { useChatStream } from "@/hooks/use-chat-stream";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { fetchJson } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
+
+function ChatContextBar({
+	quota,
+	pendingApproval,
+	onApprove,
+	onReject,
+}: {
+	quota: { used: number; limit: number } | null;
+	pendingApproval: ReturnType<typeof useChatStream>["pendingApproval"];
+	onApprove: () => void;
+	onReject: () => void;
+}) {
+	const [open, setOpen] = useState(false);
+	const quotaPercent = quota
+		? Math.min(100, Math.round((quota.used / quota.limit) * 100))
+		: 0;
+	const showQuota = Boolean(quota && quotaPercent >= 80);
+	const hasItems = Boolean(pendingApproval || showQuota);
+
+	useEffect(() => {
+		const stored = window.localStorage.getItem("chat-context-open-v2");
+		if (stored) {
+			queueMicrotask(() => setOpen(stored === "true"));
+		}
+	}, []);
+
+	function updateOpen(nextOpen: boolean) {
+		setOpen(nextOpen);
+		window.localStorage.setItem("chat-context-open-v2", String(nextOpen));
+	}
+
+	if (!hasItems) return null;
+
+	return (
+		<Collapsible
+			open={open}
+			onOpenChange={updateOpen}
+			className="shrink-0 border-b border-border/70 bg-background/95"
+		>
+			<div className="mx-auto flex min-h-11 w-full max-w-3xl items-center justify-between gap-3 px-4 py-2">
+				<div className="flex min-w-0 flex-wrap items-center gap-2">
+					<span className="truncate text-sm font-medium">Chat status</span>
+					{pendingApproval ? (
+						<Badge variant="outline">
+							<ShieldAlertIcon data-icon="inline-start" aria-hidden="true" />
+							Approval
+						</Badge>
+					) : null}
+					{showQuota ? (
+						<Badge variant={quotaPercent >= 100 ? "destructive" : "outline"}>
+							Usage {quotaPercent}%
+						</Badge>
+					) : null}
+				</div>
+				<CollapsibleTrigger asChild>
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						aria-label={open ? "Hide chat status" : "Show chat status"}
+					>
+						<ChevronDownIcon
+							data-icon="inline-start"
+							aria-hidden="true"
+							className={cn("transition-transform", !open && "-rotate-90")}
+						/>
+						{open ? "Hide" : "Show"}
+					</Button>
+				</CollapsibleTrigger>
+			</div>
+			<CollapsibleContent>
+				<div className="flex flex-col gap-0">
+					{showQuota && quota ? (
+						<QuotaBanner used={quota.used} limit={quota.limit} />
+					) : null}
+					{showQuota && pendingApproval ? <Separator /> : null}
+					{pendingApproval ? (
+						<div className="px-4 py-3">
+							<ToolApprovalBanner
+								approval={pendingApproval}
+								onApprove={onApprove}
+								onReject={onReject}
+							/>
+						</div>
+					) : null}
+				</div>
+			</CollapsibleContent>
+		</Collapsible>
+	);
+}
 
 export default function ChatPage() {
 	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
@@ -47,6 +153,7 @@ export default function ChatPage() {
 		null,
 	);
 	const bottomRef = useRef<HTMLDivElement | null>(null);
+	const skipNextMessageLoadRef = useRef(false);
 
 	const selectedAgent = useMemo(
 		() => agents.find((agent) => agent.id === selectedAgentId) ?? null,
@@ -54,12 +161,13 @@ export default function ChatPage() {
 	);
 	const canChat = Boolean(activeVersion?.providerId && activeVersion?.modelId);
 
-	const refreshConversations = async (agentId: string) => {
+	const refreshConversations = useCallback(async () => {
+		if (!workspaceId) return;
 		const data = await fetchJson<ChatConversation[]>(
-			`/api/workspace/conversations?agentId=${agentId}`,
+			`/api/workspace/conversations?workspaceId=${workspaceId}`,
 		);
 		setConversations(data);
-	};
+	}, [workspaceId]);
 
 	const {
 		messages,
@@ -72,10 +180,15 @@ export default function ChatPage() {
 		agentId: selectedAgentId,
 		conversationId: activeConversationId,
 		canChat,
-		onConversationCreated: setActiveConversationId,
-		onConversationsRefresh: async () => {
-			if (selectedAgentId) await refreshConversations(selectedAgentId);
+		onConversationCreated: (conversationId) => {
+			skipNextMessageLoadRef.current = true;
+			setActiveConversationId(conversationId);
+			const params = new URLSearchParams();
+			if (selectedAgentId) params.set("agentId", selectedAgentId);
+			params.set("conversationId", conversationId);
+			window.history.replaceState(null, "", `/chat?${params.toString()}`);
 		},
+		onConversationsRefresh: refreshConversations,
 	});
 
 	useEffect(() => {
@@ -124,25 +237,48 @@ export default function ChatPage() {
 	}, [workspaceId]);
 
 	useEffect(() => {
+		if (!workspaceId) return;
+		let cancelled = false;
+		const controller = new AbortController();
+		queueMicrotask(() => setLoadingContext(true));
+
+		async function loadConversations() {
+			try {
+				const conversationData = await fetchJson<ChatConversation[]>(
+					`/api/workspace/conversations?workspaceId=${workspaceId}`,
+					{ signal: controller.signal },
+				);
+				if (cancelled) return;
+				setConversations(conversationData);
+			} catch (err) {
+				if (err instanceof Error && err.name !== "AbortError") {
+					toast.error(err.message);
+				}
+			} finally {
+				if (!cancelled) setLoadingContext(false);
+			}
+		}
+
+		void loadConversations();
+		return () => {
+			cancelled = true;
+			controller.abort();
+		};
+	}, [workspaceId]);
+
+	useEffect(() => {
 		if (!selectedAgentId || !workspaceId) return;
 		let cancelled = false;
 		const controller = new AbortController();
 		queueMicrotask(() => setLoadingContext(true));
 
-		async function loadAgentChatContext() {
+		async function loadActiveVersion() {
 			try {
-				const [conversationData, versionData] = await Promise.all([
-					fetchJson<ChatConversation[]>(
-						`/api/workspace/conversations?agentId=${selectedAgentId}`,
-						{ signal: controller.signal },
-					),
-					fetchJson<AgentVersion[]>(
-						`/api/workspace/agents/${selectedAgentId}/versions?workspaceId=${workspaceId}`,
-						{ signal: controller.signal },
-					),
-				]);
+				const versionData = await fetchJson<AgentVersion[]>(
+					`/api/workspace/agents/${selectedAgentId}/versions?workspaceId=${workspaceId}`,
+					{ signal: controller.signal },
+				);
 				if (cancelled) return;
-				setConversations(conversationData);
 				setActiveVersion(
 					versionData.find((version) => version.isActive) ?? null,
 				);
@@ -155,7 +291,7 @@ export default function ChatPage() {
 			}
 		}
 
-		void loadAgentChatContext();
+		void loadActiveVersion();
 		return () => {
 			cancelled = true;
 			controller.abort();
@@ -183,7 +319,13 @@ export default function ChatPage() {
 
 	useEffect(() => {
 		if (!activeConversationId) {
+			skipNextMessageLoadRef.current = false;
 			setMessages([]);
+			return;
+		}
+		if (skipNextMessageLoadRef.current) {
+			skipNextMessageLoadRef.current = false;
+			setLoadingMessages(false);
 			return;
 		}
 		let cancelled = false;
@@ -199,7 +341,10 @@ export default function ChatPage() {
 					signal: controller.signal,
 				});
 				if (cancelled) return;
-				if (data.conversation?.agentId) {
+				const urlAgentId = new URL(window.location.href).searchParams.get(
+					"agentId",
+				);
+				if (data.conversation?.agentId && !urlAgentId) {
 					setSelectedAgentId(data.conversation.agentId);
 				}
 				setMessages(data.messages ?? []);
@@ -226,14 +371,126 @@ export default function ChatPage() {
 	function selectAgent(agentId: string) {
 		setSelectedAgentId(agentId);
 		setActiveVersion(null);
-		setActiveConversationId(null);
-		setMessages([]);
-		window.history.replaceState(null, "", `/chat?agentId=${agentId}`);
+		const params = new URLSearchParams({ agentId });
+		if (activeConversationId) {
+			params.set("conversationId", activeConversationId);
+		}
+		window.history.replaceState(null, "", `/chat?${params.toString()}`);
+	}
+
+	function selectConversation(conversationId: string) {
+		const conversation = conversations.find((item) => item.id === conversationId);
+		if (conversation) {
+			setSelectedAgentId(conversation.agentId);
+		}
+		setActiveConversationId(conversationId);
+		const params = new URLSearchParams();
+		if (conversation?.agentId) params.set("agentId", conversation.agentId);
+		params.set("conversationId", conversationId);
+		window.history.replaceState(null, "", `/chat?${params.toString()}`);
 	}
 
 	function startNewConversation() {
 		setActiveConversationId(null);
 		setMessages([]);
+		window.history.replaceState(
+			null,
+			"",
+			selectedAgentId ? `/chat?agentId=${selectedAgentId}` : "/chat",
+		);
+	}
+
+	async function renameConversation(conversationId: string, title: string) {
+		const data = await fetchJson<{ conversation: ChatConversation }>(
+			`/api/workspace/conversations/${conversationId}`,
+			{
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ title }),
+			},
+		);
+		setConversations((current) =>
+			current.map((conversation) =>
+				conversation.id === conversationId
+					? {
+							...conversation,
+							title: data.conversation.title,
+							updatedAt: data.conversation.updatedAt,
+						}
+					: conversation,
+			),
+		);
+	}
+
+	async function deleteConversation(conversationId: string) {
+		const confirmed = window.confirm("Delete this conversation?");
+		if (!confirmed) return;
+
+		await fetchJson(`/api/workspace/conversations/${conversationId}`, {
+			method: "DELETE",
+		});
+		setConversations((current) =>
+			current.filter((conversation) => conversation.id !== conversationId),
+		);
+		if (activeConversationId === conversationId) {
+			setActiveConversationId(null);
+			setMessages([]);
+			window.history.replaceState(
+				null,
+				"",
+				selectedAgentId ? `/chat?agentId=${selectedAgentId}` : "/chat",
+			);
+		}
+	}
+
+	function submitMessage() {
+		const content = input.trim();
+		if (!content || !canChat || sending) return;
+		setInput("");
+		void handleSubmit(content);
+	}
+
+	async function editMessage(message: ChatMessage, content: string) {
+		if (!activeConversationId) return;
+		await fetchJson(
+			`/api/workspace/conversations/${activeConversationId}/messages/${message.id}`,
+			{
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ content }),
+			},
+		);
+		setMessages(
+			messages.map((item) =>
+				item.id === message.id
+					? {
+							...item,
+							status: "completed",
+							parts: [{ type: "text", content }],
+						}
+					: item,
+			),
+		);
+	}
+
+	async function deleteMessage(message: ChatMessage) {
+		if (!activeConversationId) return;
+		await fetchJson(
+			`/api/workspace/conversations/${activeConversationId}/messages/${message.id}`,
+			{ method: "DELETE" },
+		);
+		setMessages(messages.filter((item) => item.id !== message.id));
+		await refreshConversations();
+	}
+
+	async function resendMessage(message: ChatMessage) {
+		if (!activeConversationId || sending) return;
+		const content = textFromMessage(message).trim();
+		if (!content) return;
+		await handleSubmit(content, {
+			resendFromMessageId: message.id,
+			reuseUserMessage: true,
+		});
 	}
 
 	async function reloadAgentContext() {
@@ -274,24 +531,25 @@ export default function ChatPage() {
 						<EmptyMedia variant="icon">
 							<BotIcon aria-hidden="true" />
 						</EmptyMedia>
-						<EmptyTitle>No agents available</EmptyTitle>
-						<EmptyDescription>
-							Create and configure an agent before starting a chat.
-						</EmptyDescription>
-					</EmptyHeader>
-					<div className="flex flex-wrap gap-2">
-						<Button asChild>
-							<Link href="/agents">
-								<PlusIcon data-icon="inline-start" aria-hidden="true" />
-								Create agent
-							</Link>
-						</Button>
-						<Button asChild variant="outline">
-							<Link href="/providers">Add provider</Link>
-						</Button>
-					</div>
-				</Empty>
+				<EmptyTitle>No agents available</EmptyTitle>
+				<EmptyDescription>
+					Run the short setup flow to connect a model and create your first
+					assistant.
+				</EmptyDescription>
+			</EmptyHeader>
+			<div className="flex flex-wrap gap-2">
+				<Button asChild>
+					<Link href="/setup">
+						<PlusIcon data-icon="inline-start" aria-hidden="true" />
+						Start setup
+					</Link>
+				</Button>
+				<Button asChild variant="outline">
+					<Link href="/agents">Manage assistants</Link>
+				</Button>
 			</div>
+		</Empty>
+	</div>
 		);
 	}
 
@@ -305,19 +563,67 @@ export default function ChatPage() {
 			canChat={canChat}
 			loadingSidebar={loadingContext}
 			onSelectAgent={selectAgent}
-			onSelectConversation={setActiveConversationId}
+			onSelectConversation={selectConversation}
 			onNewConversation={startNewConversation}
+			onRenameConversation={(conversationId, title) =>
+				void renameConversation(conversationId, title)
+			}
+			onDeleteConversation={(conversationId) =>
+				void deleteConversation(conversationId)
+			}
 			onSetupComplete={() => void reloadAgentContext()}
 		>
-			{quota ? <QuotaBanner used={quota.used} limit={quota.limit} /> : null}
-			<section className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
-				{pendingApproval ? (
-					<div className="mb-4">
-						<ToolApprovalBanner
-							approval={pendingApproval}
-							onApprove={() => void resolveApproval("approve")}
-							onReject={() => void resolveApproval("reject")}
-						/>
+			<ChatContextBar
+				quota={quota}
+				pendingApproval={pendingApproval}
+				onApprove={() => void resolveApproval("approve")}
+				onReject={() => void resolveApproval("reject")}
+			/>
+			<section className="min-h-0 flex-1 overflow-y-auto px-4 py-8">
+				{!loadingMessages && messages.length === 0 ? (
+					<div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-center py-12">
+						<Empty className="min-h-64 border-0 bg-transparent p-4">
+							<EmptyHeader>
+								<EmptyMedia variant="icon" className="bg-card/90 shadow-sm ring-1 ring-border/70">
+									<BotIcon aria-hidden="true" />
+								</EmptyMedia>
+								<EmptyTitle>
+									{canChat ? "What do you want to do?" : "Finish setup"}
+								</EmptyTitle>
+								<EmptyDescription>
+									{canChat
+										? "Send a message to start."
+										: "Choose a provider and model before sending messages."}
+								</EmptyDescription>
+							</EmptyHeader>
+							<EmptyContent className="flex flex-col gap-3">
+								{canChat ? (
+									<div className="flex flex-wrap justify-center gap-2">
+										{[
+											"Draft a system prompt",
+											"Compare model options",
+											"Write a support reply",
+										].map((prompt) => (
+											<Button
+												key={prompt}
+												type="button"
+												variant="outline"
+												size="sm"
+												onClick={() => setInput(prompt)}
+											>
+												{prompt}
+											</Button>
+										))}
+									</div>
+								) : (
+									<Button asChild size="sm" variant="outline">
+										<Link href={selectedAgentId ? `/agents/${selectedAgentId}` : "/agents"}>
+											Configure assistant
+										</Link>
+									</Button>
+								)}
+							</EmptyContent>
+						</Empty>
 					</div>
 				) : null}
 				<ChatMessageList
@@ -325,15 +631,17 @@ export default function ChatPage() {
 					sending={sending}
 					loading={loadingMessages}
 					bottomRef={bottomRef}
+					onEditMessage={editMessage}
+					onDeleteMessage={deleteMessage}
+					onResendMessage={resendMessage}
 				/>
 			</section>
 			<ChatComposer
 				input={input}
 				canChat={canChat}
 				sending={sending}
-				hasMessages={messages.length > 0}
 				onInputChange={setInput}
-				onSubmit={() => void handleSubmit(input.trim())}
+				onSubmit={submitMessage}
 			/>
 		</ChatLayout>
 	);

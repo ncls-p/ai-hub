@@ -165,7 +165,7 @@ export function McpServerManager() {
 			});
 			if (!res.ok) throw new Error((await res.json()).error || "Failed");
 			setForm(emptyForm);
-			toast.success("Integration added");
+			toast.success("MCP server added");
 			await load();
 		} catch (error) {
 			toast.error(
@@ -202,7 +202,7 @@ export function McpServerManager() {
 			);
 			if (!res.ok) throw new Error((await res.json()).error || "Failed");
 			setEditServer(null);
-			toast.success("Integration updated");
+			toast.success("MCP server updated");
 			await load();
 		} catch (error) {
 			toast.error(
@@ -223,7 +223,7 @@ export function McpServerManager() {
 			);
 			if (!res.ok) throw new Error("Failed to remove");
 			setDeleteId(null);
-			toast.success("Integration removed");
+			toast.success("MCP server removed");
 			await load();
 		} catch (error) {
 			toast.error(
@@ -314,7 +314,7 @@ export function McpServerManager() {
 		<div className="flex flex-col gap-6">
 			<Card>
 				<CardHeader>
-					<CardTitle>Add integration</CardTitle>
+					<CardTitle>Add MCP server</CardTitle>
 					<CardDescription>
 						Connect MCP servers with URL, API key headers, or stdio command.
 					</CardDescription>
@@ -401,7 +401,7 @@ export function McpServerManager() {
 					</div>
 					<Button disabled={busy || !form.name.trim()} onClick={() => void createServer()}>
 						{busy ? <Loader2 className="animate-spin" /> : <PlusIcon data-icon="inline-start" />}
-						Add integration
+						Add MCP server
 					</Button>
 				</CardContent>
 			</Card>
@@ -514,7 +514,7 @@ export function McpServerManager() {
 			<Dialog open={Boolean(editServer)} onOpenChange={() => setEditServer(null)}>
 				<DialogContent className="max-w-lg">
 					<DialogHeader>
-						<DialogTitle>Edit integration</DialogTitle>
+						<DialogTitle>Edit MCP server</DialogTitle>
 					</DialogHeader>
 					<div className="grid gap-3">
 						<div className="grid gap-2">
@@ -560,7 +560,7 @@ export function McpServerManager() {
 			<AlertDialog open={Boolean(deleteId)} onOpenChange={() => setDeleteId(null)}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Remove integration?</AlertDialogTitle>
+						<AlertDialogTitle>Remove MCP server?</AlertDialogTitle>
 						<AlertDialogDescription>
 							Agents bound to these tools will lose access.
 						</AlertDialogDescription>

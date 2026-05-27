@@ -53,10 +53,10 @@ export function ToolApprovalBanner({
 	const summary = summarizeToolInput(approval.toolName, approval.input);
 
 	return (
-		<div className="mx-auto flex w-full max-w-3xl flex-col gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+		<div className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-warning/35 bg-warning/10 px-4 py-3 text-sm shadow-sm">
 			<div className="flex items-start gap-2">
 				<ShieldAlertIcon
-					className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+					className="mt-0.5 size-4 shrink-0 text-warning"
 					aria-hidden="true"
 				/>
 				<div className="min-w-0 flex-1">

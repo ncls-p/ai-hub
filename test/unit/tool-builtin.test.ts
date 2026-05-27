@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { BuiltInToolDefinition } from "@/modules/tool/builtin-tools";
 
 let listBuiltInTools: () => unknown[];
@@ -17,6 +17,10 @@ beforeAll(async () => {
 		getBuiltInToolByName,
 		requiresApproval,
 	} = await import("@/modules/tool/builtin-tools"));
+});
+
+afterEach(() => {
+	vi.unstubAllGlobals();
 });
 
 describe("built-in tool registry", () => {
@@ -54,6 +58,12 @@ describe("built-in tool registry", () => {
 		const calculator = getBuiltInToolByName("calculator");
 		expect(calculator).not.toBeNull();
 		expect(calculator!.name).toBe("calculator");
+	});
+
+	it("includes web search", () => {
+		const webSearch = getBuiltInToolByName("web_search");
+		expect(webSearch).not.toBeNull();
+		expect(webSearch!.riskLevel).toBe("medium");
 	});
 
 	it("returns null for unknown tool name", () => {
@@ -122,5 +132,58 @@ describe("current_time tool", () => {
 		expect(typed).toHaveProperty("iso");
 		expect(typed).toHaveProperty("formatted");
 		expect(typed.timezone).toBe("UTC");
+	});
+});
+
+describe("web_search tool", () => {
+	it("queries SearXNG and normalizes results", async () => {
+		const fetchMock = vi.fn(async (url: string | URL) => {
+			expect(String(url)).toContain("/search?");
+			expect(String(url)).toContain("format=json");
+			expect(String(url)).toContain("q=ai+hub");
+			return new Response(
+				JSON.stringify({
+					results: [
+						{
+							title: "AI Hub",
+							url: "https://example.com/ai-hub",
+							content: "Workspace assistant platform",
+							score: 2.5,
+							engines: ["duckduckgo"],
+						},
+						{
+							title: "Ignored result without URL",
+							content: "Missing URL",
+						},
+					],
+				}),
+				{
+					status: 200,
+					headers: { "content-type": "application/json" },
+				},
+			);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const tool = getBuiltInToolByName("web_search");
+		expect(tool).not.toBeNull();
+		const result = (await tool!.execute({
+			query: "ai hub",
+			limit: 3,
+		})) as {
+			query: string;
+			results: Array<{ title: string; url: string; engines: string[] }>;
+		};
+
+		expect(result.query).toBe("ai hub");
+		expect(result.results).toEqual([
+			{
+				title: "AI Hub",
+				url: "https://example.com/ai-hub",
+				snippet: "Workspace assistant platform",
+				score: 2.5,
+				engines: ["duckduckgo"],
+			},
+		]);
 	});
 });

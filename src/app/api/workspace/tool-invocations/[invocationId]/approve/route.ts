@@ -4,11 +4,12 @@ import { z } from "zod";
 import { decryptValue, encryptValue } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
 import { getSession } from "@/modules/auth/session";
+import { executeMcpTool } from "@/modules/mcp/executor";
 import { getBuiltInTool } from "@/modules/tool/builtin-tools";
 import { audit } from "@/server/domain/services/audit";
 import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
-import { toolInvocations } from "@/server/infrastructure/db/schema";
+import { mcpTools, toolInvocations } from "@/server/infrastructure/db/schema";
 
 const paramsSchema = z.object({ invocationId: z.uuid() });
 
@@ -60,25 +61,44 @@ export async function POST(
 			);
 		}
 
-		if (invocation.toolSource !== "builtin") {
-			return NextResponse.json(
-				{ error: "Unsupported tool source" },
-				{ status: 400 },
-			);
-		}
-
-		const tool = getBuiltInTool(invocation.toolId);
-		if (!tool) {
-			return NextResponse.json({ error: "Tool not found" }, { status: 404 });
-		}
-
 		const startedAt = Date.now();
 		const input = invocation.inputJsonEncrypted
 			? JSON.parse(await decryptValue(invocation.inputJsonEncrypted))
 			: undefined;
 
 		try {
-			const output = await tool.execute(input as never);
+			let output: unknown;
+			if (invocation.toolSource === "builtin") {
+				const tool = getBuiltInTool(invocation.toolId);
+				if (!tool) {
+					return NextResponse.json({ error: "Tool not found" }, { status: 404 });
+				}
+				output = await tool.execute(input as never);
+			} else if (invocation.toolSource === "mcp") {
+				const [tool] = await db
+					.select({ mcpServerId: mcpTools.mcpServerId })
+					.from(mcpTools)
+					.where(eq(mcpTools.id, invocation.toolId))
+					.limit(1);
+				if (!tool) {
+					return NextResponse.json(
+						{ error: "MCP tool not found" },
+						{ status: 404 },
+					);
+				}
+				output = await executeMcpTool({
+					serverId: tool.mcpServerId,
+					toolId: invocation.toolId,
+					workspaceId: invocation.workspaceId,
+					toolInput: input,
+				});
+			} else {
+				return NextResponse.json(
+					{ error: "Unsupported tool source" },
+					{ status: 400 },
+				);
+			}
+
 			await db
 				.update(toolInvocations)
 				.set({

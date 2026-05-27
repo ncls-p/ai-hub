@@ -29,6 +29,21 @@ const httpFetchInputSchema = z.object({
 	method: z.enum(["GET", "HEAD"]).default("GET"),
 });
 
+const webSearchInputSchema = z.object({
+	query: z.string().trim().min(1).max(512),
+	limit: z.number().int().min(1).max(10).default(5),
+	language: z.string().trim().min(2).max(16).optional(),
+});
+
+type SearxngResult = {
+	title?: unknown;
+	url?: unknown;
+	content?: unknown;
+	engine?: unknown;
+	engines?: unknown;
+	score?: unknown;
+};
+
 function calculateExpression(expression: string) {
 	// Restricted by calculatorInputSchema to arithmetic-only characters.
 	const result = Function(`"use strict"; return (${expression});`)();
@@ -36,6 +51,59 @@ function calculateExpression(expression: string) {
 		throw new Error("Expression did not evaluate to a finite number");
 	}
 	return result;
+}
+
+function normalizeSearxngEngines(result: SearxngResult) {
+	if (Array.isArray(result.engines)) {
+		return result.engines.filter((engine) => typeof engine === "string");
+	}
+	if (typeof result.engine === "string") {
+		return [result.engine];
+	}
+	return [];
+}
+
+async function searchWebWithSearxng(input: z.infer<typeof webSearchInputSchema>) {
+	const limit = input.limit ?? 5;
+	const url = new URL(
+		"/search",
+		process.env.SEARXNG_URL || "http://localhost:18088",
+	);
+	url.searchParams.set("q", input.query);
+	url.searchParams.set("format", "json");
+	url.searchParams.set("safesearch", "1");
+	if (input.language) url.searchParams.set("language", input.language);
+
+	const response = await fetch(url, {
+		headers: { Accept: "application/json" },
+		signal: AbortSignal.timeout(15_000),
+	});
+	if (!response.ok) {
+		throw new Error(
+			`SearXNG search failed with ${response.status} ${response.statusText}`,
+		);
+	}
+
+	const payload = (await response.json()) as { results?: SearxngResult[] };
+	const results = Array.isArray(payload.results) ? payload.results : [];
+
+	return {
+		query: input.query,
+		results: results
+			.filter(
+				(result) =>
+					typeof result.title === "string" && typeof result.url === "string",
+			)
+			.slice(0, limit)
+			.map((result) => ({
+				title: result.title as string,
+				url: result.url as string,
+				snippet:
+					typeof result.content === "string" ? result.content.slice(0, 800) : "",
+				score: typeof result.score === "number" ? result.score : null,
+				engines: normalizeSearxngEngines(result),
+			})),
+	};
 }
 
 export const builtInTools = [
@@ -88,6 +156,15 @@ export const builtInTools = [
 			};
 		},
 	},
+	{
+		id: "00000000-0000-4000-8000-000000000004",
+		name: "web_search",
+		displayName: "Web search",
+		description: "Search the web through the workspace SearXNG instance.",
+		riskLevel: "medium",
+		inputSchema: webSearchInputSchema,
+		execute: searchWebWithSearxng,
+	},
 ] satisfies BuiltInToolDefinition[];
 
 export function listBuiltInTools() {
@@ -139,6 +216,28 @@ export function toolToJsonSchema(toolId: string) {
 				timezone: { type: "string", default: "UTC" },
 			},
 			required: [],
+		};
+	}
+	if (tool.name === "web_search") {
+		return {
+			type: "object",
+			properties: {
+				query: {
+					type: "string",
+					description: "Search query to send to SearXNG.",
+				},
+				limit: {
+					type: "number",
+					default: 5,
+					minimum: 1,
+					maximum: 10,
+				},
+				language: {
+					type: "string",
+					description: "Optional SearXNG language code, for example en or fr.",
+				},
+			},
+			required: ["query"],
 		};
 	}
 	return {

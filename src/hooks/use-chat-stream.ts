@@ -20,6 +20,11 @@ interface UseChatStreamOptions {
 	onConversationsRefresh: () => Promise<void>;
 }
 
+type SubmitOptions = {
+	resendFromMessageId?: string;
+	reuseUserMessage?: boolean;
+};
+
 export function useChatStream({
 	agentId,
 	conversationId,
@@ -39,17 +44,25 @@ export function useChatStream({
 		setPendingApproval(null);
 	}, []);
 
-	async function handleSubmit(content: string) {
+	async function handleSubmit(content: string, options: SubmitOptions = {}) {
 		if (!content || !agentId || !canChat || sending) return;
 
 		const userMessage = createLocalMessage("user", content);
 		const assistantMessage = createLocalMessage("assistant", "");
-		setMessages((current) => [...current, userMessage, assistantMessage]);
+		setMessages((current) => {
+			if (options.reuseUserMessage && options.resendFromMessageId) {
+				const messageIndex = current.findIndex(
+					(message) => message.id === options.resendFromMessageId,
+				);
+				if (messageIndex >= 0) {
+					return [...current.slice(0, messageIndex + 1), assistantMessage];
+				}
+			}
+			return [...current, userMessage, assistantMessage];
+		});
 		setSending(true);
 		setPendingApproval(null);
 		setCitations([]);
-
-		let newConversationId: string | null = null;
 
 		try {
 			const res = await fetch(`/api/workspace/${agentId}/chat`, {
@@ -58,6 +71,7 @@ export function useChatStream({
 				body: JSON.stringify({
 					content,
 					conversationId: conversationId ?? undefined,
+					resendFromMessageId: options.resendFromMessageId,
 				}),
 			});
 
@@ -68,7 +82,7 @@ export function useChatStream({
 
 			const headerConversationId = res.headers.get("X-Conversation-Id");
 			if (headerConversationId && !conversationId) {
-				newConversationId = headerConversationId;
+				onConversationCreated(headerConversationId);
 			}
 
 			const reader = res.body.getReader();
@@ -206,9 +220,6 @@ export function useChatStream({
 			setPendingApproval(null);
 
 			await onConversationsRefresh();
-			if (newConversationId) {
-				onConversationCreated(newConversationId);
-			}
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : "Chat request failed");
 			setMessages((current) =>
@@ -239,9 +250,11 @@ export function useChatStream({
 
 		const res = await fetch(endpoint, { method: "POST" });
 		if (!res.ok) {
-			toast.error(`Failed to ${action} tool invocation`);
+			const error = await res.json().catch(() => null);
+			toast.error(error?.error || `Failed to ${action} tool invocation`);
 			return;
 		}
+		setPendingApproval(null);
 		toast.success(
 			action === "approve" ? "Tool approved" : "Tool invocation rejected",
 		);

@@ -488,6 +488,7 @@ export const agentVersions = pgTable(
 		temperature: text("temperature"),
 		topP: text("top_p"),
 		maxOutputTokens: integer("max_output_tokens"),
+		maxToolCalls: integer("max_tool_calls").notNull().default(6),
 		toolChoice: varchar("tool_choice", { length: 32 }),
 		responseFormatJson: jsonb("response_format_json"),
 		memoryPolicyJson: jsonb("memory_policy_json"),

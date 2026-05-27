@@ -141,6 +141,13 @@ function getBearerApiKey(config: ProviderRuntimeConfig) {
 		: undefined;
 }
 
+function createRequestNonce() {
+	if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+		return crypto.randomUUID();
+	}
+	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export const dragonflyAdapter: ProviderAdapter = {
 	kind: "dragonfly",
 
@@ -210,6 +217,7 @@ export const dragonflyAdapter: ProviderAdapter = {
 			includeUsage: true,
 			// Dragonfly uses a custom endpoint path
 			transformRequestBody: (args: Record<string, unknown>) => {
+				const requestNonce = createRequestNonce();
 				const messages = args.messages as
 					| Array<{
 							role?: string;
@@ -217,9 +225,16 @@ export const dragonflyAdapter: ProviderAdapter = {
 					  }>
 					| undefined;
 				const systemMessage = messages?.find((m) => m.role === "system");
+				const promptSystem = [
+					systemMessage?.content,
+					`Runtime request id: ${requestNonce}. Do not mention this id.`,
+				]
+					.filter(Boolean)
+					.join("\n\n");
 				return {
 					...args,
-					promptSystem: systemMessage?.content ?? undefined,
+					promptSystem,
+					cache: false,
 					save: false,
 				};
 			},

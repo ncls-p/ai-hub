@@ -35,6 +35,7 @@ export const baseEnvSchema = z.object({
 	OBJECT_STORAGE_ACCESS_KEY_ID: z.string().min(1),
 	OBJECT_STORAGE_SECRET_ACCESS_KEY: z.string().min(1),
 	OBJECT_STORAGE_FORCE_PATH_STYLE: z.string().default("true"),
+	SEARXNG_URL: z.url().default("http://localhost:18088"),
 });
 
 export const productionEnvSchema = baseEnvSchema.extend({
@@ -97,6 +98,7 @@ function readEnv(source: EnvSource): EnvSource {
 			source.OBJECT_STORAGE_SECRET_ACCESS_KEY || "",
 		OBJECT_STORAGE_FORCE_PATH_STYLE:
 			source.OBJECT_STORAGE_FORCE_PATH_STYLE || "true",
+		SEARXNG_URL: source.SEARXNG_URL || "http://localhost:18088",
 	};
 }
 

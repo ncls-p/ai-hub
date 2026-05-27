@@ -130,7 +130,7 @@ export function WorkspaceApiKeys() {
 				</div>
 
 				{revealedKey ? (
-					<div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+					<div className="rounded-xl border border-warning/35 bg-warning/10 p-3 text-sm">
 						<p className="font-medium">Copy your new API key</p>
 						<div className="mt-2 flex items-center gap-2">
 							<code className="flex-1 truncate rounded bg-background px-2 py-1 text-xs">

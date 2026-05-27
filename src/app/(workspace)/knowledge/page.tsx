@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { cn } from "@/lib/utils";
 
 interface KnowledgeBase {
 	id: string;
@@ -62,6 +63,7 @@ export default function KnowledgePage() {
 	const [docForm, setDocForm] = useState({ title: "", content: "" });
 	const [query, setQuery] = useState("");
 	const [dragActive, setDragActive] = useState(false);
+	const [showCreateDialog, setShowCreateDialog] = useState(false);
 	const [editingBase, setEditingBase] = useState<KnowledgeBase | null>(null);
 	const [editBaseForm, setEditBaseForm] = useState({ name: "", description: "" });
 
@@ -187,6 +189,7 @@ export default function KnowledgePage() {
 		});
 		if (!res.ok) return toast.error("Failed to create knowledge base");
 		setBaseForm({ name: "", description: "" });
+		setShowCreateDialog(false);
 		await loadBases();
 		toast.success("Knowledge base created");
 	}
@@ -259,83 +262,151 @@ export default function KnowledgePage() {
 		<WorkspacePage
 			kicker="Configuration"
 			title="Knowledge bases"
-			description="Encrypted chunks, workspace isolation, and citation-ready retrieval."
+			description="Add source text once, then bind the knowledge base to assistants that need it."
 			width="wide"
+			actions={
+				<Button type="button" onClick={() => setShowCreateDialog(true)}>
+					<PlusIcon data-icon="inline-start" />
+					New base
+				</Button>
+			}
 		>
-			<div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-			<section className="flex flex-col gap-4">
-				<Card>
-					<CardHeader>
-						<CardTitle>Create base</CardTitle>
-					</CardHeader>
-					<CardContent className="grid gap-3">
-						<Label>Name</Label>
+			<Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Create knowledge base</DialogTitle>
+					</DialogHeader>
+					<div className="grid gap-3">
+						<Label htmlFor="knowledge-name">Name</Label>
 						<Input
+							id="knowledge-name"
 							value={baseForm.name}
 							onChange={(e) =>
 								setBaseForm({ ...baseForm, name: e.target.value })
 							}
 						/>
-						<Label>Description</Label>
+						<Label htmlFor="knowledge-description">Description</Label>
 						<Input
+							id="knowledge-description"
 							value={baseForm.description}
 							onChange={(e) =>
 								setBaseForm({ ...baseForm, description: e.target.value })
 							}
 						/>
-						<Button onClick={() => void createBase()}>
-							<PlusIcon data-icon="inline-start" />
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+							Cancel
+						</Button>
+						<Button
+							onClick={() => void createBase()}
+							disabled={!baseForm.name.trim()}
+						>
 							Create
 						</Button>
-					</CardContent>
-				</Card>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+			<div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
+			<section className="flex flex-col gap-4">
+				<div className="flex items-center justify-between">
+					<div>
+						<h2 className="text-sm font-semibold">Bases</h2>
+						<p className="text-xs text-muted-foreground">
+							Choose the source set to manage.
+						</p>
+					</div>
+					<Button
+						type="button"
+						size="icon-sm"
+						variant="outline"
+						aria-label="Create knowledge base"
+						onClick={() => setShowCreateDialog(true)}
+					>
+						<PlusIcon aria-hidden="true" />
+					</Button>
+				</div>
 				{loading ? (
 					<Loader2 className="animate-spin" />
-				) : (
-					bases.map((base) => (
-						<div
-							key={base.id}
-							className={`rounded-xl border p-3 text-left text-sm ${selectedId === base.id ? "border-primary bg-primary/5" : "border-border"}`}
-						>
-							<button
+				) : bases.length === 0 ? (
+					<Card>
+						<CardContent className="flex flex-col items-start gap-3 p-4 text-sm text-muted-foreground">
+							<p>No knowledge bases yet.</p>
+							<Button
 								type="button"
-								onClick={() => setSelectedId(base.id)}
-								className="w-full text-left"
+								size="sm"
+								variant="outline"
+								onClick={() => setShowCreateDialog(true)}
 							>
-								<span className="font-medium">{base.name}</span>
-								{base.description ? (
-									<p className="text-muted-foreground">{base.description}</p>
-								) : null}
-							</button>
-							<div className="mt-2 flex gap-1">
-								<Button
+								<PlusIcon data-icon="inline-start" />
+								Create base
+							</Button>
+						</CardContent>
+					</Card>
+				) : (
+					<div className="flex flex-col gap-2">
+						{bases.map((base) => (
+							<div
+								key={base.id}
+								className={cn(
+									"group flex items-start gap-2 rounded-2xl border p-3 text-left text-sm transition-colors",
+									selectedId === base.id
+										? "border-primary/45 bg-primary/10"
+										: "border-border/60 bg-card/70 hover:bg-muted/50",
+								)}
+							>
+								<button
 									type="button"
-									size="icon-sm"
-									variant="ghost"
-									onClick={() => {
-										setEditingBase(base);
-										setEditBaseForm({
-											name: base.name,
-											description: base.description ?? "",
-										});
-									}}
+									onClick={() => setSelectedId(base.id)}
+									className="min-w-0 flex-1 text-left"
 								>
-									<PencilIcon className="size-4" />
-								</Button>
-								<Button
-									type="button"
-									size="icon-sm"
-									variant="ghost"
-									onClick={() => void deleteBase(base.id)}
-								>
-									<Trash2Icon className="size-4" />
-								</Button>
+									<span className="block truncate font-medium">{base.name}</span>
+									{base.description ? (
+										<p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+											{base.description}
+										</p>
+									) : null}
+								</button>
+								<div className="flex shrink-0 gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+									<Button
+										type="button"
+										size="icon-sm"
+										variant="ghost"
+										aria-label={`Edit ${base.name}`}
+										onClick={() => {
+											setEditingBase(base);
+											setEditBaseForm({
+												name: base.name,
+												description: base.description ?? "",
+											});
+										}}
+									>
+										<PencilIcon aria-hidden="true" />
+									</Button>
+									<Button
+										type="button"
+										size="icon-sm"
+										variant="ghost"
+										aria-label={`Delete ${base.name}`}
+										onClick={() => void deleteBase(base.id)}
+									>
+										<Trash2Icon aria-hidden="true" />
+									</Button>
+								</div>
 							</div>
-						</div>
-					))
+						))}
+					</div>
 				)}
 			</section>
 			<section className="flex flex-col gap-4">
+				{!selectedId ? (
+					<Card>
+						<CardContent className="p-8 text-center text-sm text-muted-foreground">
+							Select or create a knowledge base to add documents.
+						</CardContent>
+					</Card>
+				) : (
+					<>
 				<Card>
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
@@ -431,6 +502,8 @@ export default function KnowledgePage() {
 						))}
 					</CardContent>
 				</Card>
+					</>
+				)}
 			</section>
 			<Dialog open={Boolean(editingBase)} onOpenChange={() => setEditingBase(null)}>
 				<DialogContent>

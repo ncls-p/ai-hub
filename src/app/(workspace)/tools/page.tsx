@@ -82,16 +82,15 @@ function StatusIcon({ status }: { status: string }) {
 	const className = "size-4 shrink-0";
 	switch (status) {
 		case "success":
-			return <CheckCircle2 className={`${className} text-green-500`} />;
+			return <CheckCircle2 className={`${className} text-success`} />;
 		case "awaiting_approval":
 		case "pending_approval":
-			return <Clock className={`${className} text-yellow-500`} />;
+			return <Clock className={`${className} text-warning`} />;
 		case "failed":
-			return <XCircle className={`${className} text-red-500`} />;
 		case "rejected":
-			return <XCircle className={`${className} text-orange-500`} />;
+			return <XCircle className={`${className} text-destructive`} />;
 		case "denied":
-			return <ShieldAlert className={`${className} text-red-500`} />;
+			return <ShieldAlert className={`${className} text-destructive`} />;
 		default:
 			return <Clock className={`${className} text-muted-foreground`} />;
 	}
@@ -186,7 +185,7 @@ function InvocationSummary({ invocation }: { invocation: ToolInvocation }) {
 				{invocation.errorMessage && (
 					<>
 						<span>·</span>
-						<span className="text-red-500">{invocation.errorMessage}</span>
+						<span className="text-destructive">{invocation.errorMessage}</span>
 					</>
 				)}
 			</div>
@@ -208,9 +207,9 @@ function PendingApprovalsPanel({
 	if (invocations.length === 0) return null;
 
 	return (
-		<Card className="border-yellow-500/30 bg-yellow-500/5">
+		<Card className="border-warning/35 bg-warning/10">
 			<CardHeader>
-				<CardTitle className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+				<CardTitle className="flex items-center gap-2 text-foreground">
 					<Clock className="size-5" aria-hidden="true" />
 					Pending Approvals ({invocations.length})
 				</CardTitle>
@@ -222,7 +221,7 @@ function PendingApprovalsPanel({
 				{invocations.map((invocation) => (
 					<div
 						key={invocation.id}
-						className="flex flex-col gap-3 rounded-xl border border-yellow-500/20 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between"
+						className="flex flex-col gap-3 rounded-xl border border-warning/25 bg-background/60 p-4 sm:flex-row sm:items-center sm:justify-between"
 					>
 						<InvocationSummary invocation={invocation} />
 						<InvocationActions
