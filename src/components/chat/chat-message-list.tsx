@@ -3,16 +3,17 @@
 import { memo, useState } from "react";
 import {
 	BrainIcon,
-	CheckIcon,
 	CheckCircle2Icon,
+	CheckIcon,
 	ChevronDownIcon,
+	ClockIcon,
 	MoreHorizontalIcon,
 	PencilIcon,
 	RefreshCcwIcon,
 	ShieldAlertIcon,
 	SparklesIcon,
 	Trash2Icon,
-	WrenchIcon,
+	XCircleIcon,
 	XIcon,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
@@ -21,9 +22,11 @@ import { code } from "@streamdown/code";
 import { CitationBlock } from "@/components/chat/citation-block";
 import {
 	citationsFromMessage,
+	getToolStatus,
 	parseToolPart,
 	renderablePartsFromMessage,
 	textFromMessage,
+	toolNameMatches,
 	type ChatMessage,
 	type ChatMessagePart,
 	type PendingToolApproval,
@@ -52,23 +55,6 @@ function stringifyForMatch(value: unknown) {
 	} catch {
 		return String(value);
 	}
-}
-
-function sanitizeToolName(name: string) {
-	return name.replace(/[^a-zA-Z0-9_]/g, "_").replace(/^_+|_+$/g, "");
-}
-
-function toolNameMatches(
-	toolCallName: string | undefined,
-	approvalName: string,
-) {
-	if (!toolCallName) return false;
-	if (toolCallName === approvalName) return true;
-	const sanitizedApprovalName = sanitizeToolName(approvalName);
-	return (
-		toolCallName === sanitizedApprovalName ||
-		toolCallName.endsWith(`_${sanitizedApprovalName}`)
-	);
 }
 
 function formatToolName(toolName: string | undefined) {
@@ -190,61 +176,84 @@ function ToolPartCard({
 }) {
 	const [open, setOpen] = useState(false);
 	const parsed = parseToolPart(part.content);
-	const isCall = part.type === "tool-call";
-	const body = isCall ? parsed.input : parsed.output;
 	const friendlyName = formatToolName(parsed.toolName);
+	const status = getToolStatus(parsed);
+	const hasResult = parsed.output !== undefined;
 	const approvalMatches = Boolean(approval);
-	const bodyText =
-		typeof body === "string" ? body : JSON.stringify(body ?? {}, null, 2);
-	const summary = summarizeToolBody(parsed.toolName, body, isCall);
-	const statusLabel = approvalMatches
-		? "Needs approval"
-		: isCall
-			? "Action proposed"
-			: "Result received";
-	const Icon = approvalMatches
-		? ShieldAlertIcon
-		: isCall
-			? WrenchIcon
-			: CheckCircle2Icon;
+
+	// Build a concise summary line
+	let summaryText = "";
+	if (status === "pending") {
+		summaryText = summarizeToolInput(friendlyName, parsed.input);
+	} else if (hasResult) {
+		summaryText = summarizeToolBody(parsed.toolName, parsed.output, false);
+	}
+
+	// Determine icon and colors based on status
+	let StatusIcon: React.ComponentType<{ className?: string }>;
+	let iconBgClass: string;
+	if (status === "error") {
+		StatusIcon = XCircleIcon;
+		iconBgClass = "border-red-400/30 bg-red-400/10 text-red-500";
+	} else if (approvalMatches) {
+		StatusIcon = ShieldAlertIcon;
+		iconBgClass = "border-amber-400/30 bg-amber-400/15 text-amber-500";
+	} else if (status === "pending") {
+		StatusIcon = ClockIcon;
+		iconBgClass = "border-blue-400/30 bg-blue-400/10 text-blue-500";
+	} else {
+		StatusIcon = CheckCircle2Icon;
+		iconBgClass = "border-emerald-400/30 bg-emerald-400/10 text-emerald-500";
+	}
+
+	// For expanded view: show input and output
+	const inputText =
+		parsed.input != null
+			? typeof parsed.input === "string"
+				? parsed.input
+				: JSON.stringify(parsed.input, null, 2)
+			: "";
+	const outputText =
+		parsed.output != null
+			? typeof parsed.output === "string"
+				? parsed.output
+				: JSON.stringify(parsed.output, null, 2)
+			: "";
 
 	return (
 		<Collapsible
 			open={open}
 			onOpenChange={setOpen}
 			className={cn(
-				"overflow-hidden rounded-xl border bg-background/80 text-xs shadow-sm",
-				approvalMatches ? "border-warning/45 bg-warning/5" : "border-border/60",
+				"group/tool overflow-hidden rounded-lg border text-[11px] transition-colors",
+				approvalMatches
+					? "border-warning/30 bg-warning/[0.04]"
+					: "border-border/40 bg-muted/[0.3] hover:bg-muted/[0.45]",
 			)}
 		>
-			<div className="flex items-start gap-3 px-3 py-2.5">
+			<div className="flex items-center gap-2 px-2.5 py-1.5">
 				<div
 					className={cn(
-						"mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border",
-						approvalMatches
-							? "border-warning/35 bg-warning/15 text-warning"
-							: isCall
-								? "border-primary/15 bg-primary/10 text-primary"
-								: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600",
+						"flex size-5 shrink-0 items-center justify-center rounded border",
+						iconBgClass,
 					)}
 				>
-					<Icon className="size-4" aria-hidden="true" />
+					<StatusIcon className="size-3" aria-hidden="true" />
 				</div>
-				<div className="min-w-0 flex-1">
-					<div className="flex flex-wrap items-center gap-2">
-						<span className="font-medium text-foreground">{statusLabel}</span>
-						<span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] leading-4 text-muted-foreground">
-							{friendlyName}
-						</span>
-					</div>
-					<p className="mt-1 line-clamp-2 text-muted-foreground">{summary}</p>
-				</div>
+				<span className="shrink-0 font-medium text-foreground/80">
+					{friendlyName}
+				</span>
+				{summaryText ? (
+					<span className="truncate text-muted-foreground">
+						· {summaryText}
+					</span>
+				) : null}
 				<CollapsibleTrigger asChild>
 					<Button
 						type="button"
 						variant="ghost"
 						size="sm"
-						className="h-7 shrink-0 px-2 text-xs"
+						className="ml-auto h-5 shrink-0 px-1.5 text-[11px] opacity-0 group-hover/tool:opacity-100"
 					>
 						<ChevronDownIcon
 							className={cn(
@@ -253,34 +262,33 @@ function ToolPartCard({
 							)}
 							aria-hidden="true"
 						/>
-						{open ? "Hide" : "Raw"}
 					</Button>
 				</CollapsibleTrigger>
 			</div>
 			{approval ? (
-				<div className="border-t border-warning/25 bg-warning/10 px-3 py-2.5">
+				<div className="border-t border-warning/20 bg-warning/[0.06] px-3 py-2">
 					<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-						<p className="text-xs text-foreground">
-							The assistant is waiting before running this action.
+						<p className="text-[11px] text-muted-foreground">
+							Waiting for approval before running this action.
 						</p>
-						<div className="flex shrink-0 justify-end gap-2">
+						<div className="flex shrink-0 justify-end gap-1.5">
 							<Button
 								type="button"
 								size="sm"
 								variant="outline"
-								className="h-8 px-3 text-xs"
+								className="h-7 px-2.5 text-[11px]"
 								onClick={() => onReject?.(approval)}
 							>
-								<XIcon data-icon="inline-start" aria-hidden="true" />
+								<XIcon className="size-3" aria-hidden="true" />
 								Reject
 							</Button>
 							<Button
 								type="button"
 								size="sm"
-								className="h-8 px-3 text-xs"
+								className="h-7 px-2.5 text-[11px]"
 								onClick={() => onApprove?.(approval)}
 							>
-								<CheckIcon data-icon="inline-start" aria-hidden="true" />
+								<CheckIcon className="size-3" aria-hidden="true" />
 								Approve
 							</Button>
 						</div>
@@ -288,22 +296,27 @@ function ToolPartCard({
 				</div>
 			) : null}
 			<CollapsibleContent>
-				<div className="border-t border-border/60 bg-muted/25 px-3 py-2.5">
-					<div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-						<span>{isCall ? "Input sent to tool" : "Tool output"}</span>
-						<Button
-							type="button"
-							size="sm"
-							variant="ghost"
-							className="h-6 px-2 text-[11px]"
-							onClick={() => setOpen(false)}
-						>
-							Close
-						</Button>
-					</div>
-					<pre className="max-h-72 overflow-auto rounded-md bg-background/80 p-2 text-[11px] leading-5 text-muted-foreground">
-						{bodyText || "(no body)"}
-					</pre>
+				<div className="border-t border-border/30 bg-muted/20 px-3 py-2">
+					{inputText ? (
+						<div className="mb-2">
+							<div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+								Input
+							</div>
+							<pre className="max-h-40 overflow-auto rounded bg-background/60 p-2 leading-4 text-[11px] text-muted-foreground">
+								{inputText}
+							</pre>
+						</div>
+					) : null}
+					{outputText ? (
+						<div>
+							<div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+								Output
+							</div>
+							<pre className="max-h-60 overflow-auto rounded bg-background/60 p-2 leading-4 text-[11px] text-muted-foreground">
+								{outputText}
+							</pre>
+						</div>
+					) : null}
 				</div>
 			</CollapsibleContent>
 		</Collapsible>

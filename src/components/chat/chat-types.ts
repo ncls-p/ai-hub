@@ -48,6 +48,23 @@ export interface ChatCitation {
 	knowledgeBaseName?: string;
 }
 
+export function sanitizeToolName(name: string) {
+	return name.replace(/[^a-zA-Z0-9_]/g, "_").replace(/^_+|_+$/g, "");
+}
+
+export function toolNameMatches(
+	toolCallName: string | undefined,
+	approvalName: string,
+) {
+	if (!toolCallName) return false;
+	if (toolCallName === approvalName) return true;
+	const sanitizedApprovalName = sanitizeToolName(approvalName);
+	return (
+		toolCallName === sanitizedApprovalName ||
+		toolCallName.endsWith(`_${sanitizedApprovalName}`)
+	);
+}
+
 export type ChatStreamEvent =
 	| { type: "text" | "reasoning"; delta: string }
 	| { type: "done" }
@@ -90,14 +107,68 @@ export function reasoningFromMessage(message: ChatMessage) {
 		.join("\n");
 }
 
+function parseToolPartRecord(part: ChatMessagePart) {
+	try {
+		return JSON.parse(part.content) as Record<string, unknown>;
+	} catch {
+		return null;
+	}
+}
+
+function mergeToolParts(parts: ChatMessagePart[]): ChatMessagePart[] {
+	const callsById = new Set<string>();
+	const resultsByCallId = new Map<string, Record<string, unknown>>();
+
+	for (const part of parts) {
+		const parsed = parseToolPartRecord(part);
+		if (!parsed || typeof parsed.toolCallId !== "string") continue;
+		const callId = parsed.toolCallId;
+
+		if (part.type === "tool-call") {
+			callsById.add(callId);
+		} else if (part.type === "tool-result") {
+			resultsByCallId.set(callId, parsed);
+		}
+	}
+
+	return parts.flatMap((part) => {
+		if (part.type === "tool-call") {
+			const parsed = parseToolPartRecord(part);
+			if (!parsed || typeof parsed.toolCallId !== "string") return [part];
+
+			const result = resultsByCallId.get(parsed.toolCallId);
+			if (!result) return [part];
+
+			return [
+				{
+					type: "tool-call",
+					content: JSON.stringify({
+						...parsed,
+						toolName: parsed.toolName ?? result.toolName,
+						output: result.output,
+					}),
+				},
+			];
+		}
+
+		if (part.type === "tool-result") {
+			const parsed = parseToolPartRecord(part);
+			const callId = parsed?.toolCallId;
+			return typeof callId === "string" && callsById.has(callId) ? [] : [part];
+		}
+
+		return [part];
+	});
+}
+
 export function renderablePartsFromMessage(message: ChatMessage) {
-	return message.parts.filter((part) =>
+	return mergeToolParts(message.parts).filter((part) =>
 		["text", "reasoning", "tool-call", "tool-result"].includes(part.type),
 	);
 }
 
 export function toolPartsFromMessage(message: ChatMessage) {
-	return message.parts.filter(
+	return mergeToolParts(message.parts).filter(
 		(part) => part.type === "tool-call" || part.type === "tool-result",
 	);
 }
@@ -113,6 +184,7 @@ export function citationsFromMessage(message: ChatMessage): ChatCitation[] {
 }
 
 export function parseToolPart(content: string): {
+	toolCallId?: string;
 	toolName?: string;
 	input?: unknown;
 	output?: unknown;
@@ -126,6 +198,22 @@ export function parseToolPart(content: string): {
 	} catch {
 		return { output: content };
 	}
+}
+
+function isDeniedToolOutput(output: unknown) {
+	return (
+		typeof output === "object" &&
+		output !== null &&
+		(output as { denied?: unknown }).denied === true
+	);
+}
+
+export function getToolStatus(
+	parsed: ReturnType<typeof parseToolPart>,
+): "pending" | "completed" | "error" {
+	if (parsed.denied || isDeniedToolOutput(parsed.output)) return "error";
+	if (parsed.output !== undefined) return "completed";
+	return "pending";
 }
 
 export function summarizeToolPart(content: string) {
@@ -183,6 +271,7 @@ export function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
 		invocationId?: unknown;
 		toolName?: unknown;
 		input?: unknown;
+		toolCallId?: unknown;
 		citations?: unknown;
 		sources?: unknown;
 	};
@@ -208,6 +297,7 @@ export function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
 	}
 	if (
 		(event.type === "tool_call" || event.type === "tool_result") &&
+		typeof event.toolCallId === "string" &&
 		typeof event.toolName === "string"
 	) {
 		return true;

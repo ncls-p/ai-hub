@@ -7,6 +7,7 @@ import {
 	appendMessagePart,
 	createLocalMessage,
 	isChatStreamEvent,
+	toolNameMatches,
 	type ChatCitation,
 	type ChatMessage,
 	type ChatStreamEvent,
@@ -199,25 +200,60 @@ function applyStreamEvent(
 		return;
 	}
 
-	if (parsed.type === "tool_call" || parsed.type === "tool_result") {
-		const partType = parsed.type === "tool_call" ? "tool-call" : "tool-result";
-		const content = JSON.stringify(
-			parsed.type === "tool_call"
-				? {
-						toolCallId: parsed.toolCallId,
-						toolName: parsed.toolName,
-						input: parsed.input,
+	if (parsed.type === "tool_call") {
+		const content = JSON.stringify({
+			toolCallId: parsed.toolCallId,
+			toolName: parsed.toolName,
+			input: parsed.input,
+		});
+		handlers.updateAssistant((message) => ({
+			...message,
+			parts: [...message.parts, { type: "tool-call", content }],
+		}));
+		return;
+	}
+
+	if (parsed.type === "tool_result") {
+		// Merge result into the matching tool-call part by toolCallId, but keep
+		// unmatched results visible for resumed or legacy streams.
+		handlers.updateAssistant((message) => {
+			const nextParts = [...message.parts];
+			let matched = false;
+			for (let i = 0; i < nextParts.length; i++) {
+				if (nextParts[i].type !== "tool-call") continue;
+				try {
+					const parsedPart = JSON.parse(nextParts[i].content) as Record<
+						string,
+						unknown
+					>;
+					if (parsedPart.toolCallId === parsed.toolCallId) {
+						nextParts[i] = {
+							type: "tool-call",
+							content: JSON.stringify({
+								...parsedPart,
+								toolName: parsedPart.toolName ?? parsed.toolName,
+								output: parsed.output,
+							}),
+						};
+						matched = true;
+						break;
 					}
-				: {
+				} catch {
+					// skip unparseable parts
+				}
+			}
+			if (!matched) {
+				nextParts.push({
+					type: "tool-result",
+					content: JSON.stringify({
 						toolCallId: parsed.toolCallId,
 						toolName: parsed.toolName,
 						output: parsed.output,
-					},
-		);
-		handlers.updateAssistant((message) => ({
-			...message,
-			parts: [...message.parts, { type: partType, content }],
-		}));
+					}),
+				});
+			}
+			return { ...message, parts: nextParts };
+		});
 		return;
 	}
 
@@ -227,7 +263,7 @@ function applyStreamEvent(
 				? parsed.citations
 				: "sources" in parsed
 					? (parsed as { sources: ChatCitation[] }).sources
-				: [];
+					: [];
 		handlers.setCitations(citationList);
 		handlers.updateAssistant((message) => ({
 			...message,
@@ -275,34 +311,39 @@ export function useChatStream({
 		);
 	}, [messages]);
 
-	const setMessagesDirect = useCallback((next: ChatMessage[]) => {
-		if (next.length === 0 || !conversationId) {
-			resolvedApprovalIdsRef.current.clear();
-			setMessages(next);
-			setCitations([]);
-			setPendingApprovals([]);
-			return;
-		}
+	const setMessagesDirect = useCallback(
+		(next: ChatMessage[]) => {
+			if (next.length === 0 || !conversationId) {
+				resolvedApprovalIdsRef.current.clear();
+				setMessages(next);
+				setCitations([]);
+				setPendingApprovals([]);
+				return;
+			}
 
-		const draft = getStoredChatStreamDraft(conversationId);
-		setMessages(mergeStoredDraft(next, draft));
-		setCitations([]);
-		setPendingApprovals(
-			filterResolvedApprovals(
-				approvalsFromDraft(draft),
-				resolvedApprovalIdsRef.current,
-			),
-		);
-	}, [conversationId]);
+			const draft = getStoredChatStreamDraft(conversationId);
+			setMessages(mergeStoredDraft(next, draft));
+			setCitations([]);
+			setPendingApprovals(
+				filterResolvedApprovals(
+					approvalsFromDraft(draft),
+					resolvedApprovalIdsRef.current,
+				),
+			);
+		},
+		[conversationId],
+	);
 
 	useEffect(() => {
 		if (!conversationId) return;
 
 		function handleDraftEvent(event: Event) {
-			const detail = (event as CustomEvent<{
-				conversationId?: string;
-				draft?: StoredChatStreamDraft | null;
-			}>).detail;
+			const detail = (
+				event as CustomEvent<{
+					conversationId?: string;
+					draft?: StoredChatStreamDraft | null;
+				}>
+			).detail;
 			if (detail?.conversationId !== conversationId) return;
 			if (!detail.draft) {
 				setPendingApprovals([]);
@@ -389,9 +430,7 @@ export function useChatStream({
 		let completed = false;
 		queueMicrotask(() => setResuming(true));
 
-		function updateAssistant(
-			updater: (message: ChatMessage) => ChatMessage,
-		) {
+		function updateAssistant(updater: (message: ChatMessage) => ChatMessage) {
 			setMessages((current) =>
 				current.map((message) =>
 					message.id === activeStreamingMessageId ? updater(message) : message,
@@ -585,7 +624,8 @@ export function useChatStream({
 			assistantDraft = updater(assistantDraft);
 			setMessages((current) =>
 				current.map((message) =>
-					message.id === assistantMessage.id || message.id === assistantMessageId
+					message.id === assistantMessage.id ||
+					message.id === assistantMessageId
 						? assistantDraft
 						: message,
 				),
@@ -676,7 +716,8 @@ export function useChatStream({
 
 			updateAssistantDraft((message) => ({ ...message, status: "completed" }));
 			clearPendingApprovals();
-			if (activeConversationId) clearStoredChatStreamDraft(activeConversationId);
+			if (activeConversationId)
+				clearStoredChatStreamDraft(activeConversationId);
 
 			await onConversationsRefresh();
 		} catch (err) {
@@ -687,7 +728,8 @@ export function useChatStream({
 				parts: [{ type: "text", content: "The assistant failed to respond." }],
 			}));
 			clearPendingApprovals();
-			if (activeConversationId) clearStoredChatStreamDraft(activeConversationId);
+			if (activeConversationId)
+				clearStoredChatStreamDraft(activeConversationId);
 		} finally {
 			setSending(false);
 		}
@@ -716,6 +758,44 @@ export function useChatStream({
 		setPendingApprovals((current) =>
 			removePendingApproval(current, approval.invocationId),
 		);
+
+		// When rejecting, mark only the matching tool-call part as denied so it
+		// displays in red while avoiding unrelated calls with the same name.
+		if (action === "reject") {
+			setMessages((current) =>
+				current.map((message) => {
+					const nextParts = message.parts.map((part) => {
+						if (part.type !== "tool-call") return part;
+						try {
+							const parsed = JSON.parse(part.content) as Record<
+								string,
+								unknown
+							>;
+							const inputMatches =
+								parsed.input === undefined ||
+								JSON.stringify(parsed.input) === JSON.stringify(approval.input);
+							if (
+								inputMatches &&
+								toolNameMatches(
+									parsed.toolName as string | undefined,
+									approval.toolName,
+								)
+							) {
+								return {
+									type: part.type,
+									content: JSON.stringify({ ...parsed, denied: true }),
+								};
+							}
+						} catch {
+							// skip unparseable parts
+						}
+						return part;
+					});
+					return { ...message, parts: nextParts };
+				}),
+			);
+		}
+
 		if (conversationId) {
 			const draft = getStoredChatStreamDraft(conversationId);
 			if (draft) {
