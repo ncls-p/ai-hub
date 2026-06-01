@@ -6,9 +6,8 @@ import { WorkspacePage } from "@/components/workspace-page";
 export default function ApiKeysPage() {
 	return (
 		<WorkspacePage
-			kicker="Access"
-			title="API keys"
-			description="Create and revoke workspace API keys for scripts, CI, and integrations."
+			title="API Keys"
+			description="Create and manage API keys for external scripts, CI pipelines, and integrations."
 			width="narrow"
 		>
 			<WorkspaceApiKeys />

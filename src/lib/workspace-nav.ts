@@ -38,38 +38,40 @@ export type WorkspaceShellState = {
 	permissions: WorkspacePermissions;
 };
 
-export const workNavItems: NavItem[] = [
+export const primaryNavItems: NavItem[] = [
 	{ href: "/chat", label: "Chat", icon: MessageSquareIcon },
 	{ href: "/agents", label: "Assistants", icon: BotIcon },
 ];
 
-export const resourceNavItems: NavItem[] = [
+export const capabilitiesNavItems: NavItem[] = [
 	{ href: "/knowledge", label: "Knowledge", icon: BookOpenIcon },
-	{ href: "/marketplace", label: "Catalog", icon: StoreIcon },
-];
-
-export const configurationNavItems: NavItem[] = [
-	{ href: "/providers", label: "AI Connections", icon: PlugZapIcon },
+	{ href: "/tools", label: "Tools", icon: WrenchIcon },
 	{ href: "/mcp", label: "MCP", icon: ServerIcon },
-	{ href: "/api-keys", label: "API keys", icon: KeyRoundIcon },
+	{ href: "/marketplace", label: "Marketplace", icon: StoreIcon },
 ];
 
-export const governanceNavItems: NavItem[] = [
+export const configNavItems: NavItem[] = [
+	{ href: "/providers", label: "Providers", icon: PlugZapIcon },
+	{ href: "/api-keys", label: "API Keys", icon: KeyRoundIcon },
+];
+
+export const adminNavItems: NavItem[] = [
 	{ href: "/usage", label: "Usage", icon: ActivityIcon },
-	{ href: "/audit", label: "Activity log", icon: ScrollTextIcon },
+	{ href: "/audit", label: "Audit Log", icon: ScrollTextIcon },
+	{ href: "/members", label: "Team", icon: UsersIcon },
 ];
 
 export const routeTitles: Record<string, string> = {
 	"/chat": "Chat",
 	"/agents": "Assistants",
-	"/providers": "AI Connections",
+	"/providers": "Providers",
 	"/knowledge": "Knowledge",
 	"/mcp": "MCP",
-	"/tools": "Approvals",
-	"/marketplace": "Catalog",
-	"/api-keys": "API keys",
+	"/tools": "Tools",
+	"/marketplace": "Marketplace",
+	"/api-keys": "API Keys",
 	"/usage": "Usage",
-	"/audit": "Activity log",
+	"/audit": "Audit Log",
 	"/members": "Team",
 	"/settings": "Settings",
 	"/setup": "Setup",
@@ -82,8 +84,9 @@ export function getRouteTitle(pathname: string): string {
 	return (
 		Object.entries(routeTitles)
 			.sort((a, b) => b[0].length - a[0].length)
-			.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ??
-		"Workspace"
+			.find(
+				([href]) => pathname === href || pathname.startsWith(`${href}/`),
+			)?.[1] ?? "Workspace"
 	);
 }
 
@@ -92,42 +95,42 @@ export function buildMenuGroups({
 	pendingToolCount,
 	permissions,
 }: WorkspaceShellState): NavGroup[] {
-	const approvalsItem: NavItem = {
+	const toolsItem: NavItem = {
 		href: "/tools",
-		label: "Approvals",
+		label: "Tools",
 		icon: WrenchIcon,
-		badge: pendingToolCount,
+		badge: pendingToolCount > 0 ? pendingToolCount : undefined,
 	};
-	const governanceItems = governanceNavItems.filter((item) => {
+
+	const adminItems = adminNavItems.filter((item) => {
 		if (item.href === "/usage") return permissions.canViewUsage;
 		if (item.href === "/audit") return permissions.canViewAudit;
-		return false;
+		return true;
 	});
-	const teamItems: NavItem[] = [
-		{ href: "/members", label: "Team", icon: UsersIcon },
-		...(isAdmin
-			? [{ href: "/settings", label: "Settings", icon: SettingsIcon }]
-			: []),
-	];
 
 	const groups: NavGroup[] = [
+		{ label: "Workspace", items: primaryNavItems },
+		{ label: "Capabilities", items: [...capabilitiesNavItems] },
+		{ label: "Configuration", items: configNavItems },
 		{
-			label: "Work",
-			items: [...workNavItems, ...(pendingToolCount > 0 ? [approvalsItem] : [])],
-		},
-		{ label: "Resources", items: resourceNavItems },
-		{
-			label: "Configuration",
+			label: "Administration",
 			items: [
-				...(pendingToolCount > 0 ? [] : [approvalsItem]),
-				...configurationNavItems,
+				...adminItems,
+				...(isAdmin
+					? [{ href: "/settings", label: "Settings", icon: SettingsIcon }]
+					: []),
 			],
 		},
-		{
-			label: "Governance",
-			items: [...governanceItems, ...teamItems],
-		},
 	];
+
+	// Inject approvals badge into Tools item
+	const capsGroup = groups.find((g) => g.label === "Capabilities");
+	if (capsGroup) {
+		const toolsIdx = capsGroup.items.findIndex((i) => i.href === "/tools");
+		if (toolsIdx >= 0) {
+			capsGroup.items[toolsIdx] = toolsItem;
+		}
+	}
 
 	return groups.filter((group) => group.items.length > 0);
 }
@@ -141,7 +144,9 @@ export type RouteBreadcrumb = {
 	href?: string;
 };
 
-export function getRouteBreadcrumbs(pathname: string): RouteBreadcrumb[] | undefined {
+export function getRouteBreadcrumbs(
+	pathname: string,
+): RouteBreadcrumb[] | undefined {
 	const agentMatch = pathname.match(/^\/agents\/([^/]+)$/);
 	if (agentMatch) {
 		return [

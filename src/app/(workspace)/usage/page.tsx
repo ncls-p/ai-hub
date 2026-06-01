@@ -92,9 +92,8 @@ export default function UsagePage() {
 
 	return (
 		<WorkspacePage
-			kicker="Governance"
 			title="Usage"
-			description="Track token consumption across chat, tools, embeddings, and integrations."
+			description="Monitor token consumption, API usage, and quota across your workspace."
 			width="wide"
 		>
 			{data?.quota ? (
@@ -102,7 +101,8 @@ export default function UsagePage() {
 					<CardHeader>
 						<CardTitle>Monthly tokens</CardTitle>
 						<CardDescription>
-							{data.quota.used.toLocaleString()} / {data.quota.limit.toLocaleString()} tokens this month
+							{data.quota.used.toLocaleString()} /{" "}
+							{data.quota.limit.toLocaleString()} tokens this month
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-2">

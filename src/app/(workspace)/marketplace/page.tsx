@@ -61,9 +61,7 @@ function ItemGrid({
 	action?: (item: MarketplaceItem) => React.ReactNode;
 }) {
 	if (items.length === 0) {
-		return (
-			<PageEmptyState icon={StoreIcon} title={emptyLabel} />
-		);
+		return <PageEmptyState icon={StoreIcon} title={emptyLabel} />;
 	}
 
 	return (
@@ -242,9 +240,8 @@ export default function MarketplacePage() {
 
 	return (
 		<WorkspacePage
-			kicker="Discover"
-			title="Catalog"
-			description="Publish, review, and install agent packages without mutating local copies after install."
+			title="Marketplace"
+			description="Discover, publish, and install shared assistants across your organization."
 			width="wide"
 		>
 			<Tabs defaultValue="install">
@@ -323,12 +320,13 @@ export default function MarketplacePage() {
 								<Label>Name override</Label>
 								<Input
 									value={draft.name}
-									onChange={(e) =>
-										setDraft({ ...draft, name: e.target.value })
-									}
+									onChange={(e) => setDraft({ ...draft, name: e.target.value })}
 								/>
 							</div>
-							<Button onClick={() => void createDraft()} disabled={!draft.agentId}>
+							<Button
+								onClick={() => void createDraft()}
+								disabled={!draft.agentId}
+							>
 								<StoreIcon data-icon="inline-start" />
 								Draft
 							</Button>
@@ -362,10 +360,7 @@ export default function MarketplacePage() {
 					{loading ? (
 						<Loader2 className="animate-spin" />
 					) : reviewItems.length === 0 ? (
-						<PageEmptyState
-							icon={StoreIcon}
-							title="No items pending review"
-						/>
+						<PageEmptyState icon={StoreIcon} title="No items pending review" />
 					) : (
 						<div className="grid gap-4">
 							{reviewItems.map((item) => (

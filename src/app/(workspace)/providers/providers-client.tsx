@@ -15,8 +15,12 @@ import {
 } from "@/components/ui/empty";
 import { useWorkspace } from "@/hooks/use-workspace";
 
-type SafeProvider = Parameters<typeof ProviderManager>[0]["initialProviders"][number];
-type ProviderModel = Parameters<typeof ProviderManager>[0]["initialModels"][number];
+type SafeProvider = Parameters<
+	typeof ProviderManager
+>[0]["initialProviders"][number];
+type ProviderModel = Parameters<
+	typeof ProviderManager
+>[0]["initialModels"][number];
 
 export function ProvidersPageClient() {
 	const { workspaceId, workspaces, isLoading } = useWorkspace();
@@ -81,17 +85,9 @@ export function ProvidersPageClient() {
 
 	return (
 		<WorkspacePage
-			kicker="Configuration"
-			title="AI Connections"
-			description="Register gateways once, then route assistants through the right provider without exposing credentials."
+			title="Providers"
+			description="Connect to AI providers and manage available models for your assistants."
 			width="default"
-			actions={
-				<div className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-					<span className="font-medium text-foreground">
-						{activeWorkspace.name}
-					</span>
-				</div>
-			}
 		>
 			{loading ? (
 				<PageLoading className="min-h-64" label="Loading connections" />

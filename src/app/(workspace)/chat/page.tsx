@@ -2,12 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-	BotIcon,
-	ChevronDownIcon,
-	Loader2,
-	PlusIcon,
-} from "lucide-react";
+import { BotIcon, ChevronDownIcon, Loader2, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatComposer } from "@/components/chat/chat-composer";
@@ -114,9 +109,7 @@ export default function ChatPage() {
 	const [agents, setAgents] = useState<ChatAgent[]>([]);
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 	const [conversations, setConversations] = useState<ChatConversation[]>([]);
-	const [activeVersion, setActiveVersion] = useState<AgentVersion | null>(
-		null,
-	);
+	const [activeVersion, setActiveVersion] = useState<AgentVersion | null>(null);
 	const [activeConversationId, setActiveConversationId] = useState<
 		string | null
 	>(null);
@@ -174,10 +167,11 @@ export default function ChatPage() {
 
 		async function loadAgents() {
 			try {
-				const response = await fetchJson<{ agents?: ChatAgent[] } | ChatAgent[]>(
-					`/api/workspace/agents?workspaceId=${workspaceId}`,
-					{ signal: controller.signal },
-				);
+				const response = await fetchJson<
+					{ agents?: ChatAgent[] } | ChatAgent[]
+				>(`/api/workspace/agents?workspaceId=${workspaceId}`, {
+					signal: controller.signal,
+				});
 				const data = (
 					Array.isArray(response) ? response : (response.agents ?? [])
 				) as ChatAgent[];
@@ -355,7 +349,9 @@ export default function ChatPage() {
 	}
 
 	function selectConversation(conversationId: string) {
-		const conversation = conversations.find((item) => item.id === conversationId);
+		const conversation = conversations.find(
+			(item) => item.id === conversationId,
+		);
 		if (conversation) {
 			setSelectedAgentId(conversation.agentId);
 		}
@@ -476,9 +472,7 @@ export default function ChatPage() {
 			const versionData = await fetchJson<AgentVersion[]>(
 				`/api/workspace/agents/${selectedAgentId}/versions?workspaceId=${workspaceId}`,
 			);
-			setActiveVersion(
-				versionData.find((version) => version.isActive) ?? null,
-			);
+			setActiveVersion(versionData.find((version) => version.isActive) ?? null);
 		} catch (error) {
 			toast.error(
 				error instanceof Error ? error.message : "Failed to reload assistant",
@@ -507,25 +501,25 @@ export default function ChatPage() {
 						<EmptyMedia variant="icon">
 							<BotIcon aria-hidden="true" />
 						</EmptyMedia>
-				<EmptyTitle>No agents available</EmptyTitle>
-				<EmptyDescription>
-					Run the short setup flow to connect a model and create your first
-					assistant.
-				</EmptyDescription>
-			</EmptyHeader>
-			<div className="flex flex-wrap gap-2">
-				<Button asChild>
-					<Link href="/setup">
-						<PlusIcon data-icon="inline-start" aria-hidden="true" />
-						Start setup
-					</Link>
-				</Button>
-				<Button asChild variant="outline">
-					<Link href="/agents">Manage assistants</Link>
-				</Button>
+						<EmptyTitle>No agents available</EmptyTitle>
+						<EmptyDescription>
+							Run the short setup flow to connect a model and create your first
+							assistant.
+						</EmptyDescription>
+					</EmptyHeader>
+					<div className="flex flex-wrap gap-2">
+						<Button asChild>
+							<Link href="/setup">
+								<PlusIcon data-icon="inline-start" aria-hidden="true" />
+								Start setup
+							</Link>
+						</Button>
+						<Button asChild variant="outline">
+							<Link href="/agents">Manage assistants</Link>
+						</Button>
+					</div>
+				</Empty>
 			</div>
-		</Empty>
-	</div>
 		);
 	}
 
@@ -549,24 +543,33 @@ export default function ChatPage() {
 			}
 			onSetupComplete={() => void reloadAgentContext()}
 		>
-			<ChatContextBar
-				quota={quota}
-			/>
+			<ChatContextBar quota={quota} />
 			<section className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-4 sm:py-8">
 				{!loadingMessages && messages.length === 0 ? (
-					<div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-center py-12">
-						<Empty className="min-h-64 border-0 bg-transparent p-4">
+					<div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-center py-16">
+						<Empty className="min-h-64 border-0 bg-transparent p-6">
 							<EmptyHeader>
-								<EmptyMedia variant="icon" className="bg-card/90 shadow-sm ring-1 ring-border/70">
-									<BotIcon aria-hidden="true" />
+								<EmptyMedia
+									variant="icon"
+									className={cn(
+										"bg-card/90 shadow-sm ring-1 ring-border/70",
+										canChat && "bg-primary/5 ring-primary/20",
+									)}
+								>
+									<BotIcon
+										className={cn(canChat && "text-primary")}
+										aria-hidden="true"
+									/>
 								</EmptyMedia>
 								<EmptyTitle>
-									{canChat ? "What do you want to do?" : "Finish setup"}
+									{canChat
+										? "What can I help you with?"
+										: "Finish setup to start chatting"}
 								</EmptyTitle>
 								<EmptyDescription>
 									{canChat
-										? "Send a message to start."
-										: "Choose a provider and model before sending messages."}
+										? "Send a message below or try one of these prompts."
+										: "Connect a provider and pick a model to get started."}
 								</EmptyDescription>
 							</EmptyHeader>
 							<EmptyContent className="flex flex-col gap-3">
@@ -589,8 +592,14 @@ export default function ChatPage() {
 										))}
 									</div>
 								) : (
-									<Button asChild size="sm" variant="outline">
-										<Link href={selectedAgentId ? `/agents/${selectedAgentId}` : "/agents"}>
+									<Button asChild size="sm">
+										<Link
+											href={
+												selectedAgentId
+													? `/agents/${selectedAgentId}`
+													: "/agents"
+											}
+										>
 											Configure assistant
 										</Link>
 									</Button>

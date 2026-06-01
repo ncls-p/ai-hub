@@ -25,13 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
 	Empty,
 	EmptyContent,
@@ -171,9 +165,12 @@ export default function AgentsPage() {
 		abortRef.current?.abort();
 		abortRef.current = new AbortController();
 		try {
-			const res = await fetch(`/api/workspace/agents?workspaceId=${workspaceId}`, {
-				signal: abortRef.current.signal,
-			});
+			const res = await fetch(
+				`/api/workspace/agents?workspaceId=${workspaceId}`,
+				{
+					signal: abortRef.current.signal,
+				},
+			);
 			if (!res.ok) throw new Error("Failed to fetch agents");
 			const data = await res.json();
 			const nextAgents = Array.isArray(data) ? data : data.agents;
@@ -366,7 +363,9 @@ export default function AgentsPage() {
 							className="justify-start px-0"
 							onClick={() => setShowAdvancedCreate((value) => !value)}
 						>
-							{showAdvancedCreate ? "Hide advanced settings" : "Advanced settings"}
+							{showAdvancedCreate
+								? "Hide advanced settings"
+								: "Advanced settings"}
 						</Button>
 						{showAdvancedCreate ? (
 							<>
@@ -400,8 +399,12 @@ export default function AgentsPage() {
 										</SelectTrigger>
 										<SelectContent>
 											<SelectItem value="personal">Personal</SelectItem>
-											<SelectItem value="marketplace">Share with workspace</SelectItem>
-											<SelectItem value="specific_user">Specific user</SelectItem>
+											<SelectItem value="marketplace">
+												Share with workspace
+											</SelectItem>
+											<SelectItem value="specific_user">
+												Specific user
+											</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
@@ -444,26 +447,28 @@ export default function AgentsPage() {
 												/>
 												<label htmlFor="agent-recommended">Recommended</label>
 											</div>
-									<Select
-										value={form.curationLabel}
-										onValueChange={(value) =>
-											setForm({ ...form, curationLabel: value })
-										}
-									>
-										<SelectTrigger className="w-full">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="none">No label</SelectItem>
-											<SelectItem value="recommended">Recommended</SelectItem>
-											<SelectItem value="organization_created">
-												Organization created
-											</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							</div>
-						) : null}
+											<Select
+												value={form.curationLabel}
+												onValueChange={(value) =>
+													setForm({ ...form, curationLabel: value })
+												}
+											>
+												<SelectTrigger className="w-full">
+													<SelectValue />
+												</SelectTrigger>
+												<SelectContent>
+													<SelectItem value="none">No label</SelectItem>
+													<SelectItem value="recommended">
+														Recommended
+													</SelectItem>
+													<SelectItem value="organization_created">
+														Organization created
+													</SelectItem>
+												</SelectContent>
+											</Select>
+										</div>
+									</div>
+								) : null}
 							</>
 						) : null}
 					</div>
@@ -529,116 +534,111 @@ export default function AgentsPage() {
 					<Loader2 className="size-6 animate-spin text-muted-foreground" />
 				</div>
 			) : agents.length === 0 ? (
-				<Card>
-					<CardContent>
-						<Empty className="min-h-72 border border-border/70 bg-background/55">
-							<EmptyHeader>
-								<EmptyMedia variant="icon">
-									<BotIcon aria-hidden="true" />
-								</EmptyMedia>
-								<EmptyTitle>No agents yet</EmptyTitle>
-								<EmptyDescription>
-									Create your first agent to start configuring model behavior,
-									tools, and knowledge sources.
-								</EmptyDescription>
-							</EmptyHeader>
-							<EmptyContent>
-								<Button
-									type="button"
-									size="sm"
-									onClick={() => setShowCreateDialog(true)}
-								>
-									<PlusIcon data-icon="inline-start" aria-hidden="true" />
-									Create agent
-								</Button>
-							</EmptyContent>
-						</Empty>
-					</CardContent>
-				</Card>
+				<Empty className="min-h-80 border border-border/70 bg-background/55">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<BotIcon aria-hidden="true" />
+						</EmptyMedia>
+						<EmptyTitle>No assistants yet</EmptyTitle>
+						<EmptyDescription>
+							Create your first assistant to start chatting with AI. You can
+							configure model, tools, and knowledge after creation.
+						</EmptyDescription>
+					</EmptyHeader>
+					<EmptyContent>
+						<Button type="button" onClick={() => setShowCreateDialog(true)}>
+							<PlusIcon data-icon="inline-start" aria-hidden="true" />
+							Create your first assistant
+						</Button>
+					</EmptyContent>
+				</Empty>
 			) : (
 				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-					{agents.map((agent) => (
-						<Card key={agent.id} className="group relative">
-							<CardHeader className="pb-3">
-								<div className="flex items-start justify-between">
-									<CardTitle className="flex items-center gap-2 text-base">
-										<BotIcon
-											className="size-4 text-primary"
-											aria-hidden="true"
-										/>
-										{agent.name}
-									</CardTitle>
-									<Button
-										variant="ghost"
-										size="icon"
-										className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"
-										onClick={() => setDeleteAgentId(agent.id)}
-										aria-label={`Delete ${agent.name}`}
-									>
-										<TrashIcon className="size-4 text-destructive" />
-									</Button>
-								</div>
-								{agent.description && (
-									<CardDescription className="line-clamp-2">
-										{agent.description}
-									</CardDescription>
-								)}
-								<div className="mt-3 flex flex-wrap gap-2">
-									<Badge
-										variant={agent.activeVersionId ? "secondary" : "outline"}
-									>
-										{agent.activeVersionId ? "Ready" : "Needs setup"}
-									</Badge>
-									{bindingSummaries[agent.id]?.toolCount ? (
-										<Badge variant="outline">
-											{bindingSummaries[agent.id].toolCount} tools
+					{agents.map((agent) => {
+						const bindings = bindingSummaries[agent.id];
+						const isReady = Boolean(agent.activeVersionId);
+						return (
+							<Card key={agent.id} className="group flex flex-col">
+								<CardHeader className="pb-3">
+									<div className="flex items-start justify-between gap-2">
+										<div className="flex min-w-0 items-center gap-3">
+											<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+												<BotIcon
+													className="size-4 text-primary"
+													aria-hidden="true"
+												/>
+											</div>
+											<div className="min-w-0">
+												<p className="truncate font-semibold">{agent.name}</p>
+												{agent.description && (
+													<p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+														{agent.description}
+													</p>
+												)}
+											</div>
+										</div>
+										<Button
+											variant="ghost"
+											size="icon"
+											className="size-8 shrink-0 -translate-x-1 opacity-0 transition-opacity group-hover:opacity-100"
+											onClick={() => setDeleteAgentId(agent.id)}
+											aria-label={`Delete ${agent.name}`}
+										>
+											<TrashIcon className="size-4 text-destructive" />
+										</Button>
+									</div>
+									<div className="mt-3 flex flex-wrap gap-1.5">
+										<Badge
+											variant={isReady ? "secondary" : "outline"}
+											className={isReady ? "bg-primary/10 text-primary" : ""}
+										>
+											{isReady ? "Ready" : "Needs setup"}
 										</Badge>
-									) : null}
-									{bindingSummaries[agent.id]?.knowledgeCount ? (
-										<Badge variant="outline">
-											{bindingSummaries[agent.id].knowledgeCount} knowledge
-										</Badge>
-									) : null}
-									{bindingSummaries[agent.id]?.mcpCount ? (
-										<Badge variant="outline">
-											{bindingSummaries[agent.id].mcpCount} MCP
-										</Badge>
-									) : null}
-								</div>
-							</CardHeader>
-							<CardContent>
-								<div className="flex items-center justify-between text-xs text-muted-foreground">
-									<span>{agent.slug}</span>
-									<span>{new Date(agent.updatedAt).toLocaleDateString()}</span>
-								</div>
-								<div className="mt-3 flex gap-2">
-									<Button
-										variant={agent.activeVersionId ? "default" : "secondary"}
-										size="sm"
-										className="flex-1"
-										onClick={() =>
-											router.push(
-												agent.activeVersionId
-													? `/chat?agentId=${agent.id}`
-													: `/agents/${agent.id}`,
-											)
-										}
-									>
-										{agent.activeVersionId ? "Chat" : "Finish setup"}
-										<ChevronRightIcon className="ml-1 size-3" />
-									</Button>
-									<Button
-										variant="outline"
-										size="sm"
-										className="flex-1"
-										onClick={() => router.push(`/agents/${agent.id}`)}
-									>
-										Configure
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
-					))}
+										{bindings?.toolCount ? (
+											<Badge variant="outline">
+												{bindings.toolCount} tools
+											</Badge>
+										) : null}
+										{bindings?.knowledgeCount ? (
+											<Badge variant="outline">
+												{bindings.knowledgeCount} knowledge
+											</Badge>
+										) : null}
+										{bindings?.mcpCount ? (
+											<Badge variant="outline">{bindings.mcpCount} MCP</Badge>
+										) : null}
+									</div>
+								</CardHeader>
+								<CardContent className="mt-auto">
+									<div className="flex gap-2">
+										<Button
+											variant={isReady ? "default" : "outline"}
+											size="sm"
+											className="flex-1"
+											onClick={() =>
+												router.push(
+													agent.activeVersionId
+														? `/chat?agentId=${agent.id}`
+														: `/agents/${agent.id}`,
+												)
+											}
+										>
+											{isReady ? "Chat" : "Finish setup"}
+											<ChevronRightIcon className="ml-1 size-3" />
+										</Button>
+										<Button
+											variant="ghost"
+											size="sm"
+											className="shrink-0"
+											onClick={() => router.push(`/agents/${agent.id}`)}
+										>
+											Configure
+										</Button>
+									</div>
+								</CardContent>
+							</Card>
+						);
+					})}
 				</div>
 			)}
 		</WorkspacePage>

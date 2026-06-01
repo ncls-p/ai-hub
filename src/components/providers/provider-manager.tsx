@@ -552,27 +552,31 @@ export function ProviderManager({
 			<div className="flex flex-col gap-4">
 				<Card>
 					<CardHeader className="border-b border-border/70 pb-4">
-						<CardTitle>Provider Registry</CardTitle>
-						<CardDescription>
-							Secure keys, base URLs, health, and provider model mappings.
-						</CardDescription>
-						<CardAction>
-							<Badge variant="secondary">{providers.length} configured</Badge>
-							<Button
-								size="sm"
-								variant={showProviderForm ? "outline" : "default"}
-								onClick={() => setShowProviderForm((v) => !v)}
-							>
-								{showProviderForm ? (
-									"Cancel"
-								) : (
-									<>
-									<PlusIcon data-icon="inline-start" aria-hidden="true" />
-									Add Provider
-									</>
-								)}
-							</Button>
-						</CardAction>
+						<div className="flex items-start justify-between gap-3">
+							<div>
+								<CardTitle>AI Providers</CardTitle>
+								<CardDescription>
+									Connect to AI services and manage available models.
+								</CardDescription>
+							</div>
+							<div className="flex shrink-0 items-center gap-2">
+								<Badge variant="secondary">{providers.length} connected</Badge>
+								<Button
+									size="sm"
+									variant={showProviderForm ? "outline" : "default"}
+									onClick={() => setShowProviderForm((v) => !v)}
+								>
+									{showProviderForm ? (
+										"Cancel"
+									) : (
+										<>
+											<PlusIcon data-icon="inline-start" aria-hidden="true" />
+											Add Provider
+										</>
+									)}
+								</Button>
+							</div>
+						</div>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-4 pt-5">
 						{showProviderForm ? (
@@ -647,7 +651,9 @@ export function ProviderManager({
 												</Select>
 											</div>
 											<div className="grid gap-2">
-												<Label htmlFor="provider-auth-type">Authentication</Label>
+												<Label htmlFor="provider-auth-type">
+													Authentication
+												</Label>
 												<Select
 													value={authType}
 													onValueChange={(value) =>
@@ -707,7 +713,10 @@ export function ProviderManager({
 									</Button>
 									<Button disabled={busy || !name} onClick={createNewProvider}>
 										{busy ? (
-											<Loader2Icon className="animate-spin" aria-hidden="true" />
+											<Loader2Icon
+												className="animate-spin"
+												aria-hidden="true"
+											/>
 										) : (
 											<PlusIcon data-icon="inline-start" aria-hidden="true" />
 										)}
@@ -1025,7 +1034,10 @@ export function ProviderManager({
 					<div className="grid gap-3">
 						<div className="grid gap-2">
 							<Label>Name</Label>
-							<Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+							<Input
+								value={editName}
+								onChange={(e) => setEditName(e.target.value)}
+							/>
 						</div>
 						<div className="grid gap-2">
 							<Label>Service URL</Label>

@@ -14,9 +14,8 @@ export default function SetupPage() {
 
 	return (
 		<WorkspacePage
-			kicker="Setup"
-			title="Welcome to AI Hub"
-			description="Connect an AI provider, pick a model, and send your first message."
+			title="Get started"
+			description="Three quick steps to start chatting with AI."
 			width="narrow"
 		>
 			<SetupWizard

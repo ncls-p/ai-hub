@@ -116,9 +116,8 @@ export default function AuditPage() {
 
 	return (
 		<WorkspacePage
-			kicker="Governance"
-			title="Activity log"
-			description="Security-sensitive actions are recorded with actor, resource, outcome, and timestamp."
+			title="Audit Log"
+			description="Track security-sensitive actions, changes, and access events across your workspace."
 			width="default"
 		>
 			<Card size="sm">

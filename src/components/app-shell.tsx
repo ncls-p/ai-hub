@@ -3,10 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import {
-	MessageSquareIcon,
-	MessageSquarePlusIcon,
-} from "lucide-react";
+import { MessageSquareIcon } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import {
@@ -131,25 +128,20 @@ export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
 									breadcrumbs={breadcrumbs}
 									leading={<WorkspaceSidebarMobileTrigger shell={shellValue} />}
 									actions={
-										<>
-											<Button
-												asChild
-												variant="ghost"
-												size="sm"
-												className="hidden sm:inline-flex"
-											>
-												<Link href="/chat">
-													<MessageSquareIcon data-icon="inline-start" aria-hidden="true" />
-													Chat
-												</Link>
-											</Button>
-											<Button asChild variant="outline" size="sm">
-												<Link href="/chat">
-													<MessageSquarePlusIcon data-icon="inline-start" aria-hidden="true" />
-													New
-												</Link>
-											</Button>
-										</>
+										<Button
+											asChild
+											variant="default"
+											size="sm"
+											className="gap-2"
+										>
+											<Link href="/chat">
+												<MessageSquareIcon
+													className="size-4"
+													aria-hidden="true"
+												/>
+												Chat now
+											</Link>
+										</Button>
 									}
 								/>
 							) : null}

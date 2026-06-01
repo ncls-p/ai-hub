@@ -45,9 +45,8 @@ export default async function MembersPage() {
 
 	return (
 		<WorkspacePage
-			kicker="Team"
 			title="Team"
-			description="Invite colleagues to your workspace or manage platform accounts."
+			description="Invite members, manage roles, and control who has access to this workspace."
 			width="default"
 		>
 			<WorkspaceMemberManagement currentUserId={session.user.id} />

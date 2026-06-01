@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, type DragEvent } from "react";
-import { BookOpenIcon, Loader2, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
+import {
+	BookOpenIcon,
+	Loader2,
+	PencilIcon,
+	PlusIcon,
+	SearchIcon,
+	Trash2Icon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { ListRow } from "@/components/list-row";
 import { PageEmptyState } from "@/components/page-empty-state";
@@ -69,7 +76,10 @@ export default function KnowledgePage() {
 	const [dragActive, setDragActive] = useState(false);
 	const [showCreateDialog, setShowCreateDialog] = useState(false);
 	const [editingBase, setEditingBase] = useState<KnowledgeBase | null>(null);
-	const [editBaseForm, setEditBaseForm] = useState({ name: "", description: "" });
+	const [editBaseForm, setEditBaseForm] = useState({
+		name: "",
+		description: "",
+	});
 
 	const loadBases = useCallback(async () => {
 		if (!workspaceId) return;
@@ -264,14 +274,13 @@ export default function KnowledgePage() {
 
 	return (
 		<WorkspacePage
-			kicker="Configuration"
-			title="Knowledge bases"
-			description="Add source text once, then bind the knowledge base to assistants that need it."
+			title="Knowledge"
+			description="Upload documents and attach them to assistants so they can reference your data."
 			width="wide"
 			actions={
 				<Button type="button" onClick={() => setShowCreateDialog(true)}>
 					<PlusIcon data-icon="inline-start" />
-					New base
+					New knowledge base
 				</Button>
 			}
 		>
@@ -299,7 +308,10 @@ export default function KnowledgePage() {
 						/>
 					</div>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+						<Button
+							variant="outline"
+							onClick={() => setShowCreateDialog(false)}
+						>
 							Cancel
 						</Button>
 						<Button
@@ -312,238 +324,244 @@ export default function KnowledgePage() {
 				</DialogContent>
 			</Dialog>
 			<div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-			<section className="flex flex-col gap-4">
-				<SectionHeader
-					title="Bases"
-					description="Choose the source set to manage."
-				/>
-				{loading ? (
-					<Loader2 className="animate-spin" />
-				) : bases.length === 0 ? (
-					<PageEmptyState
-						icon={BookOpenIcon}
-						title="No knowledge bases yet"
-						description="Create a base to upload documents for your assistants."
-					>
-						<Button
-							type="button"
-							size="sm"
-							onClick={() => setShowCreateDialog(true)}
-						>
-							<PlusIcon data-icon="inline-start" />
-							Create base
-						</Button>
-					</PageEmptyState>
-				) : (
-					<div className="flex flex-col gap-2">
-						{bases.map((base) => (
-							<ListRow
-								key={base.id}
-								selected={selectedId === base.id}
-								className="group items-start gap-2"
-							>
-								<button
-									type="button"
-									onClick={() => setSelectedId(base.id)}
-									className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left text-sm shadow-none outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-								>
-									<span className="block truncate font-medium">{base.name}</span>
-									{base.description ? (
-										<p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-											{base.description}
-										</p>
-									) : null}
-								</button>
-								<div className="flex shrink-0 gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
-									<Button
-										type="button"
-										size="icon-sm"
-										variant="ghost"
-										aria-label={`Edit ${base.name}`}
-										onClick={() => {
-											setEditingBase(base);
-											setEditBaseForm({
-												name: base.name,
-												description: base.description ?? "",
-											});
-										}}
-									>
-										<PencilIcon aria-hidden="true" />
-									</Button>
-									<Button
-										type="button"
-										size="icon-sm"
-										variant="ghost"
-										aria-label={`Delete ${base.name}`}
-										onClick={() => void deleteBase(base.id)}
-									>
-										<Trash2Icon aria-hidden="true" />
-									</Button>
-								</div>
-							</ListRow>
-						))}
-					</div>
-				)}
-			</section>
-			<section className="flex flex-col gap-4">
-				{!selectedId ? (
-					<PageEmptyState
-						icon={BookOpenIcon}
-						title="Select a knowledge base"
-						description="Choose or create a base on the left to manage documents."
+				<section className="flex flex-col gap-4">
+					<SectionHeader
+						title="Bases"
+						description="Choose the source set to manage."
 					/>
-				) : (
-					<>
-						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2">
-									<BookOpenIcon className="size-5" aria-hidden="true" />
-									Documents
-								</CardTitle>
-								<CardDescription>
-									Paste text to index. Processing documents refresh automatically.
-								</CardDescription>
-							</CardHeader>
-							<CardContent className="grid gap-3">
-								<div
-									className={cn(
-										"rounded-xl border border-dashed p-6 text-center text-sm transition-colors",
-										dragActive
-											? "border-primary bg-primary/5"
-											: "border-border text-muted-foreground",
-									)}
-									onDragOver={(event) => {
-										event.preventDefault();
-										setDragActive(true);
-									}}
-									onDragLeave={() => setDragActive(false)}
-									onDrop={handleFileDrop}
+					{loading ? (
+						<Loader2 className="animate-spin" />
+					) : bases.length === 0 ? (
+						<PageEmptyState
+							icon={BookOpenIcon}
+							title="No knowledge bases yet"
+							description="Create a base to upload documents for your assistants."
+						>
+							<Button
+								type="button"
+								size="sm"
+								onClick={() => setShowCreateDialog(true)}
+							>
+								<PlusIcon data-icon="inline-start" />
+								Create base
+							</Button>
+						</PageEmptyState>
+					) : (
+						<div className="flex flex-col gap-2">
+							{bases.map((base) => (
+								<ListRow
+									key={base.id}
+									selected={selectedId === base.id}
+									className="group items-start gap-2"
 								>
-									Drag and drop a text file here to ingest
-								</div>
-								<Input
-									aria-label="Document title"
-									name="document-title"
-									autoComplete="off"
-									placeholder="Document title…"
-									value={docForm.title}
-									onChange={(e) =>
-										setDocForm({ ...docForm, title: e.target.value })
-									}
-								/>
-								<Textarea
-									aria-label="Document content"
-									name="document-content"
-									autoComplete="off"
-									className="min-h-40"
-									placeholder="Document content…"
-									value={docForm.content}
-									onChange={(e) =>
-										setDocForm({ ...docForm, content: e.target.value })
-									}
-								/>
-							</CardContent>
-							<CardFooter className="justify-end">
-								<Button
-									onClick={() => void ingestDocument()}
-									disabled={!selectedId}
-								>
-									Ingest Document
-								</Button>
-							</CardFooter>
-						</Card>
-						<div className="grid gap-2">
-							{documents.map((doc) => (
-								<Card key={doc.id} size="sm">
-									<CardContent className="flex items-center justify-between gap-2 p-4">
-										<span className="min-w-0 truncate font-medium">
-											{doc.title}
+									<button
+										type="button"
+										onClick={() => setSelectedId(base.id)}
+										className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left text-sm shadow-none outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+									>
+										<span className="block truncate font-medium">
+											{base.name}
 										</span>
-										<div className="flex shrink-0 items-center gap-2">
-											<Badge variant={statusVariant(doc.status)}>
-												{doc.status}
-											</Badge>
-											<Button
-												type="button"
-												size="icon-sm"
-												variant="ghost"
-												aria-label={`Delete ${doc.title}`}
-												onClick={() => void deleteDocument(doc.id)}
-											>
-												<Trash2Icon aria-hidden="true" />
-											</Button>
-										</div>
-									</CardContent>
-								</Card>
+										{base.description ? (
+											<p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+												{base.description}
+											</p>
+										) : null}
+									</button>
+									<div className="flex shrink-0 gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+										<Button
+											type="button"
+											size="icon-sm"
+											variant="ghost"
+											aria-label={`Edit ${base.name}`}
+											onClick={() => {
+												setEditingBase(base);
+												setEditBaseForm({
+													name: base.name,
+													description: base.description ?? "",
+												});
+											}}
+										>
+											<PencilIcon aria-hidden="true" />
+										</Button>
+										<Button
+											type="button"
+											size="icon-sm"
+											variant="ghost"
+											aria-label={`Delete ${base.name}`}
+											onClick={() => void deleteBase(base.id)}
+										>
+											<Trash2Icon aria-hidden="true" />
+										</Button>
+									</div>
+								</ListRow>
 							))}
 						</div>
-						<Card>
-							<CardHeader>
-								<CardTitle>Search</CardTitle>
-							</CardHeader>
-							<CardContent className="grid gap-3">
-								<div className="flex flex-col gap-2 sm:flex-row">
-									<Input
-										aria-label="Search indexed text"
-										name="knowledge-search"
-										autoComplete="off"
-										value={query}
-										onChange={(e) => setQuery(e.target.value)}
-										placeholder="Search indexed text…"
-									/>
-									<Button onClick={() => void search()}>
-										<SearchIcon data-icon="inline-start" aria-hidden="true" />
-										Search
-									</Button>
-								</div>
-								{results.map((result) => (
+					)}
+				</section>
+				<section className="flex flex-col gap-4">
+					{!selectedId ? (
+						<PageEmptyState
+							icon={BookOpenIcon}
+							title="Select a knowledge base"
+							description="Choose or create a base on the left to manage documents."
+						/>
+					) : (
+						<>
+							<Card>
+								<CardHeader>
+									<CardTitle className="flex items-center gap-2">
+										<BookOpenIcon className="size-5" aria-hidden="true" />
+										Documents
+									</CardTitle>
+									<CardDescription>
+										Paste text to index. Processing documents refresh
+										automatically.
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="grid gap-3">
 									<div
-										key={result.chunkId}
-										className="rounded-xl border p-3 text-sm"
+										className={cn(
+											"rounded-xl border border-dashed p-6 text-center text-sm transition-colors",
+											dragActive
+												? "border-primary bg-primary/5"
+												: "border-border text-muted-foreground",
+										)}
+										onDragOver={(event) => {
+											event.preventDefault();
+											setDragActive(true);
+										}}
+										onDragLeave={() => setDragActive(false)}
+										onDrop={handleFileDrop}
 									>
-										<p className="font-medium">{result.documentTitle}</p>
-										<p className="mt-1 line-clamp-4 text-muted-foreground">
-											{result.content}
-										</p>
+										Drag and drop a text file here to ingest
 									</div>
+									<Input
+										aria-label="Document title"
+										name="document-title"
+										autoComplete="off"
+										placeholder="Document title…"
+										value={docForm.title}
+										onChange={(e) =>
+											setDocForm({ ...docForm, title: e.target.value })
+										}
+									/>
+									<Textarea
+										aria-label="Document content"
+										name="document-content"
+										autoComplete="off"
+										className="min-h-40"
+										placeholder="Document content…"
+										value={docForm.content}
+										onChange={(e) =>
+											setDocForm({ ...docForm, content: e.target.value })
+										}
+									/>
+								</CardContent>
+								<CardFooter className="justify-end">
+									<Button
+										onClick={() => void ingestDocument()}
+										disabled={!selectedId}
+									>
+										Ingest Document
+									</Button>
+								</CardFooter>
+							</Card>
+							<div className="grid gap-2">
+								{documents.map((doc) => (
+									<Card key={doc.id} size="sm">
+										<CardContent className="flex items-center justify-between gap-2 p-4">
+											<span className="min-w-0 truncate font-medium">
+												{doc.title}
+											</span>
+											<div className="flex shrink-0 items-center gap-2">
+												<Badge variant={statusVariant(doc.status)}>
+													{doc.status}
+												</Badge>
+												<Button
+													type="button"
+													size="icon-sm"
+													variant="ghost"
+													aria-label={`Delete ${doc.title}`}
+													onClick={() => void deleteDocument(doc.id)}
+												>
+													<Trash2Icon aria-hidden="true" />
+												</Button>
+											</div>
+										</CardContent>
+									</Card>
 								))}
-							</CardContent>
-						</Card>
-					</>
-				)}
-			</section>
-			<Dialog open={Boolean(editingBase)} onOpenChange={() => setEditingBase(null)}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Edit knowledge base</DialogTitle>
-					</DialogHeader>
-					<div className="grid gap-3">
-						<Label>Name</Label>
-						<Input
-							value={editBaseForm.name}
-							onChange={(e) =>
-								setEditBaseForm({ ...editBaseForm, name: e.target.value })
-							}
-						/>
-						<Label>Description</Label>
-						<Input
-							value={editBaseForm.description}
-							onChange={(e) =>
-								setEditBaseForm({
-									...editBaseForm,
-									description: e.target.value,
-								})
-							}
-						/>
-					</div>
-					<DialogFooter>
-						<Button variant="outline" onClick={() => setEditingBase(null)}>
-							Cancel
-						</Button>
-						<Button onClick={() => void updateBase()}>Save</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+							</div>
+							<Card>
+								<CardHeader>
+									<CardTitle>Search</CardTitle>
+								</CardHeader>
+								<CardContent className="grid gap-3">
+									<div className="flex flex-col gap-2 sm:flex-row">
+										<Input
+											aria-label="Search indexed text"
+											name="knowledge-search"
+											autoComplete="off"
+											value={query}
+											onChange={(e) => setQuery(e.target.value)}
+											placeholder="Search indexed text…"
+										/>
+										<Button onClick={() => void search()}>
+											<SearchIcon data-icon="inline-start" aria-hidden="true" />
+											Search
+										</Button>
+									</div>
+									{results.map((result) => (
+										<div
+											key={result.chunkId}
+											className="rounded-xl border p-3 text-sm"
+										>
+											<p className="font-medium">{result.documentTitle}</p>
+											<p className="mt-1 line-clamp-4 text-muted-foreground">
+												{result.content}
+											</p>
+										</div>
+									))}
+								</CardContent>
+							</Card>
+						</>
+					)}
+				</section>
+				<Dialog
+					open={Boolean(editingBase)}
+					onOpenChange={() => setEditingBase(null)}
+				>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Edit knowledge base</DialogTitle>
+						</DialogHeader>
+						<div className="grid gap-3">
+							<Label>Name</Label>
+							<Input
+								value={editBaseForm.name}
+								onChange={(e) =>
+									setEditBaseForm({ ...editBaseForm, name: e.target.value })
+								}
+							/>
+							<Label>Description</Label>
+							<Input
+								value={editBaseForm.description}
+								onChange={(e) =>
+									setEditBaseForm({
+										...editBaseForm,
+										description: e.target.value,
+									})
+								}
+							/>
+						</div>
+						<DialogFooter>
+							<Button variant="outline" onClick={() => setEditingBase(null)}>
+								Cancel
+							</Button>
+							<Button onClick={() => void updateBase()}>Save</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
 			</div>
 		</WorkspacePage>
 	);

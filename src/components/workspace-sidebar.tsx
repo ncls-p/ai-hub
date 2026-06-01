@@ -11,11 +11,7 @@ import {
 	useSyncExternalStore,
 	type ReactNode,
 } from "react";
-import {
-	ChevronLeftIcon,
-	ChevronRightIcon,
-	MenuIcon,
-} from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, MenuIcon } from "lucide-react";
 
 import { DeodisLogo } from "@/components/deodis-logo";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -85,7 +81,9 @@ const SidebarContext = createContext<SidebarContextValue | null>(null);
 export function useWorkspaceSidebar() {
 	const ctx = useContext(SidebarContext);
 	if (!ctx) {
-		throw new Error("useWorkspaceSidebar must be used within WorkspaceSidebarProvider");
+		throw new Error(
+			"useWorkspaceSidebar must be used within WorkspaceSidebarProvider",
+		);
 	}
 	return ctx;
 }
@@ -148,7 +146,9 @@ function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
 							{(activeWorkspace?.name ?? "W").slice(0, 1).toUpperCase()}
 						</div>
 					</TooltipTrigger>
-					<TooltipContent side="right">{activeWorkspace?.name ?? "Workspace"}</TooltipContent>
+					<TooltipContent side="right">
+						{activeWorkspace?.name ?? "Workspace"}
+					</TooltipContent>
 				</Tooltip>
 			);
 		}
@@ -228,19 +228,28 @@ function SidebarNavLink({
 			onClick={onNavigate}
 			aria-current={active ? "page" : undefined}
 			className={cn(
-				"flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium transition-colors",
+				"group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-150",
 				active
-					? "bg-sidebar-accent text-sidebar-accent-foreground"
-					: "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-				collapsed && "justify-center px-2",
+					? "bg-primary/10 text-primary"
+					: "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+				collapsed && "justify-center px-2.5",
 			)}
 		>
-			<Icon className="size-4 shrink-0" aria-hidden="true" />
+			<Icon
+				className={cn(
+					"size-4 shrink-0 transition-colors",
+					active && "text-primary",
+				)}
+				aria-hidden="true"
+			/>
 			{!collapsed ? (
 				<>
 					<span className="min-w-0 flex-1 truncate">{item.label}</span>
 					{item.badge && item.badge > 0 ? (
-						<Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1 text-xs">
+						<Badge
+							variant="secondary"
+							className="ml-auto h-5 min-w-[1.25rem] px-1.5 text-xs font-semibold bg-primary/10 text-primary"
+						>
 							{item.badge}
 						</Badge>
 					) : null}
@@ -274,25 +283,25 @@ function SidebarNavGroups({
 	onNavigate?: () => void;
 }) {
 	return (
-		<nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-2 py-2">
-			{groups.map((group) => (
-				<div key={group.label} className="flex flex-col gap-1">
+		<nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-2">
+			{groups.map((group, groupIndex) => (
+				<div key={group.label} className="flex flex-col gap-0.5">
+					{groupIndex > 0 && !collapsed ? (
+						<div className="my-2 h-px bg-border/50" />
+					) : null}
 					{!collapsed ? (
-						<p className="px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+						<p className="px-2 pb-1 pt-1 text-[0.65rem] font-semibold uppercase tracking-[0.15em] text-muted-foreground/70">
 							{group.label}
 						</p>
 					) : null}
-					<ul className="flex flex-col gap-0.5">
-						{group.items.map((item) => (
-							<li key={item.href}>
-								<SidebarNavLink
-									item={item}
-									collapsed={collapsed}
-									onNavigate={onNavigate}
-								/>
-							</li>
-						))}
-					</ul>
+					{group.items.map((item) => (
+						<SidebarNavLink
+							key={item.href}
+							item={item}
+							collapsed={collapsed}
+							onNavigate={onNavigate}
+						/>
+					))}
 				</div>
 			))}
 		</nav>
@@ -330,7 +339,10 @@ function SidebarPanel({
 					{!collapsed ? (
 						<DeodisLogo href="/chat" className="h-6 shrink-0" />
 					) : (
-						<DeodisLogo href="/chat" className="h-6 w-6 shrink-0 object-contain" />
+						<DeodisLogo
+							href="/chat"
+							className="h-6 w-6 shrink-0 object-contain"
+						/>
 					)}
 					{showCollapseControl ? (
 						<Button
@@ -351,7 +363,11 @@ function SidebarPanel({
 				</div>
 				<WorkspaceSwitcher collapsed={collapsed} />
 			</div>
-			<SidebarNavGroups groups={groups} collapsed={collapsed} onNavigate={onNavigate} />
+			<SidebarNavGroups
+				groups={groups}
+				collapsed={collapsed}
+				onNavigate={onNavigate}
+			/>
 			<div
 				className={cn(
 					"mt-auto shrink-0 border-t border-sidebar-border p-3",
@@ -389,7 +405,10 @@ function SidebarPanel({
 							<Tooltip>
 								<TooltipTrigger asChild>
 									<span className="inline-flex">
-										<SignOutButton iconOnly className="size-9 shrink-0 rounded-lg" />
+										<SignOutButton
+											iconOnly
+											className="size-9 shrink-0 rounded-lg"
+										/>
 									</span>
 								</TooltipTrigger>
 								<TooltipContent side="right">Sign out</TooltipContent>

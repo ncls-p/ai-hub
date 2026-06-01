@@ -207,15 +207,22 @@ function PendingApprovalsPanel({
 	if (invocations.length === 0) return null;
 
 	return (
-		<Card className="border-warning/35 bg-warning/10">
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2 text-foreground">
-					<Clock className="size-5" aria-hidden="true" />
-					Pending Approvals ({invocations.length})
-				</CardTitle>
-				<CardDescription>
-					These tool invocations are waiting for approval before execution.
-				</CardDescription>
+		<Card className="border-warning/40 bg-warning/8">
+			<CardHeader className="pb-3">
+				<div className="flex items-center gap-3">
+					<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-warning/15">
+						<Clock className="size-5 text-warning" aria-hidden="true" />
+					</div>
+					<div>
+						<CardTitle className="text-foreground">
+							{invocations.length} pending approval
+							{invocations.length !== 1 ? "s" : ""}
+						</CardTitle>
+						<CardDescription>
+							These tool invocations need your permission before running.
+						</CardDescription>
+					</div>
+				</div>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3">
 				{invocations.map((invocation) => (
@@ -408,9 +415,8 @@ export default function ToolInvocationsPage() {
 
 	return (
 		<WorkspacePage
-			kicker="Activity"
-			title="Approvals"
-			description="View and manage tool execution history. Approve or reject pending invocations."
+			title="Tools"
+			description="Monitor tool invocations and approve actions that require your permission. MCP servers are managed separately."
 			width="wide"
 		>
 			<PendingApprovalsPanel
