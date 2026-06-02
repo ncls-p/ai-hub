@@ -827,6 +827,7 @@ export default function ChatPage() {
 					onEditMessage={editMessage}
 					onDeleteMessage={deleteMessage}
 					onResendMessage={resendMessage}
+					onRegenerateAssistant={resendMessage}
 					pendingApprovals={pendingApprovals}
 					onApproveTool={(approval) =>
 						void resolveApproval("approve", approval.invocationId)

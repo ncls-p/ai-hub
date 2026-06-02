@@ -7,7 +7,7 @@ import {
 	CheckIcon,
 	ChevronDownIcon,
 	ClockIcon,
-	MoreHorizontalIcon,
+	CopyIcon,
 	PencilIcon,
 	RefreshCcwIcon,
 	ShieldAlertIcon,
@@ -38,13 +38,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuGroup,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -554,6 +548,7 @@ interface ChatMessageListProps {
 	) => Promise<void> | void;
 	onDeleteMessage?: (message: ChatMessage) => Promise<void> | void;
 	onResendMessage?: (message: ChatMessage) => Promise<void> | void;
+	onRegenerateAssistant?: (message: ChatMessage) => Promise<void> | void;
 	pendingApprovals?: PendingToolApproval[];
 	onApproveTool?: (approval: PendingToolApproval) => void;
 	onRejectTool?: (approval: PendingToolApproval) => void;
@@ -567,6 +562,7 @@ export function ChatMessageList({
 	onEditMessage,
 	onDeleteMessage,
 	onResendMessage,
+	onRegenerateAssistant,
 	pendingApprovals = [],
 	onApproveTool,
 	onRejectTool,
@@ -597,27 +593,23 @@ export function ChatMessageList({
 				const isUser = message.role === "user";
 				const canEdit = Boolean(onEditMessage) && (isUser || isAssistant);
 				const canDelete = Boolean(onDeleteMessage);
-				const canResend = Boolean(onResendMessage) && isUser;
+				const canRegenerate =
+					Boolean(onRegenerateAssistant) &&
+					isAssistant &&
+					message.status !== "streaming";
+				// Find the user message before this assistant message
+				const precedingUserMsg = (() => {
+					for (let i = index - 1; i >= 0; i--) {
+						if (messages[i].role === "user") return messages[i];
+					}
+					return null;
+				})();
 				const isEditing = editingMessageId === message.id;
 				const isAnimating =
 					sending &&
 					index === messages.length - 1 &&
 					message.status === "streaming";
 				const isLast = index === messages.length - 1;
-				const hasActions = canEdit || canDelete || canResend;
-				const actionsProps = {
-					message,
-					sending,
-					canEdit,
-					canDelete,
-					canResend,
-					onEdit: () => {
-						setEditingMessageId(message.id);
-						setEditingContent(content);
-					},
-					onDelete: () => void onDeleteMessage?.(message),
-					onResend: () => void onResendMessage?.(message),
-				};
 
 				return (
 					<article
@@ -726,19 +718,41 @@ export function ChatMessageList({
 									)}
 								</div>
 							)}
-						</div>
 
-						{/* Message actions */}
-						{hasActions && (
-							<div
-								className={cn(
-									"flex shrink-0 items-center",
-									isUser ? "self-end" : "self-start mt-1.5",
-								)}
-							>
-								<MessageActions {...actionsProps} />
-							</div>
-						)}
+							{/* Quick action bar */}
+							<MessageActionBar
+								message={message}
+								sending={sending}
+								canEdit={canEdit}
+								canDelete={canDelete}
+								canRegenerate={canRegenerate}
+								onCopy={async () => {
+									try {
+										await navigator.clipboard.writeText(content);
+									} catch {
+										// Fallback for non-HTTPS environments
+										const ta = document.createElement("textarea");
+										ta.value = content;
+										ta.style.position = "fixed";
+										ta.style.opacity = "0";
+										document.body.appendChild(ta);
+										ta.select();
+										document.execCommand("copy");
+										document.body.removeChild(ta);
+									}
+								}}
+								onEdit={() => {
+									setEditingMessageId(message.id);
+									setEditingContent(content);
+								}}
+								onDelete={() => void onDeleteMessage?.(message)}
+								onRegenerate={() => {
+									if (precedingUserMsg) {
+										void onResendMessage?.(precedingUserMsg);
+									}
+								}}
+							/>
+						</div>
 
 						{/* User avatar */}
 						{message.role === "user" && (
@@ -756,60 +770,97 @@ export function ChatMessageList({
 	);
 }
 
-function MessageActions({
+function MessageActionBar({
+	message,
 	sending,
 	canEdit,
 	canDelete,
-	canResend,
+	canRegenerate,
+	onCopy,
 	onEdit,
 	onDelete,
-	onResend,
+	onRegenerate,
 }: {
 	message: ChatMessage;
 	sending: boolean;
 	canEdit: boolean;
 	canDelete: boolean;
-	canResend: boolean;
+	canRegenerate: boolean;
+	onCopy: () => void;
 	onEdit: () => void;
 	onDelete: () => void;
-	onResend: () => void;
+	onRegenerate: () => void;
 }) {
+	const [copied, setCopied] = useState(false);
+
+	const handleCopy = () => {
+		onCopy();
+		setCopied(true);
+		setTimeout(() => setCopied(false), 2000);
+	};
+
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
+		<div
+			className={cn(
+				"mt-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/message:opacity-100",
+				message.role === "user" ? "justify-end" : "justify-start",
+			)}
+		>
+			<Button
+				type="button"
+				size="icon-sm"
+				variant="ghost"
+				aria-label={copied ? "Copied" : "Copy message"}
+				className="h-6 w-6"
+				disabled={sending}
+				onClick={handleCopy}
+			>
+				{copied ? (
+					<CheckIcon className="size-3 text-emerald-500" aria-hidden="true" />
+				) : (
+					<CopyIcon className="size-3" aria-hidden="true" />
+				)}
+			</Button>
+			{canEdit ? (
 				<Button
 					type="button"
 					size="icon-sm"
 					variant="ghost"
-					aria-label="Message actions"
-					className="mt-1 opacity-100 transition-opacity md:opacity-0 md:group-hover/message:opacity-100 data-open:opacity-100"
+					aria-label="Edit message"
+					className="h-6 w-6"
 					disabled={sending}
+					onClick={onEdit}
 				>
-					<MoreHorizontalIcon aria-hidden="true" />
+					<PencilIcon className="size-3" aria-hidden="true" />
 				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuGroup>
-					{canResend ? (
-						<DropdownMenuItem onSelect={onResend}>
-							<RefreshCcwIcon aria-hidden="true" />
-							Resend
-						</DropdownMenuItem>
-					) : null}
-					{canEdit ? (
-						<DropdownMenuItem onSelect={onEdit}>
-							<PencilIcon aria-hidden="true" />
-							Edit
-						</DropdownMenuItem>
-					) : null}
-					{canDelete ? (
-						<DropdownMenuItem variant="destructive" onSelect={onDelete}>
-							<Trash2Icon aria-hidden="true" />
-							Delete
-						</DropdownMenuItem>
-					) : null}
-				</DropdownMenuGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
+			) : null}
+			{canDelete ? (
+				<Button
+					type="button"
+					size="icon-sm"
+					variant="ghost"
+					aria-label="Delete message"
+					className="h-6 w-6 text-destructive/70 hover:text-destructive"
+					disabled={sending}
+					onClick={onDelete}
+				>
+					<Trash2Icon className="size-3" aria-hidden="true" />
+				</Button>
+			) : null}
+			{canRegenerate ? (
+				<Button
+					type="button"
+					size="sm"
+					variant="ghost"
+					aria-label="Regenerate response"
+					className="h-6 gap-1 px-2 text-[11px]"
+					disabled={sending}
+					onClick={onRegenerate}
+				>
+					<RefreshCcwIcon className="size-3" aria-hidden="true" />
+					Regenerate
+				</Button>
+			) : null}
+		</div>
 	);
 }
