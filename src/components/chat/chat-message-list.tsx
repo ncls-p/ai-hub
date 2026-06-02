@@ -13,6 +13,7 @@ import {
 	ShieldAlertIcon,
 	SparklesIcon,
 	Trash2Icon,
+	UserIcon,
 	XCircleIcon,
 	XIcon,
 } from "lucide-react";
@@ -724,8 +725,8 @@ export function ChatMessageList({
 						{/* User avatar */}
 						{message.role === "user" && (
 							<div className="mt-1.5 flex size-7 shrink-0 items-center justify-center">
-								<div className="flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground ring-1 ring-border/50">
-									U
+								<div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
+									<UserIcon className="size-3" aria-hidden="true" />
 								</div>
 							</div>
 						)}
