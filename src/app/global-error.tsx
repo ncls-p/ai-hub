@@ -1,75 +1,51 @@
 "use client";
 
+import "./globals.css";
+
 export default function GlobalError({
 	error,
+	unstable_retry,
 	reset,
 }: {
 	error: Error & { digest?: string };
-	reset: () => void;
+	unstable_retry?: () => void;
+	reset?: () => void;
 }) {
+	const retry = unstable_retry ?? reset;
+
 	return (
-		<html lang="en">
-			<body>
+		<html lang="en" suppressHydrationWarning>
+			<body className="min-h-svh bg-background text-foreground antialiased">
+				<title>Unexpected error · AI Hub</title>
 				<main
-					style={{
-						alignItems: "center",
-						background: "#0a0a0a",
-						color: "#fafafa",
-						display: "flex",
-						fontFamily:
-							"system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-						justifyContent: "center",
-						minHeight: "100vh",
-						padding: "1rem",
-					}}
+					data-page="auth"
+					className="relative isolate flex min-h-svh items-center justify-center overflow-hidden bg-background p-4"
 				>
-					<section
-						style={{
-							border: "1px solid rgba(255,255,255,0.14)",
-							borderRadius: "1rem",
-							maxWidth: "32rem",
-							padding: "1.5rem",
-							textAlign: "center",
-						}}
-					>
-						<p
-							style={{
-								fontSize: "0.75rem",
-								letterSpacing: "0.16em",
-								textTransform: "uppercase",
-							}}
-						>
-							Unexpected error
-						</p>
-						<h1>Something went wrong</h1>
-						<p style={{ color: "#a1a1aa" }}>
+					<div className="orb orb--primary orb--top-left" />
+					<div className="orb orb--muted orb--bottom-right" />
+					<div className="orb orb--accent orb--top-right" />
+					<div className="pointer-events-none absolute inset-0 grain-overlay" />
+					<div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/40 to-transparent" />
+
+					<section className="glass-card animate-in-scale relative z-10 w-full max-w-md p-6 text-center">
+						<div className="section-kicker mx-auto">Unexpected error</div>
+						<h1 className="mt-4 text-2xl font-semibold tracking-tight">
+							Something went wrong
+						</h1>
+						<p className="mt-3 text-sm leading-relaxed text-muted-foreground">
 							Try again. If this keeps happening, share this error with your
 							workspace administrator.
 						</p>
 						{error.digest ? (
-							<p
-								style={{
-									color: "#a1a1aa",
-									fontFamily: "monospace",
-									fontSize: "0.75rem",
-								}}
-							>
+							<p className="mt-4 rounded-lg border border-border/70 bg-background/60 px-3 py-2 font-mono text-xs text-muted-foreground">
 								Digest: {error.digest}
 							</p>
 						) : null}
 						<button
 							type="button"
-							onClick={reset}
-							style={{
-								background: "#fafafa",
-								border: 0,
-								borderRadius: "0.5rem",
-								color: "#0a0a0a",
-								cursor: "pointer",
-								fontWeight: 600,
-								marginTop: "1rem",
-								padding: "0.625rem 1rem",
-							}}
+							onClick={() => retry?.()}
+							disabled={!retry}
+							className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/15 transition-[background-color,box-shadow,opacity,transform] hover:bg-primary/90 hover:shadow-primary/20 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35 active:translate-y-px disabled:pointer-events-none disabled:opacity-50"
 						>
 							Try again
 						</button>

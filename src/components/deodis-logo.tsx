@@ -7,12 +7,14 @@ interface DeodisLogoProps {
 	className?: string;
 	href?: string;
 	priority?: boolean;
+	label?: string;
 }
 
 export function DeodisLogo({
 	className,
 	href = "/",
 	priority = false,
+	label = "Deodis home",
 }: DeodisLogoProps) {
 	const image = (
 		<Image
@@ -30,7 +32,11 @@ export function DeodisLogo({
 	}
 
 	return (
-		<Link href={href} className="inline-flex shrink-0 items-center">
+		<Link
+			href={href}
+			className="inline-flex shrink-0 items-center"
+			aria-label={label}
+		>
 			{image}
 		</Link>
 	);
