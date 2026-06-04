@@ -70,6 +70,7 @@ async function buildBoundTools(input: {
 	messageId: string;
 	userId: string;
 	maxToolCalls: number;
+	requireApprovalForAllTools?: boolean;
 	emitEvent?: (event: Record<string, unknown>) => void;
 	onApprovalRequired?: (event: ToolApprovalRequiredEvent) => void;
 }) {
@@ -100,6 +101,7 @@ async function buildBoundTools(input: {
 			if (!mcpContext) continue;
 			const mcpTool = mcpContext.tool;
 			const requiresMcpApproval =
+				input.requireApprovalForAllTools ||
 				mcpContext.server.requireApproval ||
 				mcpTool.requireApproval ||
 				binding.requireApproval;
@@ -267,7 +269,7 @@ async function buildBoundTools(input: {
 					}
 				}
 
-				if (binding.requireApproval) {
+				if (input.requireApprovalForAllTools || binding.requireApproval) {
 					const invocation = await logToolInvocation({
 						workspaceId: input.workspaceId,
 						conversationId: input.conversationId,
@@ -404,6 +406,7 @@ async function findUserMessageForResend(input: {
 
 async function loadConversationHistory(
 	conversationId: string,
+	maxMessages?: number,
 ): Promise<ModelMessage[]> {
 	const messageRows = await db
 		.select({
@@ -451,7 +454,7 @@ async function loadConversationHistory(
 		}
 	}
 
-	return modelMessages;
+	return maxMessages ? modelMessages.slice(-maxMessages) : modelMessages;
 }
 
 export async function POST(
@@ -691,7 +694,14 @@ export async function POST(
 			),
 			middleware: extractReasoningMiddleware({ tagName: "think" }),
 		});
-		const history = await loadConversationHistory(conversation.id);
+		const memoryPolicy = version.memoryPolicyJson as {
+			enabled?: boolean;
+			maxMessages?: number;
+		} | null;
+		const history = await loadConversationHistory(
+			conversation.id,
+			memoryPolicy?.enabled ? memoryPolicy.maxMessages : undefined,
+		);
 
 		const enqueueEvent = (event: Record<string, unknown>) =>
 			publishChatStreamEvent(assistantMessage.id, event);
@@ -728,6 +738,9 @@ export async function POST(
 			0,
 			Math.min(20, version.maxToolCalls ?? defaultMaxToolCalls),
 		);
+		const approvalPolicy = version.approvalPolicyJson as {
+			requireApprovalForAllTools?: boolean;
+		} | null;
 		const tools =
 			maxToolCalls > 0
 				? await buildBoundTools({
@@ -737,6 +750,9 @@ export async function POST(
 						messageId: assistantMessage.id,
 						userId: actorUserId,
 						maxToolCalls,
+						requireApprovalForAllTools: Boolean(
+							approvalPolicy?.requireApprovalForAllTools,
+						),
 						emitEvent: enqueueEvent,
 						onApprovalRequired: (event) => {
 							enqueueEvent({
@@ -749,6 +765,13 @@ export async function POST(
 					})
 				: {};
 		const availableToolNames = Object.keys(tools);
+		const versionToolChoice = version.toolChoice;
+		const configuredToolChoice: "auto" | "required" | "none" | undefined =
+			availableToolNames.length > 0
+				? versionToolChoice === "required" || versionToolChoice === "none"
+					? versionToolChoice
+					: "auto"
+				: undefined;
 		const toolGuidance =
 			availableToolNames.length > 0
 				? [
@@ -764,8 +787,25 @@ export async function POST(
 						.join(" ")
 				: null;
 
+		const responseFormat = version.responseFormatJson as {
+			type?: "text" | "json_object";
+		} | null;
+		const guardrails = version.guardrailsJson as {
+			enabled?: boolean;
+			blockedTopics?: string[];
+		} | null;
+		const responseFormatGuidance =
+			responseFormat?.type === "json_object"
+				? "Respond with a valid JSON object only. Do not include markdown fences or explanatory prose outside the JSON object."
+				: null;
+		const guardrailGuidance =
+			guardrails?.enabled && guardrails.blockedTopics?.length
+				? `Avoid and refuse requests about these blocked topics: ${guardrails.blockedTopics.join(", ")}.`
+				: null;
 		const systemPrompt = [
 			version.systemPrompt || "You are a helpful assistant.",
+			responseFormatGuidance,
+			guardrailGuidance,
 			toolGuidance,
 			ragContext
 				? `Use the following knowledge base excerpts when relevant:\n\n${ragContext}`
@@ -827,6 +867,14 @@ export async function POST(
 			streamedParts.push({ id: inserted.id, type, metadata });
 		}
 
+		const generationSettings = version.generationSettingsJson as {
+			topK?: number;
+			presencePenalty?: number;
+			frequencyPenalty?: number;
+			seed?: number;
+			maxRetries?: number;
+			stopSequences?: string[];
+		} | null;
 		const result = streamText({
 			model,
 			system: systemPrompt,
@@ -835,8 +883,17 @@ export async function POST(
 				? Number.parseFloat(version.temperature)
 				: undefined,
 			topP: version.topP ? Number.parseFloat(version.topP) : undefined,
+			topK: generationSettings?.topK,
+			presencePenalty: generationSettings?.presencePenalty,
+			frequencyPenalty: generationSettings?.frequencyPenalty,
+			seed: generationSettings?.seed,
+			maxRetries: generationSettings?.maxRetries,
+			stopSequences: generationSettings?.stopSequences?.length
+				? generationSettings.stopSequences
+				: undefined,
 			maxOutputTokens: version.maxOutputTokens ?? undefined,
 			tools,
+			toolChoice: configuredToolChoice,
 			stopWhen: availableToolNames.length > 0 ? () => false : undefined,
 			prepareStep:
 				availableToolNames.length > 0

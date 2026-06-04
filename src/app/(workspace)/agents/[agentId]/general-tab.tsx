@@ -1,7 +1,14 @@
-import { ShieldCheckIcon, SettingsIcon, SaveIcon } from "lucide-react";
+import {
+	GlobeIcon,
+	ShieldCheckIcon,
+	SettingsIcon,
+	SaveIcon,
+	StarIcon,
+} from "lucide-react";
 import type { SyntheticEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Card,
 	CardContent,
@@ -34,11 +41,13 @@ export function GeneralTab({
 	form,
 	setForm,
 	saving,
+	canAdminCurate,
 	onSave,
 }: {
 	form: AgentForm;
 	setForm: (fn: (prev: AgentForm) => AgentForm) => void;
 	saving: boolean;
+	canAdminCurate: boolean;
 	onSave: (e: SyntheticEvent<HTMLFormElement>) => void;
 }) {
 	return (
@@ -50,7 +59,7 @@ export function GeneralTab({
 			</InfoCallout>
 
 			<form onSubmit={onSave}>
-				<Card>
+				<Card className="hover-lift animate-in-up stagger-3">
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
 							<SettingsIcon className="size-5" aria-hidden="true" />
@@ -71,6 +80,26 @@ export function GeneralTab({
 										value={form.name}
 										onChange={(e) =>
 											setForm((prev) => ({ ...prev, name: e.target.value }))
+										}
+									/>
+								</FieldContent>
+							</Field>
+							<Field>
+								<div className="flex items-center gap-2">
+									<FieldLabel htmlFor="agent-slug">Slug</FieldLabel>
+									<SettingHint text="Unique URL-safe identifier for this assistant inside the workspace. Use lowercase letters, numbers, and hyphens." />
+								</div>
+								<FieldContent>
+									<Input
+										id="agent-slug"
+										required
+										pattern="[a-z0-9-]+"
+										value={form.slug}
+										onChange={(e) =>
+											setForm((prev) => ({
+												...prev,
+												slug: e.target.value.toLowerCase(),
+											}))
 										}
 									/>
 								</FieldContent>
@@ -101,7 +130,7 @@ export function GeneralTab({
 				</Card>
 			</form>
 
-			<Card>
+			<Card className="hover-lift animate-in-up stagger-4">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<ShieldCheckIcon className="size-5" aria-hidden="true" />
@@ -171,7 +200,7 @@ export function GeneralTab({
 						<p className="text-xs text-muted-foreground">
 							Changes apply immediately after saving.
 						</p>
-						<Button type="submit" disabled={saving}>
+						<Button type="submit" disabled={saving} className="shimmer">
 							{saving ? (
 								<Spinner data-icon="inline-start" />
 							) : (
@@ -182,6 +211,108 @@ export function GeneralTab({
 					</CardFooter>
 				</form>
 			</Card>
+
+			{canAdminCurate ? (
+				<Card className="hover-lift animate-in-up stagger-5">
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<GlobeIcon className="size-5" aria-hidden="true" />
+							Marketplace & Curation
+						</CardTitle>
+						<CardDescription>
+							Admin-only discovery controls for curated assistants.
+						</CardDescription>
+					</CardHeader>
+					<form onSubmit={onSave}>
+						<CardContent>
+							<FieldGroup>
+								<Field>
+									<div className="flex items-center gap-3 rounded-xl border border-border/60 p-3">
+										<Checkbox
+											id="agent-global"
+											checked={form.isGlobal}
+											onCheckedChange={(checked) =>
+												setForm((prev) => ({
+													...prev,
+													isGlobal: checked === true,
+												}))
+											}
+										/>
+										<div>
+											<FieldLabel htmlFor="agent-global">
+												Global assistant
+											</FieldLabel>
+											<p className="text-xs text-muted-foreground">
+												Make this assistant visible beyond its creator scope.
+											</p>
+										</div>
+									</div>
+								</Field>
+								<Field>
+									<div className="flex items-center gap-3 rounded-xl border border-border/60 p-3">
+										<Checkbox
+											id="agent-recommended"
+											checked={form.isRecommended}
+											onCheckedChange={(checked) =>
+												setForm((prev) => ({
+													...prev,
+													isRecommended: checked === true,
+												}))
+											}
+										/>
+										<div>
+											<FieldLabel htmlFor="agent-recommended" className="gap-2">
+												<StarIcon className="size-4" aria-hidden="true" />
+												Recommended
+											</FieldLabel>
+											<p className="text-xs text-muted-foreground">
+												Highlight this assistant as recommended.
+											</p>
+										</div>
+									</div>
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="agent-curation-label">
+										Curation label
+									</FieldLabel>
+									<FieldContent>
+										<Select
+											value={form.curationLabel}
+											onValueChange={(value) =>
+												setForm((prev) => ({ ...prev, curationLabel: value }))
+											}
+										>
+											<SelectTrigger
+												id="agent-curation-label"
+												className="w-full"
+											>
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="none">No label</SelectItem>
+												<SelectItem value="recommended">Recommended</SelectItem>
+												<SelectItem value="organization_created">
+													Organization created
+												</SelectItem>
+											</SelectContent>
+										</Select>
+									</FieldContent>
+								</Field>
+							</FieldGroup>
+						</CardContent>
+						<CardFooter className="justify-end">
+							<Button type="submit" disabled={saving} className="shimmer">
+								{saving ? (
+									<Spinner data-icon="inline-start" />
+								) : (
+									<SaveIcon data-icon="inline-start" aria-hidden="true" />
+								)}
+								Save curation
+							</Button>
+						</CardFooter>
+					</form>
+				</Card>
+			) : null}
 		</div>
 	);
 }

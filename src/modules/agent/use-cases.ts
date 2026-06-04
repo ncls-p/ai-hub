@@ -61,6 +61,32 @@ export interface CreateAgentInput {
 	canAdminCurate?: boolean;
 }
 
+export type AgentToolChoice = "auto" | "required" | "none";
+export type AgentResponseFormat = "text" | "json_object";
+
+export interface AgentGenerationSettings {
+	topK?: number;
+	presencePenalty?: number;
+	frequencyPenalty?: number;
+	seed?: number;
+	maxRetries?: number;
+	stopSequences?: string[];
+}
+
+export interface AgentMemoryPolicy {
+	enabled?: boolean;
+	maxMessages?: number;
+}
+
+export interface AgentGuardrails {
+	enabled?: boolean;
+	blockedTopics?: string[];
+}
+
+export interface AgentApprovalPolicy {
+	requireApprovalForAllTools?: boolean;
+}
+
 export interface UpdateAgentInput {
 	agentId: string;
 	workspaceId: string;
@@ -75,6 +101,12 @@ export interface UpdateAgentInput {
 	topP?: string;
 	maxOutputTokens?: number;
 	maxToolCalls?: number;
+	toolChoice?: AgentToolChoice;
+	generationSettings?: AgentGenerationSettings;
+	responseFormat?: AgentResponseFormat;
+	memoryPolicy?: AgentMemoryPolicy;
+	guardrails?: AgentGuardrails;
+	approvalPolicy?: AgentApprovalPolicy;
 	toolBindings?: ToolBindingInput[];
 	knowledgeBindings?: string[];
 	sharingMode?: AgentSharingMode;
@@ -356,6 +388,12 @@ export async function updateAgent(input: UpdateAgentInput) {
 		isRecommended,
 		curationLabel,
 		canAdminCurate,
+		toolChoice,
+		generationSettings,
+		responseFormat,
+		memoryPolicy,
+		guardrails,
+		approvalPolicy,
 	} = input;
 
 	const [existing] = await db
@@ -488,6 +526,30 @@ export async function updateAgent(input: UpdateAgentInput) {
 					maxToolCalls !== undefined
 						? maxToolCalls
 						: (activeConfig?.maxToolCalls ?? 6),
+				toolChoice:
+					toolChoice !== undefined
+						? toolChoice
+						: (activeConfig?.toolChoice ?? null),
+				generationSettingsJson:
+					generationSettings !== undefined
+						? generationSettings
+						: (activeConfig?.generationSettingsJson ?? null),
+				responseFormatJson:
+					responseFormat !== undefined
+						? { type: responseFormat }
+						: (activeConfig?.responseFormatJson ?? null),
+				memoryPolicyJson:
+					memoryPolicy !== undefined
+						? memoryPolicy
+						: (activeConfig?.memoryPolicyJson ?? null),
+				guardrailsJson:
+					guardrails !== undefined
+						? guardrails
+						: (activeConfig?.guardrailsJson ?? null),
+				approvalPolicyJson:
+					approvalPolicy !== undefined
+						? approvalPolicy
+						: (activeConfig?.approvalPolicyJson ?? null),
 				createdById: userId,
 			})
 			.returning();

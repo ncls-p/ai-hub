@@ -47,8 +47,35 @@ export type KnowledgeBinding = {
 
 export type ToolFilter = "all" | "enabled" | "disabled";
 
+export type AgentToolChoice = "auto" | "required" | "none";
+export type AgentResponseFormat = "text" | "json_object";
+
+export interface AgentGenerationSettings {
+	topK: string;
+	presencePenalty: string;
+	frequencyPenalty: string;
+	seed: string;
+	maxRetries: string;
+	stopSequences: string;
+}
+
+export interface AgentMemoryPolicy {
+	enabled: boolean;
+	maxMessages: number;
+}
+
+export interface AgentGuardrails {
+	enabled: boolean;
+	blockedTopics: string[];
+}
+
+export interface AgentApprovalPolicy {
+	requireApprovalForAllTools: boolean;
+}
+
 export type AgentForm = {
 	name: string;
+	slug: string;
 	description: string;
 	systemPrompt: string;
 	providerId: string;
@@ -57,6 +84,12 @@ export type AgentForm = {
 	topP: string;
 	maxOutputTokens: string;
 	maxToolCalls: string;
+	toolChoice: AgentToolChoice;
+	generationSettings: AgentGenerationSettings;
+	responseFormat: AgentResponseFormat;
+	memoryPolicy: AgentMemoryPolicy;
+	guardrails: AgentGuardrails;
+	approvalPolicy: AgentApprovalPolicy;
 	sharingMode: Agent["sharingMode"];
 	shareTargetEmail: string;
 	originalSharingMode: Agent["sharingMode"];
@@ -72,15 +105,47 @@ export type ToolBindingState = Record<
 
 /* ─── Constants ─────────────────────────────────────────────────────── */
 
-export const AVATAR_COLORS = [
-	"from-violet-500 to-indigo-600",
-	"from-cyan-500 to-blue-600",
-	"from-emerald-500 to-teal-600",
-	"from-amber-500 to-orange-600",
-	"from-rose-500 to-pink-600",
-	"from-fuchsia-500 to-purple-600",
-	"from-lime-500 to-green-600",
-	"from-sky-500 to-cyan-600",
+export const AGENT_ACCENTS = [
+	{
+		bar: "bg-violet-500",
+		iconBg: "bg-violet-500/10",
+		text: "text-violet-600 dark:text-violet-400",
+	},
+	{
+		bar: "bg-cyan-500",
+		iconBg: "bg-cyan-500/10",
+		text: "text-cyan-600 dark:text-cyan-400",
+	},
+	{
+		bar: "bg-emerald-500",
+		iconBg: "bg-emerald-500/10",
+		text: "text-emerald-600 dark:text-emerald-400",
+	},
+	{
+		bar: "bg-amber-500",
+		iconBg: "bg-amber-500/10",
+		text: "text-amber-600 dark:text-amber-400",
+	},
+	{
+		bar: "bg-rose-500",
+		iconBg: "bg-rose-500/10",
+		text: "text-rose-600 dark:text-rose-400",
+	},
+	{
+		bar: "bg-fuchsia-500",
+		iconBg: "bg-fuchsia-500/10",
+		text: "text-fuchsia-600 dark:text-fuchsia-400",
+	},
+	{
+		bar: "bg-lime-500",
+		iconBg: "bg-lime-500/10",
+		text: "text-lime-600 dark:text-lime-400",
+	},
+	{
+		bar: "bg-sky-500",
+		iconBg: "bg-sky-500/10",
+		text: "text-sky-600 dark:text-sky-400",
+	},
 ];
 
 export const defaultGenParams = {
@@ -93,6 +158,7 @@ export const defaultGenParams = {
 export function createEmptyForm(): AgentForm {
 	return {
 		name: "",
+		slug: "",
 		description: "",
 		systemPrompt: "",
 		providerId: "",
@@ -101,6 +167,19 @@ export function createEmptyForm(): AgentForm {
 		topP: defaultGenParams.topP,
 		maxOutputTokens: defaultGenParams.maxOutputTokens,
 		maxToolCalls: defaultGenParams.maxToolCalls,
+		toolChoice: "auto",
+		generationSettings: {
+			topK: "",
+			presencePenalty: "",
+			frequencyPenalty: "",
+			seed: "",
+			maxRetries: "",
+			stopSequences: "",
+		},
+		responseFormat: "text",
+		memoryPolicy: { enabled: false, maxMessages: 50 },
+		guardrails: { enabled: false, blockedTopics: [] },
+		approvalPolicy: { requireApprovalForAllTools: false },
 		sharingMode: "personal",
 		shareTargetEmail: "",
 		originalSharingMode: "personal",

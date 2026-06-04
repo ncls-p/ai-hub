@@ -42,10 +42,10 @@ export function KnowledgeTab({
 	return (
 		<div className="space-y-4">
 			<InfoCallout title="About knowledge bases" icon={BookOpenIcon}>
-				Knowledge bases give your assistant access to reference material.
-				When enabled, the assistant searches bound knowledge bases during
-				conversations and cites relevant passages. Create knowledge bases in
-				the Knowledge section and bind them here.
+				Knowledge bases give your assistant access to reference material. When
+				enabled, the assistant searches bound knowledge bases during
+				conversations and cites relevant passages. Create knowledge bases in the
+				Knowledge section and bind them here.
 			</InfoCallout>
 
 			<Toolbar
@@ -66,7 +66,7 @@ export function KnowledgeTab({
 				}
 			/>
 
-			<Card>
+			<Card className="hover-lift animate-in-up stagger-3">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<BookOpenIcon className="size-5" aria-hidden="true" />
@@ -75,7 +75,9 @@ export function KnowledgeTab({
 					<CardDescription>
 						Select knowledge bases to search during chat.
 						{selectedKnowledgeIds.length > 0 && (
-							<span className="ml-1">({selectedKnowledgeIds.length} bound)</span>
+							<span className="ml-1">
+								({selectedKnowledgeIds.length} bound)
+							</span>
 						)}
 					</CardDescription>
 				</CardHeader>
@@ -97,26 +99,22 @@ export function KnowledgeTab({
 										Create a knowledge base to give your assistant reference
 										material it can cite in conversations.
 									</p>
-									<Button
-										variant="outline"
-										size="sm"
-										asChild
-										className="mt-3"
-									>
+									<Button variant="outline" size="sm" asChild className="mt-3">
 										<Link href="/knowledge">Create knowledge base</Link>
 									</Button>
 								</>
 							)}
 						</div>
 					) : (
-						filteredKnowledgeBases.map((kb) => (
+						filteredKnowledgeBases.map((kb, idx) => (
 							<label
 								key={kb.id}
 								className={cn(
-									"ui-list-row flex cursor-pointer items-center justify-between rounded-xl border p-4 transition-colors hover:bg-muted/30",
+									"ui-list-row flex cursor-pointer items-center justify-between rounded-xl border p-4 transition-all hover:border-primary/25 hover:bg-card/65 hover:shadow-sm",
 									selectedKnowledgeIds.includes(kb.id)
 										? "border-primary/30 bg-primary/5"
 										: "border-border/60",
+									`animate-in-up stagger-${Math.min(idx + 4, 6)}`,
 								)}
 							>
 								<div className="flex items-center gap-3">
@@ -147,7 +145,7 @@ export function KnowledgeTab({
 					)}
 				</CardContent>
 				<CardFooter className="justify-end">
-					<Button onClick={onSave} disabled={saving}>
+					<Button onClick={onSave} disabled={saving} className="shimmer">
 						{saving ? (
 							<Spinner data-icon="inline-start" />
 						) : (

@@ -490,6 +490,7 @@ export const agentVersions = pgTable(
 		maxOutputTokens: integer("max_output_tokens"),
 		maxToolCalls: integer("max_tool_calls").notNull().default(6),
 		toolChoice: varchar("tool_choice", { length: 32 }),
+		generationSettingsJson: jsonb("generation_settings_json"),
 		responseFormatJson: jsonb("response_format_json"),
 		memoryPolicyJson: jsonb("memory_policy_json"),
 		guardrailsJson: jsonb("guardrails_json"),

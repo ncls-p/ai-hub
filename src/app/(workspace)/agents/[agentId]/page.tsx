@@ -38,7 +38,7 @@ import type {
 import { createEmptyForm, defaultGenParams } from "./types";
 import { isMcpToolApprovalForced } from "./utils";
 import { TabBadge } from "./shared";
-import { AgentHeader, PageActions } from "./agent-header";
+import { AgentHeader } from "./agent-header";
 import { GeneralTab } from "./general-tab";
 import { ModelTab } from "./model-tab";
 import { ToolsTab } from "./tools-tab";
@@ -145,6 +145,19 @@ export default function AgentConfigurePage() {
 			topP: string | null;
 			maxOutputTokens: number | null;
 			maxToolCalls: number | null;
+			toolChoice: "auto" | "required" | "none" | null;
+			generationSettingsJson: {
+				topK?: number;
+				presencePenalty?: number;
+				frequencyPenalty?: number;
+				seed?: number;
+				maxRetries?: number;
+				stopSequences?: string[];
+			} | null;
+			responseFormatJson: { type?: "text" | "json_object" } | null;
+			memoryPolicyJson: { enabled?: boolean; maxMessages?: number } | null;
+			guardrailsJson: { enabled?: boolean; blockedTopics?: string[] } | null;
+			approvalPolicyJson: { requireApprovalForAllTools?: boolean } | null;
 		}>;
 		const providerRows = (await providersRes.json()) as Provider[];
 		const builtinRows = (await toolsRes.json()) as BuiltinTool[];
@@ -197,6 +210,7 @@ export default function AgentConfigurePage() {
 
 		setForm({
 			name: nextAgent.name,
+			slug: nextAgent.slug,
 			description: nextAgent.description ?? "",
 			systemPrompt: activeVersion?.systemPrompt ?? "",
 			providerId: activeVersion?.providerId ?? "",
@@ -210,6 +224,37 @@ export default function AgentConfigurePage() {
 			maxToolCalls: String(
 				activeVersion?.maxToolCalls ?? Number(defaultGenParams.maxToolCalls),
 			),
+			toolChoice: activeVersion?.toolChoice ?? "auto",
+			generationSettings: {
+				topK: String(activeVersion?.generationSettingsJson?.topK ?? ""),
+				presencePenalty: String(
+					activeVersion?.generationSettingsJson?.presencePenalty ?? "",
+				),
+				frequencyPenalty: String(
+					activeVersion?.generationSettingsJson?.frequencyPenalty ?? "",
+				),
+				seed: String(activeVersion?.generationSettingsJson?.seed ?? ""),
+				maxRetries: String(
+					activeVersion?.generationSettingsJson?.maxRetries ?? "",
+				),
+				stopSequences:
+					activeVersion?.generationSettingsJson?.stopSequences?.join("\n") ??
+					"",
+			},
+			responseFormat: activeVersion?.responseFormatJson?.type ?? "text",
+			memoryPolicy: {
+				enabled: activeVersion?.memoryPolicyJson?.enabled ?? false,
+				maxMessages: activeVersion?.memoryPolicyJson?.maxMessages ?? 50,
+			},
+			guardrails: {
+				enabled: activeVersion?.guardrailsJson?.enabled ?? false,
+				blockedTopics: activeVersion?.guardrailsJson?.blockedTopics ?? [],
+			},
+			approvalPolicy: {
+				requireApprovalForAllTools:
+					activeVersion?.approvalPolicyJson?.requireApprovalForAllTools ??
+					false,
+			},
 			sharingMode: nextAgent.sharingMode,
 			shareTargetEmail: "",
 			originalSharingMode: nextAgent.sharingMode,
@@ -271,12 +316,36 @@ export default function AgentConfigurePage() {
 		if (!agentId || !workspaceId) return;
 		setSaving(true);
 		try {
+			const generationSettings = {
+				topK: Number(form.generationSettings.topK) || undefined,
+				presencePenalty:
+					form.generationSettings.presencePenalty === ""
+						? undefined
+						: Number(form.generationSettings.presencePenalty),
+				frequencyPenalty:
+					form.generationSettings.frequencyPenalty === ""
+						? undefined
+						: Number(form.generationSettings.frequencyPenalty),
+				seed:
+					form.generationSettings.seed === ""
+						? undefined
+						: Number(form.generationSettings.seed),
+				maxRetries:
+					form.generationSettings.maxRetries === ""
+						? undefined
+						: Number(form.generationSettings.maxRetries),
+				stopSequences: form.generationSettings.stopSequences
+					.split(/\n|,/)
+					.map((sequence) => sequence.trim())
+					.filter(Boolean),
+			};
 			const res = await fetch(`/api/workspace/agents/${agentId}`, {
 				method: "PATCH",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					workspaceId,
 					name: form.name,
+					slug: form.slug,
 					description: form.description,
 					systemPrompt: form.systemPrompt,
 					providerId: form.providerId || undefined,
@@ -285,6 +354,12 @@ export default function AgentConfigurePage() {
 					topP: form.topP,
 					maxOutputTokens: Number(form.maxOutputTokens) || undefined,
 					maxToolCalls: Number(form.maxToolCalls),
+					toolChoice: form.toolChoice,
+					generationSettings,
+					responseFormat: form.responseFormat,
+					memoryPolicy: form.memoryPolicy,
+					guardrails: form.guardrails,
+					approvalPolicy: form.approvalPolicy,
 					...(form.sharingMode !== form.originalSharingMode ||
 					form.shareTargetEmail.trim()
 						? {
@@ -449,12 +524,6 @@ export default function AgentConfigurePage() {
 			title="Assistant configuration"
 			description="Tune identity, model behavior, tools, and knowledge for this assistant."
 			width="default"
-			actions={
-				<PageActions
-					agentId={agentId}
-					onShowDeleteDialog={() => setShowDeleteDialog(true)}
-				/>
-			}
 		>
 			<div className="flex flex-col gap-6">
 				{/* Identity Header */}
@@ -470,82 +539,95 @@ export default function AgentConfigurePage() {
 				/>
 
 				{/* Tabs */}
-				<Tabs value={activeTab} onValueChange={setActiveTab}>
-					<TabsList className="w-full flex-wrap">
-						<TabsTrigger value="general" className="gap-2">
-							<SettingsIcon className="size-4" aria-hidden="true" />
-							Basics
-						</TabsTrigger>
-						<TabsTrigger value="model" className="gap-2">
-							<BrainIcon className="size-4" aria-hidden="true" />
-							Model
-						</TabsTrigger>
-						<TabsTrigger value="tools" className="gap-2">
-							<WrenchIcon className="size-4" aria-hidden="true" />
-							Tools
-							<TabBadge count={totalEnabledTools} />
-						</TabsTrigger>
-						<TabsTrigger value="knowledge" className="gap-2">
-							<BookOpenIcon className="size-4" aria-hidden="true" />
-							Knowledge
-							<TabBadge count={selectedKnowledgeIds.length} />
-						</TabsTrigger>
-					</TabsList>
+				<div className="surface-panel animate-in-up stagger-2">
+					<div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+						<div>
+							<h3 className="text-base font-semibold">Configuration</h3>
+							<p className="text-sm text-muted-foreground">
+								Tune identity, model behavior, tools, and knowledge.
+							</p>
+						</div>
+					</div>
+					<div className="px-5 pb-5">
+						<Tabs value={activeTab} onValueChange={setActiveTab}>
+							<TabsList className="w-full flex-wrap">
+								<TabsTrigger value="general" className="gap-2">
+									<SettingsIcon className="size-4" aria-hidden="true" />
+									Basics
+								</TabsTrigger>
+								<TabsTrigger value="model" className="gap-2">
+									<BrainIcon className="size-4" aria-hidden="true" />
+									Model
+								</TabsTrigger>
+								<TabsTrigger value="tools" className="gap-2">
+									<WrenchIcon className="size-4" aria-hidden="true" />
+									Tools
+									<TabBadge count={totalEnabledTools} />
+								</TabsTrigger>
+								<TabsTrigger value="knowledge" className="gap-2">
+									<BookOpenIcon className="size-4" aria-hidden="true" />
+									Knowledge
+									<TabBadge count={selectedKnowledgeIds.length} />
+								</TabsTrigger>
+							</TabsList>
 
-					{/* BASICS TAB */}
-					<TabsContent value="general" className="mt-4">
-						<GeneralTab
-							form={form}
-							setForm={setForm}
-							saving={saving}
-							onSave={saveGeneralModel}
-						/>
-					</TabsContent>
+							{/* BASICS TAB */}
+							<TabsContent value="general" className="mt-4">
+								<GeneralTab
+									form={form}
+									setForm={setForm}
+									saving={saving}
+									canAdminCurate={agent?.canAdminCurate ?? false}
+									onSave={saveGeneralModel}
+								/>
+							</TabsContent>
 
-					{/* MODEL TAB */}
-					<TabsContent value="model" className="mt-4">
-						<ModelTab
-							form={form}
-							setForm={setForm}
-							providers={providers}
-							models={models}
-							saving={saving}
-							onSave={saveGeneralModel}
-						/>
-					</TabsContent>
+							{/* MODEL TAB */}
+							<TabsContent value="model" className="mt-4">
+								<ModelTab
+									form={form}
+									setForm={setForm}
+									providers={providers}
+									models={models}
+									saving={saving}
+									onSave={saveGeneralModel}
+								/>
+							</TabsContent>
 
-					{/* TOOLS TAB */}
-					<TabsContent value="tools" className="mt-4">
-						<ToolsTab
-							builtinTools={builtinTools}
-							builtinBindings={builtinBindings}
-							setBuiltinBindings={setBuiltinBindings}
-							mcpServers={mcpServers}
-							mcpTools={mcpTools}
-							mcpBindings={mcpBindings}
-							setMcpBindings={setMcpBindings}
-							toolSearch={toolSearch}
-							setToolSearch={setToolSearch}
-							toolFilter={toolFilter}
-							setToolFilter={setToolFilter}
-							saving={saving}
-							onSave={saveToolBindings}
-						/>
-					</TabsContent>
+							{/* TOOLS TAB */}
+							<TabsContent value="tools" className="mt-4">
+								<ToolsTab
+									builtinTools={builtinTools}
+									builtinBindings={builtinBindings}
+									setBuiltinBindings={setBuiltinBindings}
+									mcpServers={mcpServers}
+									mcpTools={mcpTools}
+									mcpBindings={mcpBindings}
+									setMcpBindings={setMcpBindings}
+									toolSearch={toolSearch}
+									setToolSearch={setToolSearch}
+									toolFilter={toolFilter}
+									setToolFilter={setToolFilter}
+									saving={saving}
+									onSave={saveToolBindings}
+								/>
+							</TabsContent>
 
-					{/* KNOWLEDGE TAB */}
-					<TabsContent value="knowledge" className="mt-4">
-						<KnowledgeTab
-							knowledgeBases={knowledgeBases}
-							selectedKnowledgeIds={selectedKnowledgeIds}
-							setSelectedKnowledgeIds={setSelectedKnowledgeIds}
-							knowledgeSearch={knowledgeSearch}
-							setKnowledgeSearch={setKnowledgeSearch}
-							saving={saving}
-							onSave={saveKnowledgeBindings}
-						/>
-					</TabsContent>
-				</Tabs>
+							{/* KNOWLEDGE TAB */}
+							<TabsContent value="knowledge" className="mt-4">
+								<KnowledgeTab
+									knowledgeBases={knowledgeBases}
+									selectedKnowledgeIds={selectedKnowledgeIds}
+									setSelectedKnowledgeIds={setSelectedKnowledgeIds}
+									knowledgeSearch={knowledgeSearch}
+									setKnowledgeSearch={setKnowledgeSearch}
+									saving={saving}
+									onSave={saveKnowledgeBindings}
+								/>
+							</TabsContent>
+						</Tabs>
+					</div>
+				</div>
 			</div>
 
 			{/* Delete Dialog */}

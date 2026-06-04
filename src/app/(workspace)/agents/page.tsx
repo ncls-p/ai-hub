@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
 	BotIcon,
 	PlusIcon,
-	TrashIcon,
 	SearchIcon,
 	Loader2,
+	MoreHorizontal,
+	PencilIcon,
+	Trash2Icon,
 	SparklesIcon,
 	WrenchIcon,
 	BookOpenIcon,
@@ -17,6 +19,7 @@ import {
 	UsersIcon,
 	GlobeIcon,
 	StarIcon,
+	XIcon,
 } from "lucide-react";
 
 import { PageLoading } from "@/components/page-loading";
@@ -34,15 +37,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card } from "@/components/ui/card";
 import {
-	Empty,
-	EmptyContent,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
 	Dialog,
 	DialogContent,
@@ -108,32 +109,55 @@ function timeAgo(dateString: string): string {
 	return date.toLocaleDateString();
 }
 
-const AVATAR_COLORS = [
-	"from-violet-500 to-indigo-600",
-	"from-cyan-500 to-blue-600",
-	"from-emerald-500 to-teal-600",
-	"from-amber-500 to-orange-600",
-	"from-rose-500 to-pink-600",
-	"from-fuchsia-500 to-purple-600",
-	"from-lime-500 to-green-600",
-	"from-sky-500 to-cyan-600",
+const AGENT_ACCENTS = [
+	{
+		bar: "bg-violet-500",
+		iconBg: "bg-violet-500/10",
+		text: "text-violet-600 dark:text-violet-400",
+	},
+	{
+		bar: "bg-cyan-500",
+		iconBg: "bg-cyan-500/10",
+		text: "text-cyan-600 dark:text-cyan-400",
+	},
+	{
+		bar: "bg-emerald-500",
+		iconBg: "bg-emerald-500/10",
+		text: "text-emerald-600 dark:text-emerald-400",
+	},
+	{
+		bar: "bg-amber-500",
+		iconBg: "bg-amber-500/10",
+		text: "text-amber-600 dark:text-amber-400",
+	},
+	{
+		bar: "bg-rose-500",
+		iconBg: "bg-rose-500/10",
+		text: "text-rose-600 dark:text-rose-400",
+	},
+	{
+		bar: "bg-fuchsia-500",
+		iconBg: "bg-fuchsia-500/10",
+		text: "text-fuchsia-600 dark:text-fuchsia-400",
+	},
+	{
+		bar: "bg-lime-500",
+		iconBg: "bg-lime-500/10",
+		text: "text-lime-600 dark:text-lime-400",
+	},
+	{
+		bar: "bg-sky-500",
+		iconBg: "bg-sky-500/10",
+		text: "text-sky-600 dark:text-sky-400",
+	},
 ];
 
-function getAvatarColor(name: string): string {
+function getAccent(name: string) {
 	let hash = 0;
 	for (let i = 0; i < name.length; i++) {
 		hash = name.charCodeAt(i) + ((hash << 5) - hash);
 	}
-	return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function getInitials(name: string): string {
-	return name
-		.split(/\s+/)
-		.map((w) => w[0])
-		.join("")
-		.toUpperCase()
-		.slice(0, 2);
+	return AGENT_ACCENTS[Math.abs(hash) % AGENT_ACCENTS.length];
 }
 
 export default function AgentsPage() {
@@ -163,55 +187,55 @@ export default function AgentsPage() {
 	>({});
 	const abortRef = useRef<AbortController | null>(null);
 
-	const loadBindingSummaries = async (
-		agentList: Agent[],
-		currentWorkspaceId: string,
-	) => {
-		const summaries = await Promise.all(
-			agentList.map(async (agent) => {
-				const [toolsRes, knowledgeRes] = await Promise.all([
-					fetch(
-						`/api/workspace/agents/${agent.id}/tools?workspaceId=${currentWorkspaceId}`,
-					),
-					fetch(
-						`/api/workspace/agents/${agent.id}/knowledge?workspaceId=${currentWorkspaceId}`,
-					),
-				]);
-				const tools = toolsRes.ok ? await toolsRes.json() : [];
-				const knowledge = knowledgeRes.ok
-					? ((await knowledgeRes.json()) as { bindings?: unknown[] }).bindings
-					: [];
-				const toolList = Array.isArray(tools) ? tools : [];
-				const mcpCount = toolList.filter(
-					(tool) =>
-						typeof tool === "object" &&
-						tool !== null &&
-						"toolSource" in tool &&
-						(tool as { toolSource: string }).toolSource === "mcp",
-				).length;
-				return {
-					agentId: agent.id,
-					toolCount: toolList.length,
-					knowledgeCount: Array.isArray(knowledge) ? knowledge.length : 0,
-					mcpCount,
-				};
-			}),
-		);
-		setBindingSummaries(
-			Object.fromEntries(
-				summaries.map((summary) => [
-					summary.agentId,
-					{
-						toolCount: summary.toolCount,
-						knowledgeCount: summary.knowledgeCount,
-						mcpCount: summary.mcpCount,
-					},
-				]),
-			),
-		);
-	};
+	const loadBindingSummaries = useCallback(
+		async (agentList: Agent[], currentWorkspaceId: string) => {
+			const summaries = await Promise.all(
+				agentList.map(async (agent) => {
+					const [toolsRes, knowledgeRes] = await Promise.all([
+						fetch(
+							`/api/workspace/agents/${agent.id}/tools?workspaceId=${currentWorkspaceId}`,
+						),
+						fetch(
+							`/api/workspace/agents/${agent.id}/knowledge?workspaceId=${currentWorkspaceId}`,
+						),
+					]);
+					const tools = toolsRes.ok ? await toolsRes.json() : [];
+					const knowledge = knowledgeRes.ok
+						? ((await knowledgeRes.json()) as { bindings?: unknown[] }).bindings
+						: [];
+					const toolList = Array.isArray(tools) ? tools : [];
+					const mcpCount = toolList.filter(
+						(tool) =>
+							typeof tool === "object" &&
+							tool !== null &&
+							"toolSource" in tool &&
+							(tool as { toolSource: string }).toolSource === "mcp",
+					).length;
+					return {
+						agentId: agent.id,
+						toolCount: toolList.length,
+						knowledgeCount: Array.isArray(knowledge) ? knowledge.length : 0,
+						mcpCount,
+					};
+				}),
+			);
+			setBindingSummaries(
+				Object.fromEntries(
+					summaries.map((summary) => [
+						summary.agentId,
+						{
+							toolCount: summary.toolCount,
+							knowledgeCount: summary.knowledgeCount,
+							mcpCount: summary.mcpCount,
+						},
+					]),
+				),
+			);
+		},
+		[],
+	);
 
-	const refreshAgents = async () => {
+	const refreshAgents = useCallback(async () => {
 		if (!workspaceId) return;
 		abortRef.current?.abort();
 		abortRef.current = new AbortController();
@@ -227,7 +251,7 @@ export default function AgentsPage() {
 			const nextAgents = Array.isArray(data) ? data : data.agents;
 			setAgents(nextAgents);
 			setCanAdminCurate(Boolean(data.canAdminCurate));
-			void loadBindingSummaries(nextAgents, workspaceId);
+			await loadBindingSummaries(nextAgents, workspaceId);
 		} catch (err) {
 			if (err instanceof Error && err.name !== "AbortError") {
 				console.error("Failed to load agents", err);
@@ -235,7 +259,7 @@ export default function AgentsPage() {
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, [workspaceId, loadBindingSummaries]);
 
 	useEffect(() => {
 		if (!workspaceId) return;
@@ -255,7 +279,7 @@ export default function AgentsPage() {
 					const nextAgents = Array.isArray(data) ? data : data.agents;
 					setAgents(nextAgents);
 					setCanAdminCurate(Boolean(data.canAdminCurate));
-					void loadBindingSummaries(nextAgents, currentWorkspaceId);
+					await loadBindingSummaries(nextAgents, currentWorkspaceId);
 				}
 			} catch (err) {
 				if (err instanceof Error && err.name !== "AbortError") {
@@ -271,7 +295,7 @@ export default function AgentsPage() {
 			cancelled = true;
 			controller.abort();
 		};
-	}, [workspaceId]);
+	}, [workspaceId, loadBindingSummaries]);
 
 	const handleCreate = async () => {
 		if (!workspaceId || !form.name.trim()) return;
@@ -372,13 +396,268 @@ export default function AgentsPage() {
 			title="Assistants"
 			description="Manage your AI assistants — each one can have its own model, system prompt, tools, and knowledge bases."
 			width="default"
-			actions={
-				<Button type="button" onClick={() => setShowCreateDialog(true)}>
-					<PlusIcon data-icon="inline-start" aria-hidden="true" />
-					New assistant
-				</Button>
-			}
 		>
+			<div className="space-y-6">
+				{/* Header card */}
+				<div className="glass-card p-5 sm:p-6 animate-in-scale stagger-1">
+					<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+						<div>
+							<div className="section-kicker mb-2">Configuration</div>
+							<h2 className="font-heading text-xl font-semibold tracking-tight">
+								AI Assistants
+							</h2>
+							<p className="mt-1 text-sm text-muted-foreground">
+								Configure assistants with custom models, system prompts, tools,
+								and knowledge bases.
+							</p>
+						</div>
+						<Button
+							size="sm"
+							className="shimmer"
+							onClick={() => setShowCreateDialog(true)}
+						>
+							<PlusIcon className="size-4" aria-hidden="true" />
+							New assistant
+						</Button>
+					</div>
+				</div>
+
+				{/* Agents list card */}
+				<section className="surface-panel animate-in-up stagger-2">
+					{/* Toolbar */}
+					<div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+						<div>
+							<h3 className="text-base font-semibold">Assistants</h3>
+							<p className="text-sm text-muted-foreground">
+								{agents.length} assistant{agents.length !== 1 ? "s" : ""}{" "}
+								configured
+							</p>
+						</div>
+						<div className="flex items-center gap-2">
+							{agents.length > 2 ? (
+								<div className="relative w-48 sm:w-56">
+									<SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+									<Input
+										placeholder="Filter…"
+										value={searchQuery}
+										onChange={(e) => setSearchQuery(e.target.value)}
+										className="h-8 pl-9 text-sm"
+									/>
+									{searchQuery ? (
+										<Button
+											variant="ghost"
+											size="icon-sm"
+											className="absolute right-1 top-1/2 size-6 -translate-y-1/2"
+											onClick={() => setSearchQuery("")}
+											aria-label="Clear search"
+										>
+											<XIcon className="size-3" aria-hidden="true" />
+										</Button>
+									) : null}
+								</div>
+							) : null}
+						</div>
+					</div>
+
+					{/* List content */}
+					{loading ? (
+						<div className="flex items-center justify-center py-20">
+							<Loader2 className="size-6 animate-spin text-muted-foreground" />
+						</div>
+					) : agents.length === 0 ? (
+						<div className="px-5 py-12 text-center">
+							<p className="text-sm font-medium">No assistants yet</p>
+							<p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+								Create your first assistant to start chatting with AI. Each
+								assistant gets its own model, system prompt, tools, and
+								knowledge bases.
+							</p>
+							<Button
+								size="sm"
+								className="mt-4 shimmer"
+								onClick={() => setShowCreateDialog(true)}
+							>
+								<PlusIcon className="size-4" aria-hidden="true" />
+								Create your first assistant
+							</Button>
+						</div>
+					) : filteredAgents.length === 0 ? (
+						<div className="px-5 py-8 text-center text-sm text-muted-foreground">
+							No assistant matches &ldquo;{searchQuery}&rdquo;.
+						</div>
+					) : (
+						<div className="p-2 space-y-1">
+							{filteredAgents.map((agent, idx) => {
+								const bindings = bindingSummaries[agent.id];
+								const isReady = Boolean(agent.activeVersionId);
+								const accent = getAccent(agent.name);
+
+								return (
+									<div
+										key={agent.id}
+										className={cn(
+											"group flex items-center gap-3 rounded-xl border border-transparent p-3 transition-all hover:border-border/60 hover:bg-card/60 hover:shadow-sm",
+											!isReady && "opacity-60",
+											`animate-in-up stagger-${Math.min(idx + 3, 6)}`,
+										)}
+									>
+										<div
+											className={cn(
+												"hidden h-8 w-1 shrink-0 rounded-full sm:block",
+												accent.bar,
+											)}
+										/>
+										<div
+											className={cn(
+												"flex size-8 shrink-0 items-center justify-center rounded-lg",
+												accent.iconBg,
+												accent.text,
+											)}
+										>
+											<BotIcon className="size-4" aria-hidden="true" />
+										</div>
+										<div className="min-w-0 flex-1">
+											<div className="flex items-center gap-2">
+												<p className="truncate text-sm font-medium">
+													{agent.name}
+												</p>
+												<Badge
+													variant={isReady ? "default" : "outline"}
+													className={cn(
+														"gap-1 text-xs",
+														isReady
+															? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25"
+															: "",
+													)}
+												>
+													{isReady ? (
+														<SparklesIcon
+															className="size-3"
+															aria-hidden="true"
+														/>
+													) : (
+														<ClockIcon className="size-3" aria-hidden="true" />
+													)}
+													{isReady ? "Ready" : "Needs setup"}
+												</Badge>
+											</div>
+											<p className="truncate font-mono text-xs text-muted-foreground">
+												{agent.description
+													? agent.description
+													: `slug: ${agent.slug} · created ${timeAgo(agent.createdAt)}`}
+											</p>
+										</div>
+
+										{/* Badges */}
+										<div className="hidden items-center gap-1.5 sm:flex">
+											{agent.sharingMode === "marketplace" && (
+												<Badge variant="secondary" className="gap-1">
+													<UsersIcon className="size-3" aria-hidden="true" />
+													Workspace
+												</Badge>
+											)}
+											{agent.sharingMode === "specific_user" && (
+												<Badge variant="secondary" className="gap-1">
+													<ShieldIcon className="size-3" aria-hidden="true" />
+													Shared
+												</Badge>
+											)}
+											{agent.isGlobal && (
+												<Badge variant="secondary" className="gap-1">
+													<GlobeIcon className="size-3" aria-hidden="true" />
+													Global
+												</Badge>
+											)}
+											{agent.isRecommended && (
+												<Badge variant="secondary" className="gap-1">
+													<StarIcon className="size-3" aria-hidden="true" />
+													Recommended
+												</Badge>
+											)}
+										</div>
+
+										{/* Capability indicators */}
+										<div className="hidden items-center gap-3 lg:flex">
+											<div className="flex items-center gap-1 text-xs text-muted-foreground">
+												<WrenchIcon className="size-3" aria-hidden="true" />
+												<span>{bindings?.toolCount ?? "–"}</span>
+											</div>
+											<div className="flex items-center gap-1 text-xs text-muted-foreground">
+												<BookOpenIcon className="size-3" aria-hidden="true" />
+												<span>{bindings?.knowledgeCount ?? "–"}</span>
+											</div>
+											<div className="flex items-center gap-1 text-xs text-muted-foreground">
+												<ServerIcon className="size-3" aria-hidden="true" />
+												<span>{bindings?.mcpCount ?? "–"}</span>
+											</div>
+										</div>
+
+										{/* Quick actions */}
+										<Button
+											variant="ghost"
+											size="sm"
+											className="shrink-0 text-xs"
+											onClick={() =>
+												router.push(
+													agent.activeVersionId
+														? `/chat?agentId=${agent.id}`
+														: `/agents/${agent.id}`,
+												)
+											}
+										>
+											{isReady ? "Chat" : "Setup"}
+										</Button>
+
+										{/* Dropdown actions */}
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<Button
+													size="icon-sm"
+													variant="ghost"
+													className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+													aria-label="Agent actions"
+												>
+													<MoreHorizontal className="size-4" />
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent align="end">
+												<DropdownMenuItem
+													onClick={() =>
+														router.push(
+															agent.activeVersionId
+																? `/chat?agentId=${agent.id}`
+																: `/agents/${agent.id}`,
+														)
+													}
+												>
+													<SparklesIcon className="size-4" />
+													{isReady ? "Chat now" : "Finish setup"}
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													onClick={() => router.push(`/agents/${agent.id}`)}
+												>
+													<PencilIcon className="size-4" />
+													Configure
+												</DropdownMenuItem>
+												<DropdownMenuSeparator />
+												<DropdownMenuItem
+													variant="destructive"
+													onClick={() => setDeleteAgentId(agent.id)}
+												>
+													<Trash2Icon className="size-4" />
+													Delete agent
+												</DropdownMenuItem>
+											</DropdownMenuContent>
+										</DropdownMenu>
+									</div>
+								);
+							})}
+						</div>
+					)}
+				</section>
+			</div>
+
+			{/* Create dialog */}
 			<Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
 				<DialogContent className="max-w-md">
 					<DialogHeader>
@@ -564,6 +843,7 @@ export default function AgentsPage() {
 				</DialogContent>
 			</Dialog>
 
+			{/* Delete confirmation */}
 			<AlertDialog
 				open={deleteAgentId !== null}
 				onOpenChange={(open) => {
@@ -590,250 +870,6 @@ export default function AgentsPage() {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-
-			{/* Search bar */}
-			{agents.length > 2 && (
-				<div className="relative">
-					<SearchIcon
-						className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-						aria-hidden="true"
-					/>
-					<Input
-						placeholder="Search assistants…"
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						className="pl-9"
-					/>
-				</div>
-			)}
-
-			{loading ? (
-				<div className="flex items-center justify-center py-20">
-					<Loader2 className="size-6 animate-spin text-muted-foreground" />
-				</div>
-			) : agents.length === 0 ? (
-				<Empty className="min-h-80 border border-border/70 bg-background/55">
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<BotIcon aria-hidden="true" />
-						</EmptyMedia>
-						<EmptyTitle>No assistants yet</EmptyTitle>
-						<EmptyDescription>
-							Create your first assistant to start chatting with AI. Each
-							assistant gets its own model, system prompt, tools, and knowledge
-							bases.
-						</EmptyDescription>
-					</EmptyHeader>
-					<EmptyContent>
-						<Button type="button" onClick={() => setShowCreateDialog(true)}>
-							<PlusIcon data-icon="inline-start" aria-hidden="true" />
-							Create your first assistant
-						</Button>
-					</EmptyContent>
-				</Empty>
-			) : filteredAgents.length === 0 ? (
-				<div className="flex flex-col items-center justify-center py-16 text-center">
-					<SearchIcon
-						className="size-8 text-muted-foreground/50"
-						aria-hidden="true"
-					/>
-					<p className="mt-3 text-sm font-medium">
-						No assistants match your search
-					</p>
-					<p className="mt-1 text-xs text-muted-foreground">
-						Try a different keyword or clear the search
-					</p>
-					<Button
-						variant="ghost"
-						size="sm"
-						className="mt-3"
-						onClick={() => setSearchQuery("")}
-					>
-						Clear search
-					</Button>
-				</div>
-			) : (
-				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-					{filteredAgents.map((agent) => {
-						const bindings = bindingSummaries[agent.id];
-						const isReady = Boolean(agent.activeVersionId);
-						const avatarColor = getAvatarColor(agent.name);
-						const initials = getInitials(agent.name);
-
-						return (
-							<Card
-								key={agent.id}
-								className={cn(
-									"group relative overflow-hidden transition-shadow hover:shadow-md",
-									!isReady && "border-l-2 border-l-amber-500",
-								)}
-							>
-								{/* Top accent bar */}
-								<div
-									className={cn(
-										"absolute inset-x-0 top-0 h-1 bg-gradient-to-r",
-										avatarColor,
-									)}
-								/>
-
-								<div className="flex flex-col gap-4 p-4 pt-5">
-									{/* Header: avatar + name + delete */}
-									<div className="flex items-start justify-between gap-2">
-										<div className="flex min-w-0 items-center gap-3">
-											<div
-												className={cn(
-													"flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm",
-													avatarColor,
-												)}
-											>
-												<span className="text-sm font-bold">{initials}</span>
-											</div>
-											<div className="min-w-0">
-												<p className="truncate font-semibold">{agent.name}</p>
-												{agent.description ? (
-													<p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-														{agent.description}
-													</p>
-												) : (
-													<p className="mt-0.5 line-clamp-1 text-xs italic text-muted-foreground/60">
-														No description
-													</p>
-												)}
-											</div>
-										</div>
-										<Button
-											variant="ghost"
-											size="icon"
-											className="size-8 shrink-0 -translate-x-1 opacity-0 transition-opacity group-hover:opacity-100"
-											onClick={() => setDeleteAgentId(agent.id)}
-											aria-label={`Delete ${agent.name}`}
-										>
-											<TrashIcon className="size-4 text-destructive" />
-										</Button>
-									</div>
-
-									{/* Status + sharing badges */}
-									<div className="flex flex-wrap items-center gap-2">
-										<Badge
-											variant={isReady ? "default" : "outline"}
-											className={cn(
-												"gap-1",
-												isReady
-													? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25"
-													: "",
-											)}
-										>
-											{isReady ? (
-												<SparklesIcon className="size-3" aria-hidden="true" />
-											) : (
-												<ClockIcon className="size-3" aria-hidden="true" />
-											)}
-											{isReady ? "Ready" : "Needs setup"}
-										</Badge>
-
-										{agent.sharingMode === "marketplace" && (
-											<Badge variant="secondary" className="gap-1">
-												<UsersIcon className="size-3" aria-hidden="true" />
-												Workspace
-											</Badge>
-										)}
-										{agent.sharingMode === "specific_user" && (
-											<Badge variant="secondary" className="gap-1">
-												<ShieldIcon className="size-3" aria-hidden="true" />
-												Shared
-											</Badge>
-										)}
-										{agent.isGlobal && (
-											<Badge variant="secondary" className="gap-1">
-												<GlobeIcon className="size-3" aria-hidden="true" />
-												Global
-											</Badge>
-										)}
-										{agent.isRecommended && (
-											<Badge variant="secondary" className="gap-1">
-												<StarIcon className="size-3" aria-hidden="true" />
-												Recommended
-											</Badge>
-										)}
-									</div>
-
-									{/* Capability indicators */}
-									<div className="grid grid-cols-3 gap-2">
-										<div className="flex flex-col items-center rounded-lg bg-muted/50 px-2 py-2 text-center">
-											<WrenchIcon
-												className="size-3.5 text-muted-foreground"
-												aria-hidden="true"
-											/>
-											<span className="mt-1 text-xs font-medium">
-												{bindings?.toolCount ?? "–"}
-											</span>
-											<span className="text-[10px] text-muted-foreground">
-												Tools
-											</span>
-										</div>
-										<div className="flex flex-col items-center rounded-lg bg-muted/50 px-2 py-2 text-center">
-											<BookOpenIcon
-												className="size-3.5 text-muted-foreground"
-												aria-hidden="true"
-											/>
-											<span className="mt-1 text-xs font-medium">
-												{bindings?.knowledgeCount ?? "–"}
-											</span>
-											<span className="text-[10px] text-muted-foreground">
-												Knowledge
-											</span>
-										</div>
-										<div className="flex flex-col items-center rounded-lg bg-muted/50 px-2 py-2 text-center">
-											<ServerIcon
-												className="size-3.5 text-muted-foreground"
-												aria-hidden="true"
-											/>
-											<span className="mt-1 text-xs font-medium">
-												{bindings?.mcpCount ?? "–"}
-											</span>
-											<span className="text-[10px] text-muted-foreground">
-												MCP
-											</span>
-										</div>
-									</div>
-
-									{/* Metadata */}
-									<div className="flex items-center justify-between text-[11px] text-muted-foreground/70">
-										<span>Created {timeAgo(agent.createdAt)}</span>
-										<span className="font-mono opacity-60">{agent.slug}</span>
-									</div>
-
-									{/* Actions */}
-									<div className="flex gap-2">
-										<Button
-											variant={isReady ? "default" : "outline"}
-											size="sm"
-											className="flex-1"
-											onClick={() =>
-												router.push(
-													agent.activeVersionId
-														? `/chat?agentId=${agent.id}`
-														: `/agents/${agent.id}`,
-												)
-											}
-										>
-											{isReady ? "Chat now" : "Finish setup"}
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											className="shrink-0"
-											onClick={() => router.push(`/agents/${agent.id}`)}
-										>
-											Configure
-										</Button>
-									</div>
-								</div>
-							</Card>
-						);
-					})}
-				</div>
-			)}
 		</WorkspacePage>
 	);
 }

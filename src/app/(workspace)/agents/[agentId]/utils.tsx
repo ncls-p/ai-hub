@@ -1,31 +1,17 @@
 import type { ReactNode } from "react";
-import {
-	BrainIcon,
-	ServerIcon,
-	SparklesIcon,
-	ZapIcon,
-} from "lucide-react";
+import { BrainIcon, ServerIcon, SparklesIcon, ZapIcon } from "lucide-react";
 
 import type { McpServer, McpTool, ToolBindingState } from "./types";
-import { AVATAR_COLORS } from "./types";
+import { AGENT_ACCENTS } from "./types";
 
-/* ─── Avatar helpers ──────────────────────────────────────────────── */
+/* ─── Accent helpers ──────────────────────────────────────────────── */
 
-export function getAvatarColor(name: string): string {
+export function getAgentAccent(name: string) {
 	let hash = 0;
 	for (let i = 0; i < name.length; i++) {
 		hash = name.charCodeAt(i) + ((hash << 5) - hash);
 	}
-	return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-export function getInitials(name: string): string {
-	return name
-		.split(/\s+/)
-		.map((w) => w[0])
-		.join("")
-		.toUpperCase()
-		.slice(0, 2);
+	return AGENT_ACCENTS[Math.abs(hash) % AGENT_ACCENTS.length];
 }
 
 /* ─── Provider icon ───────────────────────────────────────────────── */
@@ -79,11 +65,9 @@ export function getMcpServerState(
 		selectedCount: selectedTools.length,
 		forcedApprovalCount,
 		allSelected:
-			bindableTools.length > 0 &&
-			selectedTools.length === bindableTools.length,
+			bindableTools.length > 0 && selectedTools.length === bindableTools.length,
 		someSelected:
-			selectedTools.length > 0 &&
-			selectedTools.length < bindableTools.length,
+			selectedTools.length > 0 && selectedTools.length < bindableTools.length,
 		allApproval:
 			selectedTools.length > 0 &&
 			selectedApprovalTools.length === selectedTools.length,

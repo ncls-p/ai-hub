@@ -15,6 +15,33 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+
+/* ─── Metric Cell (listing-page style) ────────────────────────────── */
+
+export function MetricCell({
+	label,
+	value,
+	accent = false,
+}: {
+	label: string;
+	value: string | number;
+	accent?: boolean;
+}) {
+	return (
+		<div>
+			<p
+				className={cn(
+					"text-2xl font-bold leading-none",
+					accent ? "text-emerald-600 dark:text-emerald-400" : "text-foreground",
+				)}
+			>
+				{value}
+			</p>
+			<p className="mt-1 text-xs text-muted-foreground">{label}</p>
+		</div>
+	);
+}
 
 /* ─── Info Callout ────────────────────────────────────────────────── */
 
@@ -28,9 +55,9 @@ export function InfoCallout({
 	icon?: typeof InfoIcon;
 }) {
 	return (
-		<div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 p-4">
+		<div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/[0.04] dark:bg-primary/[0.06] p-4 animate-in-fade stagger-3">
 			<Icon
-				className="size-4 shrink-0 mt-0.5 text-muted-foreground"
+				className="size-4 shrink-0 mt-0.5 text-primary/70"
 				aria-hidden="true"
 			/>
 			<div className="flex-1 text-sm">
@@ -73,7 +100,7 @@ export function StatCard({
 	label: string;
 }) {
 	return (
-		<div className="flex flex-col items-center rounded-xl bg-background/60 px-4 py-2.5 text-center shadow-sm">
+		<div className="flex flex-col items-center rounded-xl bg-background/50 px-4 py-2.5 text-center shadow-sm backdrop-blur-sm border border-border/40 transition-all hover:border-primary/25 hover:shadow-md">
 			<Icon className="size-4 text-muted-foreground" aria-hidden="true" />
 			<span className="mt-1 text-lg font-semibold">{value}</span>
 			<span className="text-[10px] uppercase tracking-wider text-muted-foreground">

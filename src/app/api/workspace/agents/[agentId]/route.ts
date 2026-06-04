@@ -41,6 +41,35 @@ const updateAgentSchema = z.object({
 		.optional(),
 	toolBindings: z.array(toolBindingInputSchema).optional(),
 	knowledgeBindings: z.array(z.uuid()).optional(),
+	toolChoice: z.enum(["auto", "required", "none"]).optional(),
+	generationSettings: z
+		.object({
+			topK: z.number().int().positive().optional(),
+			presencePenalty: z.number().min(-1).max(1).optional(),
+			frequencyPenalty: z.number().min(-1).max(1).optional(),
+			seed: z.number().int().optional(),
+			maxRetries: z.number().int().min(0).optional(),
+			stopSequences: z.array(z.string()).optional(),
+		})
+		.optional(),
+	responseFormat: z.enum(["text", "json_object"]).optional(),
+	memoryPolicy: z
+		.object({
+			enabled: z.boolean().optional(),
+			maxMessages: z.number().int().positive().optional(),
+		})
+		.optional(),
+	guardrails: z
+		.object({
+			enabled: z.boolean().optional(),
+			blockedTopics: z.array(z.string()).optional(),
+		})
+		.optional(),
+	approvalPolicy: z
+		.object({
+			requireApprovalForAllTools: z.boolean().optional(),
+		})
+		.optional(),
 });
 
 function isUniqueConstraintError(error: unknown) {
@@ -244,9 +273,13 @@ export async function DELETE(
 			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 		}
 		if (
-			(error as Error).message === "Only the creator or an admin can delete this agent"
+			(error as Error).message ===
+			"Only the creator or an admin can delete this agent"
 		) {
-			return NextResponse.json({ error: (error as Error).message }, { status: 403 });
+			return NextResponse.json(
+				{ error: (error as Error).message },
+				{ status: 403 },
+			);
 		}
 
 		logger.error("Failed to archive agent", {}, error as Error);

@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { ChevronDownIcon, SaveIcon, ServerIcon, ShieldCheckIcon, WrenchIcon } from "lucide-react";
+import {
+	ChevronDownIcon,
+	SaveIcon,
+	ServerIcon,
+	ShieldCheckIcon,
+	WrenchIcon,
+} from "lucide-react";
 
 import { ListRow } from "@/components/list-row";
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +25,13 @@ import {
 } from "@/components/ui/collapsible";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
-
-import type { BuiltinTool, McpServer, McpTool, ToolBindingState, ToolFilter } from "./types";
+import type {
+	BuiltinTool,
+	McpServer,
+	McpTool,
+	ToolBindingState,
+	ToolFilter,
+} from "./types";
 import { getMcpServerState, isMcpToolApprovalForced } from "./utils";
 import { InfoCallout, Toolbar } from "./shared";
 
@@ -55,14 +65,15 @@ function BuiltinToolsSection({
 	});
 
 	return (
-		<Card>
+		<Card className="hover-lift animate-in-up stagger-3">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<WrenchIcon className="size-5" aria-hidden="true" />
 					Built-in Tools
 				</CardTitle>
 				<CardDescription>
-					Platform-provided tools. Toggle to enable and set approval requirements.
+					Platform-provided tools. Toggle to enable and set approval
+					requirements.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-2">
@@ -85,10 +96,7 @@ function BuiltinToolsSection({
 					</div>
 				) : (
 					filtered.map((tool) => (
-						<ListRow
-							key={tool.id}
-							className="items-center justify-between"
-						>
+						<ListRow key={tool.id} className="items-center justify-between">
 							<div className="min-w-0">
 								<div className="flex items-center gap-2">
 									<p className="font-medium">{tool.name}</p>
@@ -137,7 +145,8 @@ function BuiltinToolsSection({
 											...current,
 											[tool.id]: {
 												enabled: checked,
-												requireApproval: current[tool.id]?.requireApproval ?? false,
+												requireApproval:
+													current[tool.id]?.requireApproval ?? false,
 											},
 										}))
 									}
@@ -182,7 +191,8 @@ function McpServerRow({
 				next[tool.id] = {
 					enabled: enabled && tool.enabled,
 					requireApproval:
-						isMcpToolApprovalForced(tool, mcpServers) || (cb?.requireApproval ?? false),
+						isMcpToolApprovalForced(tool, mcpServers) ||
+						(cb?.requireApproval ?? false),
 				};
 			}
 			return next;
@@ -233,7 +243,7 @@ function McpServerRow({
 	return (
 		<Collapsible
 			defaultOpen={false}
-			className="rounded-xl border border-border/60 p-3"
+			className="rounded-xl border border-border/60 bg-background/45 p-3 shadow-sm backdrop-blur-sm transition-all hover:border-primary/25 hover:bg-background/70"
 		>
 			<div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
 				<div className="flex min-w-0 gap-2">
@@ -302,7 +312,8 @@ function McpServerRow({
 			<CollapsibleContent className="flex flex-col gap-2 pt-3">
 				{serverState.allTools.length === 0 ? (
 					<p className="text-sm text-muted-foreground">
-						No tools synced yet. Sync this MCP server before binding it to an assistant.
+						No tools synced yet. Sync this MCP server before binding it to an
+						assistant.
 					</p>
 				) : (
 					serverState.allTools.map((tool) => {
@@ -343,7 +354,9 @@ function McpServerRow({
 												(approvalForced || Boolean(binding?.requireApproval))
 											}
 											disabled={!toolSelected || approvalForced}
-											onCheckedChange={(checked) => setToolApproval(tool, checked)}
+											onCheckedChange={(checked) =>
+												setToolApproval(tool, checked)
+											}
 										/>
 									</label>
 									<label className="flex items-center gap-2">
@@ -351,7 +364,9 @@ function McpServerRow({
 										<Switch
 											checked={toolSelected}
 											disabled={!tool.enabled}
-											onCheckedChange={(checked) => setToolEnabled(tool, checked)}
+											onCheckedChange={(checked) =>
+												setToolEnabled(tool, checked)
+											}
 										/>
 									</label>
 								</div>
@@ -393,12 +408,12 @@ function McpToolsSection({
 						(t) =>
 							t.name.toLowerCase().includes(q) ||
 							(t.description ?? "").toLowerCase().includes(q),
-				);
+					);
 			})
 		: mcpServers;
 
 	return (
-		<Card>
+		<Card className="hover-lift animate-in-up stagger-4">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<ServerIcon className="size-5" aria-hidden="true" />
@@ -423,7 +438,8 @@ function McpToolsSection({
 						{mcpServers.length === 0 && (
 							<>
 								<p className="mt-1 text-sm text-muted-foreground">
-									Connect an MCP server to give your assistant access to external tools.
+									Connect an MCP server to give your assistant access to
+									external tools.
 								</p>
 								<Button variant="outline" size="sm" asChild className="mt-3">
 									<Link href="/mcp">Add MCP server</Link>
@@ -445,7 +461,7 @@ function McpToolsSection({
 				)}
 			</CardContent>
 			<CardFooter className="justify-end">
-				<Button onClick={onSave} disabled={saving}>
+				<Button onClick={onSave} disabled={saving} className="shimmer">
 					{saving ? (
 						<Spinner data-icon="inline-start" />
 					) : (
@@ -477,7 +493,9 @@ export function ToolsTab({
 }: {
 	builtinTools: BuiltinTool[];
 	builtinBindings: ToolBindingState;
-	setBuiltinBindings: (fn: (prev: ToolBindingState) => ToolBindingState) => void;
+	setBuiltinBindings: (
+		fn: (prev: ToolBindingState) => ToolBindingState,
+	) => void;
 	mcpServers: McpServer[];
 	mcpTools: McpTool[];
 	mcpBindings: ToolBindingState;
