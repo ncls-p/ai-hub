@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import {
   createContext,
   useCallback,
@@ -14,6 +14,7 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon, MenuIcon } from "lucide-react";
 
 import { DeodisLogo } from "@/components/deodis-logo";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggleButton } from "@/components/theme-toggle-button";
 import { Badge } from "@/components/ui/badge";
@@ -219,6 +220,8 @@ function SidebarNavLink({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
+  const label = t(item.labelKey);
   const Icon = item.icon;
   const active = isNavItemActive(pathname, item.href);
 
@@ -244,7 +247,7 @@ function SidebarNavLink({
       />
       {!collapsed ? (
         <>
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
           {item.badge && item.badge > 0 ? (
             <Badge
               variant="secondary"
@@ -263,7 +266,7 @@ function SidebarNavLink({
       <Tooltip>
         <TooltipTrigger asChild>{link}</TooltipTrigger>
         <TooltipContent side="right">
-          {item.label}
+          {label}
           {item.badge && item.badge > 0 ? ` (${item.badge})` : ""}
         </TooltipContent>
       </Tooltip>
@@ -282,16 +285,17 @@ function SidebarNavGroups({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
+  const t = useTranslations("nav.groups");
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-2">
       {groups.map((group, groupIndex) => (
-        <div key={group.label} className="flex flex-col gap-0.5">
+        <div key={group.labelKey} className="flex flex-col gap-0.5">
           {groupIndex > 0 && !collapsed ? (
             <div className="my-2 h-px bg-border/50" />
           ) : null}
           {!collapsed ? (
             <p className="px-2 pb-1 pt-1 text-[0.65rem] font-semibold uppercase tracking-[0.15em] text-muted-foreground/70">
-              {group.label}
+              {t(group.labelKey)}
             </p>
           ) : null}
           {group.items.map((item) => (
@@ -398,7 +402,10 @@ function SidebarPanel({
               <TooltipContent side="right">Theme</TooltipContent>
             </Tooltip>
           ) : (
-            <ThemeToggleButton className="flex-1 justify-start rounded-lg" />
+            <>
+              <ThemeToggleButton className="flex-1 justify-start rounded-lg" />
+              <LocaleSwitcher className="h-9 w-[7rem] shrink-0" />
+            </>
           )}
           {shell.displayName ? (
             collapsed ? (

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, usePathname } from "@/i18n/navigation";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { MessageSquareIcon } from "lucide-react";
 
@@ -16,7 +16,7 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { fetchJson, fetchPendingToolCount } from "@/lib/api-client";
 import {
   getRouteBreadcrumbs,
-  getRouteTitle,
+  getRouteTitleKey,
   type WorkspacePermissions,
   type WorkspaceShellState,
 } from "@/lib/workspace-nav";
@@ -40,10 +40,18 @@ export function useWorkspaceShell() {
 
 export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
   const pathname = usePathname();
+  const tNav = useTranslations("nav");
+  const tShell = useTranslations("shell");
   const { workspaceId } = useWorkspace();
   const isChatRoute = pathname === "/chat" || pathname.startsWith("/chat/");
-  const currentTitle = getRouteTitle(pathname);
-  const breadcrumbs = getRouteBreadcrumbs(pathname);
+  const titleKey = getRouteTitleKey(pathname);
+  const currentTitle =
+    titleKey === "workspace" ? tShell("workspace") : tNav(titleKey);
+  const rawBreadcrumbs = getRouteBreadcrumbs(pathname);
+  const breadcrumbs = rawBreadcrumbs?.map((crumb) => ({
+    label: tNav(crumb.labelKey),
+    href: crumb.href,
+  }));
   const [pendingToolCount, setPendingToolCount] = useState(0);
   const [permissions, setPermissions] = useState<WorkspacePermissions>({
     canViewUsage: false,
@@ -126,6 +134,7 @@ export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
                 <AppHeader
                   title={currentTitle}
                   breadcrumbs={breadcrumbs}
+                  subtitle={tShell("workspace")}
                   leading={<WorkspaceSidebarMobileTrigger shell={shellValue} />}
                   actions={
                     <Button
@@ -139,7 +148,7 @@ export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
                           className="size-4"
                           aria-hidden="true"
                         />
-                        Chat now
+                        {tShell("returnToChat")}
                       </Link>
                     </Button>
                   }

@@ -1,0 +1,212 @@
+{
+  "common": {
+    "advanced": "Advanced",
+    "hideAdvanced": "Hide advanced",
+    "showAdvanced": "Advanced options",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "loading": "Loading…",
+    "search": "Search",
+    "back": "Back",
+    "chatNow": "Open chat",
+    "language": "Language",
+    "english": "English",
+    "french": "French"
+  },
+  "nav": {
+    "groups": {
+      "primary": "Main",
+      "capabilities": "Capabilities",
+      "configuration": "Configuration",
+      "administration": "Administration"
+    },
+    "chat": "Chat",
+    "assistants": "Assistants",
+    "knowledge": "Knowledge",
+    "toolsHub": "Tools & integrations",
+    "marketplace": "Marketplace",
+    "aiConnections": "AI connections",
+    "apiKeys": "API keys",
+    "team": "Team",
+    "usage": "Usage",
+    "activityLog": "Activity log",
+    "settings": "Settings",
+    "setup": "Setup",
+    "assistantConfig": "Assistant settings",
+    "workspace": "Workspace"
+  },
+  "chat": {
+    "title": "Chat",
+    "messagePlaceholder": "Message {name}…",
+    "setupRequired": "Finish setup before chatting…",
+    "emptyTitle": "New conversation",
+    "emptyTitleNamed": "Chat with {name}",
+    "emptyDescription": "Send a message to get started.",
+    "emptySetup": "Connect an AI provider to unlock your assistant.",
+    "noAssistants": "No assistants yet",
+    "noAssistantsDescription": "Create one or finish setup to start chatting.",
+    "finishSetup": "Finish setup",
+    "manageAssistants": "Manage assistants",
+    "openSettings": "Assistant settings",
+    "continueLast": "Continue last conversation",
+    "configureProvider": "Connect AI",
+    "createAgent": "Create assistant"
+  },
+  "setup": {
+    "title": "Get started",
+    "description": "Connect your AI, pick a model, and start chatting.",
+    "steps": {
+      "provider": "Connect AI",
+      "model": "Pick a model",
+      "agent": "Start chatting"
+    },
+    "providerDescription": "Choose how this workspace talks to AI models.",
+    "modelDescription": "Select the model your assistant will use.",
+    "agentDescription": "Name your assistant and go to chat.",
+    "assistantName": "Assistant name",
+    "assistantNamePlaceholder": "My assistant",
+    "continue": "Continue",
+    "startChat": "Start chatting",
+    "addManually": "Add model manually",
+    "recommended": "Recommended"
+  },
+  "agents": {
+    "title": "Assistants",
+    "description": "Create and tune assistants for your team.",
+    "create": "New assistant",
+    "createTitle": "Create assistant",
+    "name": "Name",
+    "namePlaceholder": "Support bot",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "What this assistant is for…",
+    "model": "Model",
+    "selectModel": "Select a model",
+    "statusReady": "Ready",
+    "statusMissingModel": "Needs a model",
+    "statusDraft": "Draft",
+    "chat": "Chat",
+    "configure": "Configure",
+    "configureDescription": "Name, model, instructions, tools, and knowledge.",
+    "advancedHint": "Slug, sharing, generation, and guardrails",
+    "tabs": {
+      "essential": "Essentials",
+      "capabilities": "Capabilities",
+      "overview": "Overview",
+      "instructions": "Instructions",
+      "model": "Model",
+      "knowledge": "Knowledge",
+      "tools": "Tools"
+    },
+    "configurePage": {
+      "back": "Back to assistants",
+      "identityHint": "How this assistant appears in chat and the list.",
+      "modelHint": "Which AI powers replies and how it should behave.",
+      "sharing": "Who can use it",
+      "sharingPersonal": "Only me",
+      "sharingWorkspace": "Everyone in workspace",
+      "sharingUser": "One person (email)",
+      "globalAssistant": "Visible across the organization",
+      "recommended": "Show as recommended",
+      "saved": "Assistant saved",
+      "capabilitiesSaved": "Tools and knowledge saved",
+      "deleted": "Assistant deleted",
+      "delete": "Delete assistant",
+      "builtinTools": "Built-in tools",
+      "builtinToolsHint": "Platform tools this assistant can call.",
+      "noBuiltinTools": "No built-in tools available.",
+      "mcpTools": "MCP integrations",
+      "mcpToolsHint": "External tools connected via MCP servers.",
+      "noMcpServers": "No MCP server connected yet.",
+      "noMcpToolsSynced": "No tools synced for this server.",
+      "addMcp": "Add MCP server",
+      "manageMcp": "Manage MCP",
+      "disabledInMcp": "Disabled on server",
+      "knowledge": "Knowledge",
+      "knowledgeHint": "Document bases searched during chat.",
+      "noKnowledge": "No knowledge base yet.",
+      "createKnowledge": "Create knowledge base"
+    },
+    "overview": {
+      "title": "Overview",
+      "description": "Quick summary and next steps.",
+      "testInChat": "Test in chat",
+      "model": "Model",
+      "knowledgeCount": "{count} knowledge bases",
+      "toolsCount": "{count} tools enabled",
+      "notConfigured": "Not configured"
+    },
+    "model": {
+      "provider": "Provider",
+      "modelLabel": "Model",
+      "systemPrompt": "Instructions",
+      "systemPromptPlaceholder": "Describe role, tone, and limits for this assistant…",
+      "advancedHint": "Sampling, memory, guardrails, and tool behavior",
+      "resetDefaults": "Reset generation defaults"
+    }
+  },
+  "providers": {
+    "title": "AI connections",
+    "description": "Connect providers and manage models for your workspace.",
+    "add": "Add connection",
+    "test": "Test",
+    "manageModels": "Models",
+    "advancedHint": "Provider type, auth, and custom headers"
+  },
+  "knowledge": {
+    "title": "Knowledge",
+    "description": "Documents your assistants can search during conversations.",
+    "emptyTitle": "No knowledge bases yet",
+    "emptyStep1": "Create a knowledge base",
+    "emptyStep2": "Add documents",
+    "emptyStep3": "Attach to an assistant"
+  },
+  "tools": {
+    "title": "Tools & integrations",
+    "description": "Built-in tools, MCP servers, and approval queue.",
+    "tabs": {
+      "builtin": "Built-in",
+      "mcp": "MCP servers",
+      "approvals": "Approvals"
+    },
+    "builtinHelp": "Capabilities shipped with AI Hub.",
+    "mcpHelp": "External tools connected via the Model Context Protocol.",
+    "approvalsHelp": "Review tool calls that need human approval.",
+    "filters": {
+      "all": "All",
+      "pending": "Pending",
+      "history": "History"
+    }
+  },
+  "mcp": {
+    "advancedHint": "Custom HTTP headers and environment variables"
+  },
+  "marketplace": {
+    "title": "Marketplace",
+    "description": "Install and share assistants across your organization."
+  },
+  "admin": {
+    "settingsTitle": "Settings",
+    "settingsDescription": "Workspace registration and system health.",
+    "membersTitle": "Team",
+    "usageTitle": "Usage",
+    "auditTitle": "Activity log",
+    "apiKeysTitle": "API keys"
+  },
+  "shell": {
+    "returnToChat": "Back to chat",
+    "workspace": "Workspace"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "email": "Email",
+    "password": "Password"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "return": "Return to workspace"
+  }
+}

@@ -567,8 +567,13 @@
   }
 
   /* ── Streamdown token animation ── */
+  .streaming-markdown {
+    overflow-wrap: break-word;
+  }
+
   [data-sd-animate="true"] {
-    display: inline-block;
+    display: inline;
+    overflow-wrap: break-word;
     animation: var(--sd-animation) var(--sd-duration, 420ms)
       var(--sd-easing, cubic-bezier(0.16, 1, 0.3, 1)) both;
     animation-delay: var(--sd-delay, 0ms);

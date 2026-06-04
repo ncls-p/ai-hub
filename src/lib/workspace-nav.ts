@@ -6,7 +6,6 @@ import {
 	MessageSquareIcon,
 	PlugZapIcon,
 	ScrollTextIcon,
-	ServerIcon,
 	SettingsIcon,
 	StoreIcon,
 	UsersIcon,
@@ -16,13 +15,13 @@ import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
 	href: string;
-	label: string;
+	labelKey: string;
 	icon: LucideIcon;
 	badge?: number;
 };
 
 export type NavGroup = {
-	label: string;
+	labelKey: string;
 	items: NavItem[];
 };
 
@@ -39,55 +38,50 @@ export type WorkspaceShellState = {
 };
 
 export const primaryNavItems: NavItem[] = [
-	{ href: "/chat", label: "Chat", icon: MessageSquareIcon },
-	{ href: "/agents", label: "Assistants", icon: BotIcon },
+	{ href: "/chat", labelKey: "chat", icon: MessageSquareIcon },
+	{ href: "/agents", labelKey: "assistants", icon: BotIcon },
 ];
 
 export const capabilitiesNavItems: NavItem[] = [
-	{ href: "/knowledge", label: "Knowledge", icon: BookOpenIcon },
-	{ href: "/tools", label: "Tools", icon: WrenchIcon },
-	{ href: "/mcp", label: "MCP", icon: ServerIcon },
-	{ href: "/marketplace", label: "Marketplace", icon: StoreIcon },
+	{ href: "/knowledge", labelKey: "knowledge", icon: BookOpenIcon },
+	{ href: "/tools", labelKey: "toolsHub", icon: WrenchIcon },
+	{ href: "/marketplace", labelKey: "marketplace", icon: StoreIcon },
 ];
 
 export const configNavItems: NavItem[] = [
-	{ href: "/providers", label: "Providers", icon: PlugZapIcon },
-	{ href: "/api-keys", label: "API Keys", icon: KeyRoundIcon },
+	{ href: "/providers", labelKey: "aiConnections", icon: PlugZapIcon },
+	{ href: "/api-keys", labelKey: "apiKeys", icon: KeyRoundIcon },
 ];
 
 export const adminNavItems: NavItem[] = [
-	{ href: "/usage", label: "Usage", icon: ActivityIcon },
-	{ href: "/audit", label: "Audit Log", icon: ScrollTextIcon },
-	{ href: "/members", label: "Team", icon: UsersIcon },
+	{ href: "/usage", labelKey: "usage", icon: ActivityIcon },
+	{ href: "/audit", labelKey: "activityLog", icon: ScrollTextIcon },
+	{ href: "/members", labelKey: "team", icon: UsersIcon },
 ];
 
-export const routeTitles: Record<string, string> = {
-	"/chat": "Chat",
-	"/agents": "Assistants",
-	"/providers": "Providers",
-	"/knowledge": "Knowledge",
-	"/mcp": "MCP",
-	"/tools": "Tools",
-	"/marketplace": "Marketplace",
-	"/api-keys": "API Keys",
-	"/usage": "Usage",
-	"/audit": "Audit Log",
-	"/members": "Team",
-	"/settings": "Settings",
-	"/setup": "Setup",
+export const routeTitleKeys: Record<string, string> = {
+	"/chat": "chat",
+	"/agents": "assistants",
+	"/providers": "aiConnections",
+	"/knowledge": "knowledge",
+	"/tools": "toolsHub",
+	"/marketplace": "marketplace",
+	"/api-keys": "apiKeys",
+	"/usage": "usage",
+	"/audit": "activityLog",
+	"/members": "team",
+	"/settings": "settings",
+	"/setup": "setup",
 };
 
-export function getRouteTitle(pathname: string): string {
+export function getRouteTitleKey(pathname: string): string {
 	if (/^\/agents\/[^/]+$/.test(pathname)) {
-		return "Assistant configuration";
+		return "assistantConfig";
 	}
-	return (
-		Object.entries(routeTitles)
-			.sort((a, b) => b[0].length - a[0].length)
-			.find(
-				([href]) => pathname === href || pathname.startsWith(`${href}/`),
-			)?.[1] ?? "Workspace"
-	);
+	const match = Object.entries(routeTitleKeys)
+		.sort((a, b) => b[0].length - a[0].length)
+		.find(([href]) => pathname === href || pathname.startsWith(`${href}/`));
+	return match?.[1] ?? "workspace";
 }
 
 export function buildMenuGroups({
@@ -97,7 +91,7 @@ export function buildMenuGroups({
 }: WorkspaceShellState): NavGroup[] {
 	const toolsItem: NavItem = {
 		href: "/tools",
-		label: "Tools",
+		labelKey: "toolsHub",
 		icon: WrenchIcon,
 		badge: pendingToolCount > 0 ? pendingToolCount : undefined,
 	};
@@ -108,39 +102,42 @@ export function buildMenuGroups({
 		return true;
 	});
 
+	const capabilities = capabilitiesNavItems.map((item) =>
+		item.href === "/tools" ? toolsItem : item,
+	);
+
 	const groups: NavGroup[] = [
-		{ label: "Workspace", items: primaryNavItems },
-		{ label: "Capabilities", items: [...capabilitiesNavItems] },
-		{ label: "Configuration", items: configNavItems },
+		{ labelKey: "primary", items: primaryNavItems },
+		{ labelKey: "capabilities", items: capabilities },
+		{ labelKey: "configuration", items: configNavItems },
 		{
-			label: "Administration",
+			labelKey: "administration",
 			items: [
 				...adminItems,
 				...(isAdmin
-					? [{ href: "/settings", label: "Settings", icon: SettingsIcon }]
+					? [{ href: "/settings", labelKey: "settings", icon: SettingsIcon }]
 					: []),
 			],
 		},
 	];
 
-	// Inject approvals badge into Tools item
-	const capsGroup = groups.find((g) => g.label === "Capabilities");
-	if (capsGroup) {
-		const toolsIdx = capsGroup.items.findIndex((i) => i.href === "/tools");
-		if (toolsIdx >= 0) {
-			capsGroup.items[toolsIdx] = toolsItem;
-		}
-	}
-
 	return groups.filter((group) => group.items.length > 0);
 }
 
 export function isNavItemActive(pathname: string, href: string): boolean {
+	if (href === "/tools") {
+		return (
+			pathname === "/tools" ||
+			pathname.startsWith("/tools/") ||
+			pathname === "/mcp" ||
+			pathname.startsWith("/mcp/")
+		);
+	}
 	return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export type RouteBreadcrumb = {
-	label: string;
+	labelKey: string;
 	href?: string;
 };
 
@@ -150,8 +147,8 @@ export function getRouteBreadcrumbs(
 	const agentMatch = pathname.match(/^\/agents\/([^/]+)$/);
 	if (agentMatch) {
 		return [
-			{ label: "Assistants", href: "/agents" },
-			{ label: "Configuration" },
+			{ labelKey: "assistants", href: "/agents" },
+			{ labelKey: "assistantConfig" },
 		];
 	}
 	return undefined;

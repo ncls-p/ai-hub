@@ -50,8 +50,8 @@ const STREAMING_TEXT_ANIMATION = {
 	animation: "tokenFadeIn",
 	duration: 340,
 	easing: "cubic-bezier(0.16, 1, 0.3, 1)",
-	sep: "char",
-	stagger: 3,
+	sep: "word",
+	stagger: 12,
 } satisfies AnimateOptions;
 
 function stringifyForMatch(value: unknown) {

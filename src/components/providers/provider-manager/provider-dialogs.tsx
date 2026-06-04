@@ -1,4 +1,9 @@
+"use client";
+
 import { Loader2Icon, PlusIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
+
+import { AdvancedSection } from "@/components/ui/advanced-section";
 
 import {
 	AlertDialog,
@@ -58,29 +63,25 @@ type AddProviderDialogProps = {
 };
 
 export function AddProviderDialog(props: AddProviderDialogProps) {
+	const t = useTranslations("providers");
+	const tCommon = useTranslations("common");
 	return (
 		<Dialog open={props.open} onOpenChange={props.onOpenChange}>
 			<DialogContent className="sm:max-w-lg">
 				<DialogHeader>
-					<DialogTitle>Connect AI provider</DialogTitle>
-					<DialogDescription>
-						Add an AI service connection for your agents to use.
-					</DialogDescription>
+					<DialogTitle>{t("add")}</DialogTitle>
+					<DialogDescription>{t("description")}</DialogDescription>
 				</DialogHeader>
 				<div className="grid gap-4">
 					<AddProviderBasicFields {...props} />
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						className="self-start px-0 text-xs"
-						onClick={() => props.onAdvancedChange(!props.addAdvanced)}
+					<AdvancedSection
+						label={tCommon("advanced")}
+						hint={t("advancedHint")}
+						storageKey="advanced:provider-add"
+						defaultOpen={props.addAdvanced}
 					>
-						{props.addAdvanced
-							? "Hide advanced options"
-							: "Show advanced options"}
-					</Button>
-					{props.addAdvanced ? <AddProviderAdvancedFields {...props} /> : null}
+						<AddProviderAdvancedFields {...props} />
+					</AdvancedSection>
 				</div>
 				<DialogFooter>
 					<Button variant="outline" onClick={() => props.onOpenChange(false)}>

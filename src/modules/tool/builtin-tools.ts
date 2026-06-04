@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { env } from "@/lib/env";
 
-export type ToolRiskLevel = "low" | "medium" | "high" | "critical";
+import type { ToolRiskLevel } from "./builtin-tools-catalog";
+
+export type { ToolRiskLevel } from "./builtin-tools-catalog";
 
 export interface BuiltInToolDefinition<Input = unknown, Output = unknown> {
 	id: string;
@@ -67,6 +68,7 @@ function normalizeSearxngEngines(result: SearxngResult) {
 async function searchWebWithSearxng(
 	input: z.infer<typeof webSearchInputSchema>,
 ) {
+	const { env } = await import("@/lib/env");
 	const limit = input.limit ?? 5;
 	const url = new URL("/search", env.SEARXNG_URL);
 	url.searchParams.set("q", input.query);

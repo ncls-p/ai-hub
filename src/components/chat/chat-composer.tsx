@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Loader2, PaperclipIcon, SendIcon, SparklesIcon } from "lucide-react";
 import { useRef, useEffect, useState } from "react";
 

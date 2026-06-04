@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import {
   BotIcon,
@@ -167,6 +168,7 @@ function ModelMetadata({
 /* ── Stepper ── */
 
 function SetupStepper({ currentStep }: { currentStep: StepId }) {
+  const t = useTranslations("setup.steps");
   const stepIndex = steps.findIndex((s) => s.id === currentStep);
 
   return (
@@ -210,7 +212,7 @@ function SetupStepper({ currentStep }: { currentStep: StepId }) {
                     !isActive && !isComplete && "text-muted-foreground",
                   )}
                 >
-                  {item.label}
+                  {t(item.id)}
                 </span>
               </div>
               {i < steps.length - 1 ? (
@@ -481,7 +483,7 @@ export function SetupWizard({
               workspaceId,
               name: agentForm.name,
               slug: slugify(agentForm.name),
-              systemPrompt: "You are a helpful assistant.",
+              systemPrompt: "",
               providerId,
               modelId: modelDbId,
             }),

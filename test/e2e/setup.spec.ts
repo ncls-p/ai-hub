@@ -44,11 +44,11 @@ async function ensureE2EUser() {
 }
 
 async function signIn(page: Page) {
-	await page.goto("/auth/signin");
+	await page.goto("/en/auth/signin");
 	await page.getByLabel("Email").fill(e2eUser.email);
 	await page.getByLabel("Password").fill(e2eUser.password);
 	await page.getByRole("button", { name: "Sign in" }).click();
-	await expect(page).toHaveURL(/\/(chat|setup)/);
+	await expect(page).toHaveURL(/\/en\/(chat|setup)/);
 }
 
 test.beforeAll(async () => {
@@ -61,20 +61,20 @@ test.beforeEach(async ({ page }) => {
 
 test.describe("setup wizard", () => {
 	test("shows welcome copy on the setup page", async ({ page }) => {
-		await page.goto("/setup");
+		await page.goto("/en/setup");
 		await expect(
-			page.getByRole("heading", { name: /Welcome to AI Hub/i }),
+			page.getByRole("heading", { name: /Get started/i }),
 		).toBeVisible();
 		await expect(
-			page.getByText("Connect an AI provider", { exact: true }),
+			page.getByText("Connect AI", { exact: true }),
 		).toBeVisible();
-		await expect(page.getByText("Model", { exact: true })).toBeVisible();
+		await expect(page.getByText("Pick a model", { exact: true })).toBeVisible();
 	});
 });
 
 test.describe("team page", () => {
 	test("shows workspace members section", async ({ page }) => {
-		await page.goto("/members");
+		await page.goto("/en/members");
 		await expect(page.getByText(/Workspace members/i)).toBeVisible();
 	});
 });

@@ -1,5 +1,7 @@
 import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { fallbackSystemPrompt } from "@/lib/copy-defaults";
 import { z } from "zod";
 import { decryptValue, encryptValue } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
@@ -802,8 +804,9 @@ export async function POST(
 			guardrails?.enabled && guardrails.blockedTopics?.length
 				? `Avoid and refuse requests about these blocked topics: ${guardrails.blockedTopics.join(", ")}.`
 				: null;
+		const localeCookie = (await cookies()).get("NEXT_LOCALE")?.value ?? "en";
 		const systemPrompt = [
-			version.systemPrompt || "You are a helpful assistant.",
+			version.systemPrompt?.trim() || fallbackSystemPrompt(localeCookie),
 			responseFormatGuidance,
 			guardrailGuidance,
 			toolGuidance,

@@ -1,0 +1,212 @@
+{
+  "common": {
+    "advanced": "Avancé",
+    "hideAdvanced": "Masquer l’avancé",
+    "showAdvanced": "Options avancées",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "create": "Créer",
+    "loading": "Chargement…",
+    "search": "Rechercher",
+    "back": "Retour",
+    "chatNow": "Ouvrir le chat",
+    "language": "Langue",
+    "english": "Anglais",
+    "french": "Français"
+  },
+  "nav": {
+    "groups": {
+      "primary": "Principal",
+      "capabilities": "Capacités",
+      "configuration": "Configuration",
+      "administration": "Administration"
+    },
+    "chat": "Chat",
+    "assistants": "Assistants",
+    "knowledge": "Connaissances",
+    "toolsHub": "Outils & intégrations",
+    "marketplace": "Marketplace",
+    "aiConnections": "Connexions IA",
+    "apiKeys": "Clés API",
+    "team": "Équipe",
+    "usage": "Usage",
+    "activityLog": "Journal d’activité",
+    "settings": "Paramètres",
+    "setup": "Configuration initiale",
+    "assistantConfig": "Réglages de l’assistant",
+    "workspace": "Espace de travail"
+  },
+  "chat": {
+    "title": "Chat",
+    "messagePlaceholder": "Message à {name}…",
+    "setupRequired": "Terminez la configuration pour discuter…",
+    "emptyTitle": "Nouvelle conversation",
+    "emptyTitleNamed": "Discuter avec {name}",
+    "emptyDescription": "Envoyez un message pour commencer.",
+    "emptySetup": "Connectez un fournisseur IA pour activer votre assistant.",
+    "noAssistants": "Aucun assistant",
+    "noAssistantsDescription": "Créez-en un ou terminez la configuration pour discuter.",
+    "finishSetup": "Terminer la configuration",
+    "manageAssistants": "Gérer les assistants",
+    "openSettings": "Réglages de l’assistant",
+    "continueLast": "Reprendre la dernière conversation",
+    "configureProvider": "Connecter l’IA",
+    "createAgent": "Créer un assistant"
+  },
+  "setup": {
+    "title": "Premiers pas",
+    "description": "Connectez votre IA, choisissez un modèle, puis discutez.",
+    "steps": {
+      "provider": "Connecter l’IA",
+      "model": "Choisir un modèle",
+      "agent": "Commencer à discuter"
+    },
+    "providerDescription": "Choisissez comment cet espace accède aux modèles.",
+    "modelDescription": "Sélectionnez le modèle de votre assistant.",
+    "agentDescription": "Nommez votre assistant et ouvrez le chat.",
+    "assistantName": "Nom de l’assistant",
+    "assistantNamePlaceholder": "Mon assistant",
+    "continue": "Continuer",
+    "startChat": "Discuter",
+    "addManually": "Ajouter un modèle manuellement",
+    "recommended": "Recommandé"
+  },
+  "agents": {
+    "title": "Assistants",
+    "description": "Créez et ajustez les assistants de votre équipe.",
+    "create": "Nouvel assistant",
+    "createTitle": "Créer un assistant",
+    "name": "Nom",
+    "namePlaceholder": "Assistant support",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "À quoi sert cet assistant…",
+    "model": "Modèle",
+    "selectModel": "Choisir un modèle",
+    "statusReady": "Prêt",
+    "statusMissingModel": "Modèle requis",
+    "statusDraft": "Brouillon",
+    "chat": "Discuter",
+    "configure": "Configurer",
+    "configureDescription": "Nom, modèle, instructions, outils et connaissances.",
+    "advancedHint": "Slug, partage, génération et garde-fous",
+    "tabs": {
+      "essential": "Essentiel",
+      "capabilities": "Capacités",
+      "overview": "Vue d’ensemble",
+      "instructions": "Instructions",
+      "model": "Modèle",
+      "knowledge": "Connaissances",
+      "tools": "Outils"
+    },
+    "configurePage": {
+      "back": "Retour aux assistants",
+      "identityHint": "Comment cet assistant apparaît dans le chat et la liste.",
+      "modelHint": "Quelle IA répond et comment elle doit se comporter.",
+      "sharing": "Qui peut l’utiliser",
+      "sharingPersonal": "Moi seulement",
+      "sharingWorkspace": "Tout l’espace de travail",
+      "sharingUser": "Une personne (e-mail)",
+      "globalAssistant": "Visible dans l’organisation",
+      "recommended": "Afficher comme recommandé",
+      "saved": "Assistant enregistré",
+      "capabilitiesSaved": "Outils et connaissances enregistrés",
+      "deleted": "Assistant supprimé",
+      "delete": "Supprimer l’assistant",
+      "builtinTools": "Outils intégrés",
+      "builtinToolsHint": "Outils fournis par la plateforme.",
+      "noBuiltinTools": "Aucun outil intégré disponible.",
+      "mcpTools": "Intégrations MCP",
+      "mcpToolsHint": "Outils externes via serveurs MCP.",
+      "noMcpServers": "Aucun serveur MCP connecté.",
+      "noMcpToolsSynced": "Aucun outil synchronisé pour ce serveur.",
+      "addMcp": "Ajouter un serveur MCP",
+      "manageMcp": "Gérer les MCP",
+      "disabledInMcp": "Désactivé sur le serveur",
+      "knowledge": "Connaissances",
+      "knowledgeHint": "Bases de documents consultées pendant le chat.",
+      "noKnowledge": "Aucune base de connaissances.",
+      "createKnowledge": "Créer une base"
+    },
+    "overview": {
+      "title": "Vue d’ensemble",
+      "description": "Résumé et prochaines étapes.",
+      "testInChat": "Tester dans le chat",
+      "model": "Modèle",
+      "knowledgeCount": "{count} bases de connaissances",
+      "toolsCount": "{count} outils actifs",
+      "notConfigured": "Non configuré"
+    },
+    "model": {
+      "provider": "Fournisseur",
+      "modelLabel": "Modèle",
+      "systemPrompt": "Instructions",
+      "systemPromptPlaceholder": "Rôle, ton et limites de cet assistant…",
+      "advancedHint": "Échantillonnage, mémoire, garde-fous et outils",
+      "resetDefaults": "Réinitialiser la génération"
+    }
+  },
+  "providers": {
+    "title": "Connexions IA",
+    "description": "Connectez des fournisseurs et gérez les modèles de l’espace.",
+    "add": "Ajouter une connexion",
+    "test": "Tester",
+    "manageModels": "Modèles",
+    "advancedHint": "Type, authentification et en-têtes personnalisés"
+  },
+  "knowledge": {
+    "title": "Connaissances",
+    "description": "Documents que vos assistants peuvent interroger.",
+    "emptyTitle": "Aucune base de connaissances",
+    "emptyStep1": "Créer une base",
+    "emptyStep2": "Ajouter des documents",
+    "emptyStep3": "Lier à un assistant"
+  },
+  "tools": {
+    "title": "Outils & intégrations",
+    "description": "Outils intégrés, serveurs MCP et file d’approbation.",
+    "tabs": {
+      "builtin": "Intégrés",
+      "mcp": "Serveurs MCP",
+      "approvals": "Approbations"
+    },
+    "builtinHelp": "Capacités fournies par AI Hub.",
+    "mcpHelp": "Outils externes via le Model Context Protocol.",
+    "approvalsHelp": "Validez les appels d’outils sensibles.",
+    "filters": {
+      "all": "Tout",
+      "pending": "En attente",
+      "history": "Historique"
+    }
+  },
+  "mcp": {
+    "advancedHint": "En-têtes HTTP et variables d’environnement"
+  },
+  "marketplace": {
+    "title": "Marketplace",
+    "description": "Installez et partagez des assistants dans l’organisation."
+  },
+  "admin": {
+    "settingsTitle": "Paramètres",
+    "settingsDescription": "Inscription et santé du système.",
+    "membersTitle": "Équipe",
+    "usageTitle": "Usage",
+    "auditTitle": "Journal d’activité",
+    "apiKeysTitle": "Clés API"
+  },
+  "shell": {
+    "returnToChat": "Retour au chat",
+    "workspace": "Espace de travail"
+  },
+  "auth": {
+    "signIn": "Connexion",
+    "signUp": "Inscription",
+    "email": "E-mail",
+    "password": "Mot de passe"
+  },
+  "notFound": {
+    "title": "Page introuvable",
+    "return": "Retour à l’espace"
+  }
+}

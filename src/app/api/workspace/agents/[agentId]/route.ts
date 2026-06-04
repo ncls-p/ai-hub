@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getSession } from "@/modules/auth/session";
+import { db } from "@/server/infrastructure/db";
+import { users } from "@/server/infrastructure/db/schema";
 import {
 	getVisibleAgentById,
 	updateAgent,
@@ -129,7 +132,17 @@ export async function GET(
 			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 		}
 
-		return NextResponse.json({ ...agent, canAdminCurate });
+		let shareTargetEmail: string | null = null;
+		if (agent.shareTargetUserId) {
+			const [target] = await db
+				.select({ email: users.email })
+				.from(users)
+				.where(eq(users.id, agent.shareTargetUserId))
+				.limit(1);
+			shareTargetEmail = target?.email ?? null;
+		}
+
+		return NextResponse.json({ ...agent, canAdminCurate, shareTargetEmail });
 	} catch (error) {
 		logger.error("Failed to get agent", {}, error as Error);
 		return NextResponse.json(
