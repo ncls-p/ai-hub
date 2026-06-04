@@ -12,7 +12,6 @@ const widthClass: Record<WorkspacePageWidth, string> = {
 };
 
 export function WorkspacePage({
-  kicker,
   title,
   description,
   width = "default",
@@ -20,7 +19,6 @@ export function WorkspacePage({
   children,
   className,
 }: {
-  kicker?: string;
   title: string;
   description?: string;
   width?: WorkspacePageWidth;
@@ -31,23 +29,18 @@ export function WorkspacePage({
   return (
     <div
       className={cn(
-        "mx-auto flex min-h-full w-full flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8",
+        "page-content mx-auto flex min-h-full w-full flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8",
         widthClass[width],
         className,
       )}
     >
-      <header className="flex flex-col gap-4 border-b border-border/40 pb-6 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-          {kicker ? (
-            <div className="section-kicker animate-in-fade stagger-1">
-              {kicker}
-            </div>
-          ) : null}
-          <h1 className="animate-in-fade stagger-2 text-pretty text-3xl font-semibold tracking-tight">
+      <header className="flex flex-col gap-4 border-b border-border/60 pb-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <h1 className="text-pretty text-2xl font-semibold tracking-tight">
             {title}
           </h1>
           {description ? (
-            <p className="animate-in-fade stagger-3 max-w-2xl text-pretty text-sm leading-relaxed text-muted-foreground">
+            <p className="max-w-2xl text-pretty text-sm leading-relaxed text-muted-foreground">
               {description}
             </p>
           ) : null}
@@ -55,13 +48,13 @@ export function WorkspacePage({
         {actions ? (
           <div
             data-slot="workspace-page-actions"
-            className="animate-in-fade stagger-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center [&>[data-slot=button]]:w-full sm:[&>[data-slot=button]]:w-auto"
+            className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center [&>[data-slot=button]]:w-full sm:[&>[data-slot=button]]:w-auto"
           >
             {actions}
           </div>
         ) : null}
       </header>
-      <div className="animate-in-up stagger-3">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }

@@ -97,9 +97,9 @@ export function HealthIndicator({
 }) {
 	const dotColor =
 		status === "healthy"
-			? "bg-emerald-500"
+			? "bg-success"
 			: status === "unhealthy"
-				? "bg-red-500"
+				? "bg-destructive"
 				: "bg-muted-foreground/40";
 	const label =
 		status === "healthy"

@@ -76,7 +76,7 @@ export function ModelTab({
 	return (
 		<div className="space-y-4">
 			{/* Provider & Model */}
-			<Card className="hover-lift animate-in-up stagger-3">
+			<Card className="animate-in-up stagger-3">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<SparklesIcon className="size-5" aria-hidden="true" />
@@ -156,7 +156,7 @@ export function ModelTab({
 			</Card>
 
 			{/* System Prompt */}
-			<Card className="hover-lift animate-in-up stagger-4">
+			<Card className="animate-in-up stagger-4">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<MessageSquareIcon className="size-5" aria-hidden="true" />

@@ -15,7 +15,7 @@ export function PageLoading({
   return (
     <div
       className={cn(
-        "flex min-h-[40vh] flex-col items-center justify-center gap-3 rounded-2xl border border-border/60 bg-card/60 animate-in-scale",
+        "flex min-h-[40vh] flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-card",
         className,
       )}
       aria-live="polite"
@@ -31,10 +31,7 @@ export function ListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-3">
       {Array.from({ length: rows }).map((_, index) => (
-        <Skeleton
-          key={index}
-          className="h-16 w-full rounded-2xl skeleton-shimmer"
-        />
+        <Skeleton key={index} className="h-16 w-full rounded-2xl" />
       ))}
     </div>
   );

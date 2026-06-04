@@ -55,109 +55,79 @@ export default function SignInPage() {
 	return (
 		<main
 			data-page="auth"
-			className="relative isolate flex min-h-svh items-center justify-center bg-background p-4 overflow-hidden"
+			className="flex min-h-svh items-center justify-center bg-background p-4"
 		>
-			{/* Ambient orbs */}
-			<div className="orb orb--primary orb--top-left" />
-			<div className="orb orb--muted orb--bottom-right" />
-			<div className="orb orb--accent orb--top-right" />
-
-			{/* Grain overlay */}
-			<div className="pointer-events-none absolute inset-0 grain-overlay" />
-
-			{/* Top accent line */}
-			<div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/40 to-transparent" />
-
-			<div className="relative z-10 flex w-full max-w-md flex-col gap-5 animate-in-up">
-				{/* Logo */}
-				<div className="flex justify-center animate-in-fade stagger-1">
+			<div className="animate-in-up flex w-full max-w-md flex-col gap-6">
+				<div className="flex justify-center">
 					<DeodisLogo priority className="h-8" />
 				</div>
 
-				{/* Glass card */}
-				<div className="glass-card animate-in-scale stagger-2">
-					<Card className="border-0 shadow-none bg-transparent">
-						<CardHeader className="gap-3">
-							<div className="section-kicker animate-in-fade stagger-3">
-								Account
-							</div>
-							<CardTitle className="text-2xl tracking-tight">
-								Sign in to AI Hub
-							</CardTitle>
-							<CardDescription>
-								Welcome back. Open your workspace to manage providers, agents,
-								and conversations.
-							</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<form onSubmit={handleSubmit} className="space-y-4">
-								{error ? (
-									<Alert
-										variant="destructive"
-										aria-live="polite"
-										className="animate-in-up"
-									>
-										<AlertTitle>We couldn&apos;t sign you in</AlertTitle>
-										<AlertDescription>{error}</AlertDescription>
-									</Alert>
-								) : null}
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-2xl tracking-tight">
+							Sign in to AI Hub
+						</CardTitle>
+						<CardDescription>
+							Welcome back. Open your workspace to manage providers, agents,
+							and conversations.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<form onSubmit={handleSubmit} className="space-y-4">
+							{error ? (
+								<Alert variant="destructive" aria-live="polite">
+									<AlertTitle>We couldn&apos;t sign you in</AlertTitle>
+									<AlertDescription>{error}</AlertDescription>
+								</Alert>
+							) : null}
 
-								<Field>
-									<FieldLabel htmlFor="email">Email</FieldLabel>
-									<FieldContent>
-										<Input
-											id="email"
-											type="email"
-											autoComplete="email"
-											required
-											value={email}
-											onChange={(event) => setEmail(event.target.value)}
-											placeholder="you@company.com"
-											className="transition-shadow duration-200 focus:ring-4 focus:ring-ring/10"
-										/>
-									</FieldContent>
-								</Field>
+							<Field>
+								<FieldLabel htmlFor="email">Email</FieldLabel>
+								<FieldContent>
+									<Input
+										id="email"
+										type="email"
+										autoComplete="email"
+										required
+										value={email}
+										onChange={(event) => setEmail(event.target.value)}
+										placeholder="you@company.com"
+									/>
+								</FieldContent>
+							</Field>
 
-								<Field>
-									<FieldLabel htmlFor="password">Password</FieldLabel>
-									<FieldContent>
-										<Input
-											id="password"
-											type="password"
-											autoComplete="current-password"
-											required
-											value={password}
-											onChange={(event) => setPassword(event.target.value)}
-											placeholder="Enter your password…"
-											className="transition-shadow duration-200 focus:ring-4 focus:ring-ring/10"
-										/>
-									</FieldContent>
-								</Field>
+							<Field>
+								<FieldLabel htmlFor="password">Password</FieldLabel>
+								<FieldContent>
+									<Input
+										id="password"
+										type="password"
+										autoComplete="current-password"
+										required
+										value={password}
+										onChange={(event) => setPassword(event.target.value)}
+										placeholder="Enter your password…"
+									/>
+								</FieldContent>
+							</Field>
 
-								<Button
-									type="submit"
-									size="lg"
-									className="w-full shimmer transition-all duration-200 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-0.5 active:translate-y-0"
-									disabled={loading}
-								>
-									{loading ? (
-										<Spinner data-icon="inline-start" />
-									) : (
-										<LogInIcon data-icon="inline-start" aria-hidden="true" />
-									)}
-									Sign in
-								</Button>
-							</form>
-						</CardContent>
-					</Card>
-				</div>
+							<Button type="submit" size="lg" className="w-full" disabled={loading}>
+								{loading ? (
+									<Spinner data-icon="inline-start" />
+								) : (
+									<LogInIcon data-icon="inline-start" aria-hidden="true" />
+								)}
+								Sign in
+							</Button>
+						</form>
+					</CardContent>
+				</Card>
 
-				{/* Sign up link */}
-				<p className="text-center text-sm text-muted-foreground animate-in-fade stagger-4">
+				<p className="text-center text-sm text-muted-foreground">
 					Don&apos;t have an account?{" "}
 					<Link
 						href="/auth/signup"
-						className="font-medium text-primary hover:underline underline-offset-4 transition-all"
+						className="font-medium text-primary underline-offset-4 hover:underline"
 					>
 						Sign up
 					</Link>

@@ -66,7 +66,7 @@ export function KnowledgeTab({
 				}
 			/>
 
-			<Card className="hover-lift animate-in-up stagger-3">
+			<Card className="animate-in-up stagger-3">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<BookOpenIcon className="size-5" aria-hidden="true" />
@@ -145,7 +145,7 @@ export function KnowledgeTab({
 					)}
 				</CardContent>
 				<CardFooter className="justify-end">
-					<Button onClick={onSave} disabled={saving} className="shimmer">
+					<Button onClick={onSave} disabled={saving}>
 						{saving ? (
 							<Spinner data-icon="inline-start" />
 						) : (

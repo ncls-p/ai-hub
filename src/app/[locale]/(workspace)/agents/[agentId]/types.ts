@@ -107,49 +107,6 @@ export type ToolBindingState = Record<
 
 /* ─── Constants ─────────────────────────────────────────────────────── */
 
-export const AGENT_ACCENTS = [
-	{
-		bar: "bg-violet-500",
-		iconBg: "bg-violet-500/10",
-		text: "text-violet-600 dark:text-violet-400",
-	},
-	{
-		bar: "bg-cyan-500",
-		iconBg: "bg-cyan-500/10",
-		text: "text-cyan-600 dark:text-cyan-400",
-	},
-	{
-		bar: "bg-emerald-500",
-		iconBg: "bg-emerald-500/10",
-		text: "text-emerald-600 dark:text-emerald-400",
-	},
-	{
-		bar: "bg-amber-500",
-		iconBg: "bg-amber-500/10",
-		text: "text-amber-600 dark:text-amber-400",
-	},
-	{
-		bar: "bg-rose-500",
-		iconBg: "bg-rose-500/10",
-		text: "text-rose-600 dark:text-rose-400",
-	},
-	{
-		bar: "bg-fuchsia-500",
-		iconBg: "bg-fuchsia-500/10",
-		text: "text-fuchsia-600 dark:text-fuchsia-400",
-	},
-	{
-		bar: "bg-lime-500",
-		iconBg: "bg-lime-500/10",
-		text: "text-lime-600 dark:text-lime-400",
-	},
-	{
-		bar: "bg-sky-500",
-		iconBg: "bg-sky-500/10",
-		text: "text-sky-600 dark:text-sky-400",
-	},
-];
-
 export const defaultGenParams = {
 	temperature: "0.7",
 	topP: "1",

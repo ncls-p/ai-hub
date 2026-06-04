@@ -2,17 +2,6 @@ import type { ReactNode } from "react";
 import { BrainIcon, ServerIcon, SparklesIcon, ZapIcon } from "lucide-react";
 
 import type { McpServer, McpTool, ToolBindingState } from "./types";
-import { AGENT_ACCENTS } from "./types";
-
-/* ─── Accent helpers ──────────────────────────────────────────────── */
-
-export function getAgentAccent(name: string) {
-	let hash = 0;
-	for (let i = 0; i < name.length; i++) {
-		hash = name.charCodeAt(i) + ((hash << 5) - hash);
-	}
-	return AGENT_ACCENTS[Math.abs(hash) % AGENT_ACCENTS.length];
-}
 
 /* ─── Provider icon ───────────────────────────────────────────────── */
 

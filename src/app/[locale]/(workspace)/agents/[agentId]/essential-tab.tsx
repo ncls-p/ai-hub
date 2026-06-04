@@ -298,7 +298,7 @@ export function EssentialTab({
 			</AdvancedSection>
 
 			<CardFooter className="justify-end px-0 pb-0">
-				<Button type="submit" disabled={saving} className="shimmer">
+				<Button type="submit" disabled={saving}>
 					{saving ? (
 						<Spinner data-icon="inline-start" />
 					) : (

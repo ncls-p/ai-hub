@@ -18,7 +18,7 @@ export function MetricCell({
 			<p
 				className={cn(
 					"text-2xl font-bold leading-none",
-					accent ? "text-emerald-600 dark:text-emerald-400" : "text-foreground",
+					accent ? "text-success" : "text-foreground",
 				)}
 			>
 				{value}
@@ -92,7 +92,7 @@ export function StatsSidebar({
 								<p className="text-xs text-muted-foreground">models</p>
 							</div>
 							<div className="px-5 py-4">
-								<p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+								<p className="text-xl font-bold text-success">
 									{enabledModels}
 								</p>
 								<p className="text-xs text-muted-foreground">enabled</p>

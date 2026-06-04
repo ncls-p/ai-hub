@@ -152,7 +152,7 @@ export function ChatLayout({
 			{!canChat ? (
 				<Badge
 					variant="outline"
-					className="hidden shrink-0 items-center gap-1 rounded-lg border-amber-500/30 bg-amber-500/8 px-2 py-0.5 text-[11px] font-medium text-amber-600 sm:inline-flex"
+					className="hidden shrink-0 items-center gap-1 rounded-lg border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning sm:inline-flex"
 				>
 					<Settings2Icon className="size-3" aria-hidden="true" />
 					needs setup
@@ -172,7 +172,7 @@ export function ChatLayout({
 				}}
 			>
 				{sidebarOpen && (
-					<aside className="h-full w-80 border-r border-border/60 bg-background/95 backdrop-blur-xl shadow-sm">
+					<aside className="h-full w-80 border-r border-border bg-background">
 						<ChatSidebar {...desktopSidebarProps} className="w-full" />
 					</aside>
 				)}
@@ -236,7 +236,7 @@ export function ChatLayout({
 								type="button"
 								size="sm"
 								variant="outline"
-								className="hidden h-8 gap-1.5 rounded-lg border-border/50 bg-background/60 px-3 text-xs font-medium transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm hover:bg-background active:translate-y-0 sm:inline-flex"
+								className="hidden h-8 gap-1.5 rounded-lg px-3 text-xs font-medium sm:inline-flex"
 								aria-label="New conversation"
 								onClick={onNewConversation}
 							>
@@ -260,7 +260,7 @@ export function ChatLayout({
 								<Button
 									type="button"
 									size="sm"
-									className="h-8 gap-1.5 rounded-lg px-3 text-xs font-medium transition-all duration-200 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0"
+									className="h-8 gap-1.5 rounded-lg px-3 text-xs font-medium"
 									onClick={() => setSetupOpen(true)}
 								>
 									<Settings2Icon className="size-3.5" aria-hidden="true" />

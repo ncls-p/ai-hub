@@ -72,14 +72,14 @@ function ChatContextBar({
 		<Collapsible
 			open={open}
 			onOpenChange={updateOpen}
-			className="shrink-0 border-b border-border/60 bg-gradient-to-r from-background via-background/98 to-background"
+			className="shrink-0 border-b border-border/60 bg-background"
 		>
 			<div className="mx-auto flex min-h-10 w-full max-w-4xl items-center justify-between gap-3 px-4 py-1.5">
 				<div className="flex min-w-0 flex-wrap items-center gap-2">
 					<span className="truncate text-sm font-medium">Chat status</span>
 					<Badge
 						variant={quotaPercent >= 100 ? "destructive" : "outline"}
-						className="rounded-lg border-amber-500/20 bg-amber-500/8 text-[11px] font-medium"
+						className="rounded-lg text-[11px] font-medium"
 					>
 						Usage {quotaPercent}%
 					</Badge>
@@ -613,8 +613,7 @@ export default function ChatPage() {
 		return (
 			<div className="flex h-full flex-col items-center justify-center gap-4">
 				<div className="relative">
-					<div className="absolute inset-0 animate-ping rounded-full bg-primary/10" />
-					<div className="relative flex size-12 items-center justify-center rounded-full bg-primary/10">
+					<div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
 						<Loader2
 							className="size-6 animate-spin text-primary"
 							aria-hidden="true"
@@ -636,12 +635,8 @@ export default function ChatPage() {
 			<div className="mx-auto flex h-full w-full max-w-3xl items-center justify-center px-4 animate-in-up">
 				<Empty className="min-h-80 w-full surface-panel">
 					<EmptyHeader>
-						<EmptyMedia
-							variant="icon"
-							className="glow-primary-hover group relative"
-						>
-							<div className="absolute inset-0 animate-ping rounded-full bg-primary/10" />
-							<BotIcon className="relative" aria-hidden="true" />
+						<EmptyMedia variant="icon">
+							<BotIcon aria-hidden="true" />
 						</EmptyMedia>
 						<EmptyTitle>{t("noAssistants")}</EmptyTitle>
 						<EmptyDescription>{t("noAssistantsDescription")}</EmptyDescription>
@@ -689,35 +684,17 @@ export default function ChatPage() {
 			>
 				{!loadingMessages && messages.length === 0 ? (
 					<div className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center px-4 py-12 sm:py-16 animate-in-fade">
-						{/* Decorative orbs */}
-						<div className="pointer-events-none absolute inset-0 overflow-hidden">
-							<div className="orb orb--primary orb--top-left" />
-							<div className="orb orb--muted orb--bottom-right" />
-						</div>
-
 						<div className="relative flex w-full flex-col items-center gap-6">
 							{/* Icon */}
 							<div
 								className={cn(
-									"relative mb-2 flex size-16 items-center justify-center rounded-2xl shadow-lg ring-1 transition-all duration-500",
+									"mb-2 flex size-16 items-center justify-center rounded-2xl border",
 									canChat
-										? "bg-gradient-to-br from-primary/10 to-primary/5 ring-primary/20 glow-primary-hover"
-										: "bg-muted/50 ring-border/60",
+										? "border-primary/20 bg-primary/10 text-primary"
+										: "border-border bg-muted/50 text-muted-foreground",
 								)}
 							>
-								<div
-									className={cn(
-										"absolute inset-0 animate-ping rounded-2xl",
-										canChat ? "bg-primary/10" : "bg-transparent",
-									)}
-								/>
-								<BotIcon
-									className={cn(
-										"relative size-8 transition-all duration-300",
-										canChat ? "text-primary" : "text-muted-foreground",
-									)}
-									aria-hidden="true"
-								/>
+								<BotIcon className="size-8" aria-hidden="true" />
 							</div>
 
 							<div className="text-center">

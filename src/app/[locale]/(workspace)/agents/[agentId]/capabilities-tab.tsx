@@ -88,7 +88,7 @@ function McpServerCollapsible({
 	return (
 		<Collapsible
 			defaultOpen={false}
-			className="rounded-xl border border-border/60 bg-background/45 p-3 shadow-sm backdrop-blur-sm transition-all hover:border-primary/25 hover:bg-background/70"
+			className="rounded-xl border border-border bg-background p-3 transition-colors hover:border-primary/35 hover:bg-muted/40"
 		>
 			<div className="flex items-start gap-2">
 				<CollapsibleTrigger asChild>
@@ -325,7 +325,6 @@ export function CapabilitiesTab({
 					type="button"
 					disabled={saving}
 					onClick={onSave}
-					className="shimmer"
 				>
 					{saving ? (
 						<Spinner data-icon="inline-start" />

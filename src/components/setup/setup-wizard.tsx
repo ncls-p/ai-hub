@@ -624,7 +624,6 @@ export function SetupWizard({
                   type="button"
                   onClick={() => void createProvider()}
                   disabled={busy || !providerForm.name.trim()}
-                  className="transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
                 >
                   {busy ? (
                     <Loader2 className="animate-spin" aria-hidden="true" />
@@ -639,7 +638,6 @@ export function SetupWizard({
                     variant="outline"
                     disabled={loadingProviders}
                     onClick={() => setStep("model")}
-                    className="transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
                   >
                     Skip — use existing
                   </Button>
@@ -804,7 +802,6 @@ export function SetupWizard({
                               }
                               void addAndSelectModel(model);
                             }}
-                            className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0"
                           >
                             {isSelected ? (
                               "Selected"
@@ -898,7 +895,7 @@ export function SetupWizard({
 
               <Button
                 type="button"
-                className="mt-2 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+                className="mt-2"
                 onClick={() => setStep("agent")}
                 disabled={!modelDbId}
               >
@@ -968,7 +965,6 @@ export function SetupWizard({
                   disabled={
                     busy || !modelDbId || (!agentId && !agentForm.name.trim())
                   }
-                  className="transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
                 >
                   {busy ? (
                     <Loader2 className="animate-spin" aria-hidden="true" />
@@ -984,7 +980,6 @@ export function SetupWizard({
                   type="button"
                   variant="outline"
                   onClick={() => setStep("model")}
-                  className="transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   Back
                 </Button>

@@ -48,7 +48,6 @@ export default async function SettingsPage() {
 
 	return (
 		<WorkspacePage
-			kicker="Admin"
 			title={t("settingsTitle")}
 			description={t("settingsDescription")}
 			width="narrow"

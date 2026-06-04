@@ -59,7 +59,7 @@ export function GeneralTab({
 			</InfoCallout>
 
 			<form onSubmit={onSave}>
-				<Card className="hover-lift animate-in-up stagger-3">
+				<Card className="animate-in-up stagger-3">
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
 							<SettingsIcon className="size-5" aria-hidden="true" />
@@ -130,7 +130,7 @@ export function GeneralTab({
 				</Card>
 			</form>
 
-			<Card className="hover-lift animate-in-up stagger-4">
+			<Card className="animate-in-up stagger-4">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<ShieldCheckIcon className="size-5" aria-hidden="true" />
@@ -200,7 +200,7 @@ export function GeneralTab({
 						<p className="text-xs text-muted-foreground">
 							Changes apply immediately after saving.
 						</p>
-						<Button type="submit" disabled={saving} className="shimmer">
+						<Button type="submit" disabled={saving}>
 							{saving ? (
 								<Spinner data-icon="inline-start" />
 							) : (
@@ -213,7 +213,7 @@ export function GeneralTab({
 			</Card>
 
 			{canAdminCurate ? (
-				<Card className="hover-lift animate-in-up stagger-5">
+				<Card className="animate-in-up stagger-5">
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
 							<GlobeIcon className="size-5" aria-hidden="true" />
@@ -301,7 +301,7 @@ export function GeneralTab({
 							</FieldGroup>
 						</CardContent>
 						<CardFooter className="justify-end">
-							<Button type="submit" disabled={saving} className="shimmer">
+							<Button type="submit" disabled={saving}>
 								{saving ? (
 									<Spinner data-icon="inline-start" />
 								) : (

@@ -20,11 +20,9 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 
 import { MetricCell } from "./shared";
 import type { Agent, Model, Provider } from "./types";
-import { getAgentAccent } from "./utils";
 
 export function AgentHeader({
 	agent,
@@ -49,18 +47,11 @@ export function AgentHeader({
 	const selectedProvider = providers.find((p) => p.id === form.providerId);
 	const selectedModel = models.find((m) => m.id === form.modelId);
 	const hasModel = Boolean(form.providerId && form.modelId);
-	const accent = agent ? getAgentAccent(agent.name) : getAgentAccent("?");
 
 	return (
-		<div className="glass-card p-5 sm:p-6 animate-in-scale stagger-1">
+		<div className="surface-panel p-5 sm:p-6">
 			<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
-				<div
-					className={cn(
-						"flex size-12 shrink-0 items-center justify-center rounded-xl",
-						accent.iconBg,
-						accent.text,
-					)}
-				>
+				<div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
 					<BotIcon className="size-6" aria-hidden="true" />
 				</div>
 
@@ -70,7 +61,7 @@ export function AgentHeader({
 							{agent?.name ?? form.name}
 						</h2>
 						{hasModel ? (
-							<Badge className="gap-1 bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 dark:text-emerald-400">
+							<Badge variant="outline" className="gap-1 border-success/30 bg-success/10 text-success">
 								<SparklesIcon className="size-3" aria-hidden="true" />
 								{t("statusReady")}
 							</Badge>
@@ -99,7 +90,7 @@ export function AgentHeader({
 
 				<div className="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end">
 					{hasModel && agent?.id ? (
-						<Button asChild size="sm" className="shimmer">
+						<Button asChild size="sm">
 							<Link href={`/chat?agentId=${agent.id}`}>
 								<MessageCircleIcon className="size-4" aria-hidden="true" />
 								{t("chat")}
@@ -131,7 +122,7 @@ export function AgentHeader({
 				</div>
 			</div>
 
-			<div className="mt-5 grid grid-cols-3 gap-x-6 gap-y-3 border-t border-border/40 pt-5">
+			<div className="mt-5 grid grid-cols-3 gap-x-6 gap-y-3 border-t border-border pt-5">
 				<MetricCell label={t("tabs.tools")} value={totalEnabledTools} />
 				<MetricCell label={t("tabs.knowledge")} value={selectedKnowledgeIds.length} />
 				<MetricCell label="MCP" value={enabledMcpCount} />

@@ -111,57 +111,6 @@ function timeAgo(dateString: string): string {
 	return date.toLocaleDateString();
 }
 
-const AGENT_ACCENTS = [
-	{
-		bar: "bg-violet-500",
-		iconBg: "bg-violet-500/10",
-		text: "text-violet-600 dark:text-violet-400",
-	},
-	{
-		bar: "bg-cyan-500",
-		iconBg: "bg-cyan-500/10",
-		text: "text-cyan-600 dark:text-cyan-400",
-	},
-	{
-		bar: "bg-emerald-500",
-		iconBg: "bg-emerald-500/10",
-		text: "text-emerald-600 dark:text-emerald-400",
-	},
-	{
-		bar: "bg-amber-500",
-		iconBg: "bg-amber-500/10",
-		text: "text-amber-600 dark:text-amber-400",
-	},
-	{
-		bar: "bg-rose-500",
-		iconBg: "bg-rose-500/10",
-		text: "text-rose-600 dark:text-rose-400",
-	},
-	{
-		bar: "bg-fuchsia-500",
-		iconBg: "bg-fuchsia-500/10",
-		text: "text-fuchsia-600 dark:text-fuchsia-400",
-	},
-	{
-		bar: "bg-lime-500",
-		iconBg: "bg-lime-500/10",
-		text: "text-lime-600 dark:text-lime-400",
-	},
-	{
-		bar: "bg-sky-500",
-		iconBg: "bg-sky-500/10",
-		text: "text-sky-600 dark:text-sky-400",
-	},
-];
-
-function getAccent(name: string) {
-	let hash = 0;
-	for (let i = 0; i < name.length; i++) {
-		hash = name.charCodeAt(i) + ((hash << 5) - hash);
-	}
-	return AGENT_ACCENTS[Math.abs(hash) % AGENT_ACCENTS.length];
-}
-
 export default function AgentsPage() {
 	const t = useTranslations("agents");
 	const tCommon = useTranslations("common");
@@ -395,38 +344,19 @@ export default function AgentsPage() {
 
 	return (
 		<WorkspacePage
-			kicker="Configuration"
 			title="Assistants"
 			description="Manage your AI assistants — each one can have its own model, system prompt, tools, and knowledge bases."
 			width="default"
+			actions={
+				<Button size="sm" onClick={() => setShowCreateDialog(true)}>
+					<PlusIcon className="size-4" aria-hidden="true" />
+					New assistant
+				</Button>
+			}
 		>
 			<div className="space-y-6">
-				{/* Header card */}
-				<div className="glass-card p-5 sm:p-6 animate-in-scale stagger-1">
-					<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-						<div>
-							<div className="section-kicker mb-2">Configuration</div>
-							<h2 className="font-heading text-xl font-semibold tracking-tight">
-								AI Assistants
-							</h2>
-							<p className="mt-1 text-sm text-muted-foreground">
-								Configure assistants with custom models, system prompts, tools,
-								and knowledge bases.
-							</p>
-						</div>
-						<Button
-							size="sm"
-							className="shimmer"
-							onClick={() => setShowCreateDialog(true)}
-						>
-							<PlusIcon className="size-4" aria-hidden="true" />
-							New assistant
-						</Button>
-					</div>
-				</div>
-
 				{/* Agents list card */}
-				<section className="surface-panel animate-in-up stagger-2">
+				<section className="surface-panel">
 					{/* Toolbar */}
 					<div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
 						<div>
@@ -477,7 +407,7 @@ export default function AgentsPage() {
 							</p>
 							<Button
 								size="sm"
-								className="mt-4 shimmer"
+								className="mt-4"
 								onClick={() => setShowCreateDialog(true)}
 							>
 								<PlusIcon className="size-4" aria-hidden="true" />
@@ -490,33 +420,19 @@ export default function AgentsPage() {
 						</div>
 					) : (
 						<div className="p-2 space-y-1">
-							{filteredAgents.map((agent, idx) => {
+							{filteredAgents.map((agent) => {
 								const bindings = bindingSummaries[agent.id];
 								const isReady = Boolean(agent.activeVersionId);
-								const accent = getAccent(agent.name);
 
 								return (
 									<div
 										key={agent.id}
 										className={cn(
-											"group flex items-center gap-3 rounded-xl border border-transparent p-3 transition-all hover:border-border/60 hover:bg-card/60 hover:shadow-sm",
+											"group flex items-center gap-3 rounded-xl border border-transparent p-3 transition-colors hover:border-border hover:bg-muted/40",
 											!isReady && "opacity-60",
-											`animate-in-up stagger-${Math.min(idx + 3, 6)}`,
 										)}
 									>
-										<div
-											className={cn(
-												"hidden h-8 w-1 shrink-0 rounded-full sm:block",
-												accent.bar,
-											)}
-										/>
-										<div
-											className={cn(
-												"flex size-8 shrink-0 items-center justify-center rounded-lg",
-												accent.iconBg,
-												accent.text,
-											)}
-										>
+										<div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
 											<BotIcon className="size-4" aria-hidden="true" />
 										</div>
 										<div className="min-w-0 flex-1">
@@ -525,11 +441,11 @@ export default function AgentsPage() {
 													{agent.name}
 												</p>
 												<Badge
-													variant={isReady ? "default" : "outline"}
+													variant="outline"
 													className={cn(
 														"gap-1 text-xs",
 														isReady
-															? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25"
+															? "border-success/30 bg-success/10 text-success"
 															: "",
 													)}
 												>

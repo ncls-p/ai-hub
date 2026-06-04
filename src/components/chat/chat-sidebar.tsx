@@ -111,9 +111,9 @@ function ConversationItem({
 					: "border-transparent hover:border-border/40 hover:bg-muted/50",
 			)}
 		>
-			{/* Active glow bar */}
+			{/* Active indicator bar */}
 			{isActive && (
-				<div className="absolute left-0 top-1/2 h-3/5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary shadow-[0_0_6px_-1px_var(--primary)]" />
+				<div className="absolute left-0 top-1/2 h-3/5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary" />
 			)}
 
 			{isEditing ? (
@@ -325,8 +325,7 @@ export function ChatSidebar({
 
 	return (
 		<div className={cn("flex h-full min-h-0 flex-col", className)}>
-			{/* Header — glass surface matching composer */}
-			<div className="flex items-center justify-between border-b border-border/50 px-4 py-3 backdrop-blur-xl">
+			<div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
 				<div className="flex items-center gap-2">
 					{onCollapsedChange ? (
 						<Tooltip>
@@ -355,7 +354,7 @@ export function ChatSidebar({
 					size="sm"
 					variant="outline"
 					onClick={onNewConversation}
-					className="h-8 gap-1 rounded-lg border-border/50 bg-background/60 px-3 text-xs font-medium shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm hover:shadow-primary/10 hover:bg-background active:translate-y-0"
+					className="h-8 gap-1 rounded-lg px-3 text-xs font-medium"
 				>
 					<PlusIcon className="size-3" aria-hidden="true" />
 					New
@@ -479,7 +478,7 @@ export function ChatSidebar({
 
 			{/* Footer */}
 			{showThemeToggle ? (
-				<div className="border-t border-border/50 p-3 backdrop-blur-xl">
+				<div className="border-t border-border/50 p-3">
 					<ThemeToggleButton className="w-full" />
 				</div>
 			) : null}

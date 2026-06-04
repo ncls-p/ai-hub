@@ -138,7 +138,7 @@ function StatCard({
 	return (
 		<div
 			className={cn(
-				"group relative overflow-hidden rounded-2xl border border-border/60 bg-background/80 p-4 transition-all duration-300 hover:border-border/80 hover:bg-background hover:shadow-lg",
+				"group relative overflow-hidden rounded-2xl border border-border bg-background p-4 transition-colors hover:border-primary/35",
 			)}
 		>
 			{/* Accent bar */}
@@ -258,7 +258,7 @@ function InvocationActions({
 				size="sm"
 				onClick={() => onApprove(invocationId)}
 				disabled={isBusy}
-				className="min-w-[88px] transition-all duration-200 hover:shadow-lg hover:shadow-primary/10"
+				className="min-w-[88px]"
 			>
 				{busyAction === "approve" ? (
 					<Loader2 className="animate-spin" aria-hidden="true" />

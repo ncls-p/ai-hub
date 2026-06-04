@@ -4,10 +4,10 @@ import { cn } from "@/lib/utils";
 export type StatusKind = "ready" | "warning" | "error" | "pending";
 
 const styles: Record<StatusKind, string> = {
-	ready: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-	warning: "border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-400",
+	ready: "border-success/30 bg-success/10 text-success",
+	warning: "border-warning/30 bg-warning/10 text-warning",
 	error: "border-destructive/25 bg-destructive/10 text-destructive",
-	pending: "border-border/60 bg-muted/50 text-muted-foreground",
+	pending: "border-border bg-muted/50 text-muted-foreground",
 };
 
 export function StatusBadge({

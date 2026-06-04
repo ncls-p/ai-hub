@@ -65,7 +65,7 @@ function BuiltinToolsSection({
 	});
 
 	return (
-		<Card className="hover-lift animate-in-up stagger-3">
+		<Card className="animate-in-up stagger-3">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<WrenchIcon className="size-5" aria-hidden="true" />
@@ -243,7 +243,7 @@ function McpServerRow({
 	return (
 		<Collapsible
 			defaultOpen={false}
-			className="rounded-xl border border-border/60 bg-background/45 p-3 shadow-sm backdrop-blur-sm transition-all hover:border-primary/25 hover:bg-background/70"
+			className="rounded-xl border border-border bg-background p-3 transition-colors hover:border-primary/35 hover:bg-muted/40"
 		>
 			<div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
 				<div className="flex min-w-0 gap-2">
@@ -413,7 +413,7 @@ function McpToolsSection({
 		: mcpServers;
 
 	return (
-		<Card className="hover-lift animate-in-up stagger-4">
+		<Card className="animate-in-up stagger-4">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<ServerIcon className="size-5" aria-hidden="true" />
@@ -461,7 +461,7 @@ function McpToolsSection({
 				)}
 			</CardContent>
 			<CardFooter className="justify-end">
-				<Button onClick={onSave} disabled={saving} className="shimmer">
+				<Button onClick={onSave} disabled={saving}>
 					{saving ? (
 						<Spinner data-icon="inline-start" />
 					) : (

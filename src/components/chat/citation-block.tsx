@@ -17,14 +17,12 @@ export function CitationBlock({ citations, className }: CitationBlockProps) {
 	return (
 		<div
 			className={cn(
-				"group/citations overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-muted/40 to-muted/20 transition-all duration-300 hover:border-primary/25 hover:shadow-md",
+				"group/citations overflow-hidden rounded-xl border border-border bg-muted/30 transition-colors hover:border-primary/25",
 				className,
 			)}
 		>
-			{/* Header with subtle gradient accent */}
-			<div className="relative border-b border-border/50 px-3.5 py-2.5">
-				<div className="absolute inset-0 bg-gradient-to-r from-primary/[0.06] to-transparent opacity-0 transition-opacity duration-300 group-hover/citations:opacity-100" />
-				<div className="relative flex items-center gap-2">
+			<div className="border-b border-border/50 px-3.5 py-2.5">
+				<div className="flex items-center gap-2">
 					<div className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
 						<BookOpenIcon className="size-3" aria-hidden="true" />
 					</div>
@@ -47,7 +45,7 @@ export function CitationBlock({ citations, className }: CitationBlockProps) {
 					const relevancePct = Math.min(100, Math.max(0, rawRelevance));
 					const relevanceColor =
 						relevancePct > 70
-							? "bg-emerald-500"
+							? "bg-success"
 							: relevancePct > 40
 								? "bg-primary"
 								: "bg-muted-foreground";

@@ -16,24 +16,17 @@ export function ConfigSection({
 	children,
 	icon: Icon,
 	className,
-	stagger = "3",
 }: {
 	title: string;
 	description?: string;
 	children: ReactNode;
 	icon?: LucideIcon;
 	className?: string;
-	/** Animation stagger class suffix (1–6) */
+	/** Deprecated: animation stagger is no longer applied */
 	stagger?: string;
 }) {
 	return (
-		<Card
-			className={cn(
-				"hover-lift animate-in-up",
-				`stagger-${stagger}`,
-				className,
-			)}
-		>
+		<Card className={cn(className)}>
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 text-base">
 					{Icon ? <Icon className="size-5" aria-hidden="true" /> : null}

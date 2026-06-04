@@ -435,7 +435,6 @@ export default function AgentConfigurePage() {
 
 	return (
 		<WorkspacePage
-			kicker={t("configure")}
 			title={agent?.name ?? t("configure")}
 			description={t("configureDescription")}
 			width="default"

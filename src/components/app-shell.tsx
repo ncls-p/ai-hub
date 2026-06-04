@@ -120,7 +120,7 @@ export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
         key={isChatRoute ? "chat" : "workspace"}
         defaultCollapsed={isChatRoute}
       >
-        <div data-page="app-shell" className="app-shell mesh-bg">
+        <div data-page="app-shell" className="app-shell">
           <a
             href="#workspace-main"
             className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-full focus:border focus:border-border/70 focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-lg"

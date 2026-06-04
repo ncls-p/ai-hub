@@ -22,7 +22,7 @@ export function ThemeToggleButton({
       variant="outline"
       size={iconOnly ? "icon" : "sm"}
       className={cn(
-        "rounded-full text-muted-foreground hover:text-foreground transition-all duration-300 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0",
+        "rounded-full text-muted-foreground transition-colors hover:text-foreground",
         className,
       )}
       aria-label="Toggle theme"

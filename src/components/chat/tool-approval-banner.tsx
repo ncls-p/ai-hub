@@ -120,33 +120,21 @@ export function ToolApprovalBanner({
 			<div
 				role="alert"
 				className={cn(
-					"group relative overflow-hidden rounded-2xl border p-4 text-sm transition-all duration-300",
+					"group relative overflow-hidden rounded-2xl border p-4 text-sm transition-colors",
 					isHighRisk
-						? "border-destructive/30 bg-gradient-to-br from-destructive/[0.06] to-destructive/[0.02] hover:border-destructive/40 shadow-lg shadow-destructive/5"
+						? "border-destructive/30 bg-destructive/[0.04] hover:border-destructive/40"
 						: isMediumRisk
-							? "border-warning/30 bg-gradient-to-br from-warning/[0.06] to-warning/[0.02] hover:border-warning/40 shadow-lg shadow-warning/5"
-							: "border-info/30 bg-gradient-to-br from-info/[0.06] to-info/[0.02] hover:border-info/40 shadow-lg shadow-info/5",
+							? "border-warning/30 bg-warning/[0.04] hover:border-warning/40"
+							: "border-info/30 bg-info/[0.04] hover:border-info/40",
 				)}
 			>
-				{/* Ambient glow */}
-				<div
-					className={cn(
-						"absolute -top-12 right-8 size-24 rounded-full blur-3xl opacity-15 transition-opacity duration-500 group-hover:opacity-25",
-						isHighRisk
-							? "bg-destructive"
-							: isMediumRisk
-								? "bg-warning"
-								: "bg-info",
-					)}
-				/>
-
 				<div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 					{/* Left: info */}
 					<div className="flex min-w-0 flex-1 items-start gap-3">
 						{/* Icon */}
 						<div
 							className={cn(
-								"relative flex size-10 shrink-0 items-center justify-center rounded-xl ring-1 transition-transform duration-300 group-hover:scale-105",
+								"relative flex size-10 shrink-0 items-center justify-center rounded-xl ring-1",
 								isHighRisk
 									? "bg-destructive/10 text-destructive ring-destructive/20"
 									: isMediumRisk
@@ -154,21 +142,7 @@ export function ToolApprovalBanner({
 										: "bg-info/10 text-info ring-info/20",
 							)}
 						>
-							<ShieldAlertIcon
-								className="size-5 animate-pulse"
-								aria-hidden="true"
-							/>
-							{/* Pulse ring */}
-							<div
-								className={cn(
-									"absolute inset-0 rounded-xl animate-ping opacity-20",
-									isHighRisk
-										? "bg-destructive/30"
-										: isMediumRisk
-											? "bg-warning/30"
-											: "bg-info/30",
-								)}
-							/>
+							<ShieldAlertIcon className="size-5" aria-hidden="true" />
 						</div>
 
 						<div className="min-w-0 flex-1">
@@ -236,7 +210,7 @@ export function ToolApprovalBanner({
 							type="button"
 							size="sm"
 							onClick={onApprove}
-							className="h-9 gap-1.5 bg-primary px-4 text-xs font-medium text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+							className="h-9 gap-1.5 px-4 text-xs font-medium"
 						>
 							<CheckCircle2 className="size-3.5" aria-hidden="true" />
 							Approve

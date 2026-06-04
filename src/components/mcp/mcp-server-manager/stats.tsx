@@ -16,7 +16,7 @@ function MetricCell({
 			<p
 				className={cn(
 					"text-2xl font-bold leading-none",
-					accent ? "text-emerald-600 dark:text-emerald-400" : "text-foreground",
+					accent ? "text-success" : "text-foreground",
 				)}
 			>
 				{value}

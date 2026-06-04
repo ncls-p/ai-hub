@@ -23,7 +23,7 @@ export function ResourceCard({
 	className?: string;
 }) {
 	return (
-		<Card className={cn("hover-lift flex flex-col", className)}>
+		<Card className={cn("flex flex-col transition-colors hover:border-primary/35", className)}>
 			<CardHeader className="gap-2 pb-2">
 				<div className="flex items-start justify-between gap-2">
 					<CardTitle className="text-base">{title}</CardTitle>

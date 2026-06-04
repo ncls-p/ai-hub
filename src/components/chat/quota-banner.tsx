@@ -102,7 +102,7 @@ export function QuotaBanner({ used, limit }: { used: number; limit: number }) {
 					asChild
 					size="sm"
 					variant="outline"
-					className="shrink-0 gap-1.5 border-border/60 bg-background/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 hover:bg-background"
+					className="shrink-0 gap-1.5"
 				>
 					<Link href="/usage">
 						<BarChart3Icon className="size-3.5" aria-hidden="true" />

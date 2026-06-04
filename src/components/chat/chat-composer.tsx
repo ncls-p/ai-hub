@@ -44,15 +44,6 @@ export function ChatComposer({
 			className="w-full min-w-0 shrink-0 bg-transparent px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 sm:pt-3"
 		>
 			<div className="relative mx-auto w-full min-w-0 max-w-4xl">
-				{/* Subtle gradient glow behind composer */}
-				<div
-					className={cn(
-						"absolute -bottom-8 left-1/2 -z-10 h-32 w-3/4 -translate-x-1/2 rounded-full blur-3xl transition-opacity duration-500",
-						"bg-gradient-to-r from-primary/5 via-primary/8 to-primary/5",
-						focused ? "opacity-100" : "opacity-0",
-					)}
-				/>
-
 				<div
 					className={cn(
 						"composer-box rounded-xl sm:rounded-2xl transition-all duration-300",
@@ -103,9 +94,9 @@ export function ChatComposer({
 							disabled={sending || !input.trim() || !canChat}
 							aria-label="Send message"
 							className={cn(
-								"size-9 shrink-0 rounded-lg shadow-sm transition-all duration-300 active:scale-90 sm:size-10 sm:rounded-xl",
+								"size-9 shrink-0 rounded-lg transition-colors sm:size-10 sm:rounded-xl",
 								input.trim() && canChat && !sending
-									? "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5"
+									? "bg-primary text-primary-foreground hover:bg-primary/90"
 									: "opacity-60",
 							)}
 						>

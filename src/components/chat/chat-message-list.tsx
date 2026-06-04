@@ -199,16 +199,16 @@ function ToolPartCard({
 	let iconBgClass: string;
 	if (status === "error") {
 		StatusIcon = XCircleIcon;
-		iconBgClass = "border-red-400/30 bg-red-400/10 text-red-500";
+		iconBgClass = "border-destructive/30 bg-destructive/10 text-destructive";
 	} else if (approvalMatches) {
 		StatusIcon = ShieldAlertIcon;
-		iconBgClass = "border-amber-400/30 bg-amber-400/15 text-amber-500";
+		iconBgClass = "border-warning/30 bg-warning/15 text-warning";
 	} else if (status === "pending") {
 		StatusIcon = ClockIcon;
-		iconBgClass = "border-blue-400/30 bg-blue-400/10 text-blue-500";
+		iconBgClass = "border-info/30 bg-info/10 text-info";
 	} else {
 		StatusIcon = CheckCircle2Icon;
-		iconBgClass = "border-emerald-400/30 bg-emerald-400/10 text-emerald-500";
+		iconBgClass = "border-success/30 bg-success/10 text-success";
 	}
 
 	// For expanded view: show input and output
@@ -784,7 +784,7 @@ function MessageActionBar({
 				onClick={handleCopy}
 			>
 				{copied ? (
-					<CheckIcon className="size-3 text-emerald-500" aria-hidden="true" />
+					<CheckIcon className="size-3 text-success" aria-hidden="true" />
 				) : (
 					<CopyIcon className="size-3" aria-hidden="true" />
 				)}
