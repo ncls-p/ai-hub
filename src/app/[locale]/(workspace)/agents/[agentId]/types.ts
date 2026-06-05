@@ -24,6 +24,7 @@ export type Model = {
 export type BuiltinTool = {
 	id: string;
 	name: string;
+	displayName: string;
 	description: string;
 	riskLevel: string;
 };

@@ -8,6 +8,7 @@ import {
 	ChevronDownIcon,
 	ClockIcon,
 	CopyIcon,
+	Maximize2Icon,
 	PencilIcon,
 	RefreshCcwIcon,
 	ShieldAlertIcon,
@@ -42,6 +43,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -79,6 +81,7 @@ function summarizeToolBody(
 ) {
 	if (isCall) return summarizeToolInput(formatToolName(toolName), body);
 	if (body === null || body === undefined) return "The tool finished.";
+	if (isHtmlArtifactOutput(body)) return `Rendered ${body.title}.`;
 	if (typeof body === "string") return body.slice(0, 180);
 	if (Array.isArray(body))
 		return `Returned ${body.length} item${body.length === 1 ? "" : "s"}.`;
@@ -92,6 +95,163 @@ function summarizeToolBody(
 			: "The tool finished.";
 	}
 	return String(body).slice(0, 180);
+}
+
+type HtmlArtifactOutput = {
+	kind: "html_artifact";
+	title: string;
+	html: string;
+	css: string;
+	js: string;
+	height: number;
+};
+
+function isHtmlArtifactOutput(value: unknown): value is HtmlArtifactOutput {
+	if (typeof value !== "object" || value === null) return false;
+	const record = value as Record<string, unknown>;
+	return (
+		record.kind === "html_artifact" &&
+		typeof record.title === "string" &&
+		typeof record.html === "string" &&
+		typeof record.css === "string" &&
+		typeof record.js === "string" &&
+		typeof record.height === "number"
+	);
+}
+
+function htmlArtifactFromToolInput(value: unknown): HtmlArtifactOutput | null {
+	if (typeof value !== "object" || value === null) return null;
+	const record = value as Record<string, unknown>;
+	if (typeof record.html !== "string") return null;
+	return {
+		kind: "html_artifact",
+		title:
+			typeof record.title === "string" ? record.title : "Interactive preview",
+		html: record.html,
+		css: typeof record.css === "string" ? record.css : "",
+		js: typeof record.js === "string" ? record.js : "",
+		height: typeof record.height === "number" ? record.height : 420,
+	};
+}
+
+function decodeJsonStringFragment(raw: string) {
+	const safeRaw = raw.endsWith("\\") ? raw.slice(0, -1) : raw;
+	try {
+		return JSON.parse(`"${safeRaw}"`) as string;
+	} catch {
+		return safeRaw
+			.replace(/\\n/g, "\n")
+			.replace(/\\t/g, "\t")
+			.replace(/\\"/g, '"')
+			.replace(/\\\\/g, "\\");
+	}
+}
+
+function extractJsonStringField(inputText: string, field: string) {
+	const fieldIndex = inputText.indexOf(`"${field}"`);
+	if (fieldIndex === -1) return null;
+	const colonIndex = inputText.indexOf(":", fieldIndex);
+	if (colonIndex === -1) return null;
+	const valueStart = inputText.indexOf('"', colonIndex + 1);
+	if (valueStart === -1) return null;
+
+	let escaped = false;
+	let raw = "";
+	for (let index = valueStart + 1; index < inputText.length; index += 1) {
+		const char = inputText[index];
+		if (escaped) {
+			raw += `\\${char}`;
+			escaped = false;
+			continue;
+		}
+		if (char === "\\") {
+			escaped = true;
+			continue;
+		}
+		if (char === '"') break;
+		raw += char;
+	}
+	if (escaped) raw += "\\";
+	return decodeJsonStringFragment(raw);
+}
+
+function htmlArtifactFromInputText(inputText: string | undefined) {
+	if (!inputText) return null;
+	try {
+		return htmlArtifactFromToolInput(JSON.parse(inputText));
+	} catch {
+		const html = extractJsonStringField(inputText, "html");
+		if (!html) return null;
+		const heightMatch = inputText.match(/"height"\s*:\s*(\d+)/);
+		return {
+			kind: "html_artifact" as const,
+			title:
+				extractJsonStringField(inputText, "title") ?? "Generating preview…",
+			html,
+			css: extractJsonStringField(inputText, "css") ?? "",
+			js: extractJsonStringField(inputText, "js") ?? "",
+			height: heightMatch ? Number(heightMatch[1]) : 420,
+		};
+	}
+}
+
+function escapeClosingTags(value: string) {
+	return value.replace(/<\/(script|style)/gi, "<\\/$1");
+}
+
+function artifactSourceDocument(
+	artifact: HtmlArtifactOutput,
+	options: { fullscreen?: boolean } = {},
+) {
+	const fullscreenCss = options.fullscreen
+		? `
+html, body { width: 100%; min-height: 100%; }
+body { overflow: auto; }
+body > .container,
+body > .grid,
+body > main,
+body > section,
+body > article,
+body > div:first-child {
+	width: 100% !important;
+	max-width: none !important;
+}
+body > .container,
+body > main,
+body > section,
+body > article,
+body > div:first-child {
+	min-height: 100dvh;
+}
+`
+		: "";
+
+	return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob: https:; font-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'" />
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+${escapeClosingTags(artifact.css)}
+${fullscreenCss}
+</style>
+</head>
+<body>
+${artifact.html}
+<script>
+${escapeClosingTags(artifact.js)}
+</script>
+</body>
+</html>`;
+}
+
+function artifactCombinedCode(artifact: HtmlArtifactOutput) {
+	return `<style>\n${artifact.css}\n</style>\n\n${artifact.html}\n\n<script>\n${artifact.js}\n</script>`;
 }
 
 function toolPartMatchesApproval(
@@ -168,6 +328,193 @@ function PendingApprovalCard({
 	);
 }
 
+function ArtifactCodeBlocks({ artifact }: { artifact: HtmlArtifactOutput }) {
+	return (
+		<div className="grid gap-2 border-t border-border/50 bg-muted/20 p-3">
+			{[
+				["HTML", artifact.html],
+				["CSS", artifact.css],
+				["JavaScript", artifact.js],
+			].map(([label, source]) => (
+				<div key={label}>
+					<div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+						{label}
+					</div>
+					<pre className="max-h-64 overflow-auto rounded-md border border-border/50 bg-background/80 p-2 font-mono text-[11px] leading-4 text-muted-foreground">
+						{source || "// empty"}
+					</pre>
+				</div>
+			))}
+		</div>
+	);
+}
+
+function HtmlArtifactCard({
+	artifact,
+	isLive = false,
+}: {
+	artifact: HtmlArtifactOutput;
+	isLive?: boolean;
+}) {
+	const [codeOpen, setCodeOpen] = useState(false);
+	const [fullscreenOpen, setFullscreenOpen] = useState(false);
+	const [fullscreenCodeOpen, setFullscreenCodeOpen] = useState(false);
+	const [copied, setCopied] = useState(false);
+	const codeText = artifactCombinedCode(artifact);
+	const srcDoc = artifactSourceDocument(artifact);
+	const fullscreenSrcDoc = artifactSourceDocument(artifact, {
+		fullscreen: true,
+	});
+
+	async function copyCode() {
+		await navigator.clipboard.writeText(codeText);
+		setCopied(true);
+		setTimeout(() => setCopied(false), 2000);
+	}
+
+	return (
+		<div className="overflow-hidden rounded-xl border border-primary/20 bg-background text-xs shadow-sm">
+			<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 bg-muted/35 px-3 py-2.5">
+				<div className="min-w-0">
+					<p className="truncate font-medium text-foreground">
+						{artifact.title}
+					</p>
+					<p className="text-[11px] text-muted-foreground">
+						{isLive
+							? "Live HTML/CSS/JS preview"
+							: "Interactive HTML/CSS/JS preview"}
+					</p>
+				</div>
+				<div className="flex items-center gap-1.5">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						className="h-7 px-2.5 text-[11px]"
+						onClick={() => setFullscreenOpen(true)}
+					>
+						<Maximize2Icon className="size-3" aria-hidden="true" />
+						Fullscreen
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="h-7 px-2.5 text-[11px]"
+						onClick={copyCode}
+					>
+						{copied ? "Copied" : "Copy code"}
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						className="h-7 px-2.5 text-[11px]"
+						onClick={() => setCodeOpen((current) => !current)}
+					>
+						{codeOpen ? "Hide code" : "View code"}
+					</Button>
+				</div>
+			</div>
+			<iframe
+				title={artifact.title}
+				srcDoc={srcDoc}
+				sandbox="allow-scripts"
+				className="block w-full bg-white"
+				style={{ height: artifact.height }}
+			/>
+			<Collapsible open={codeOpen} onOpenChange={setCodeOpen}>
+				<CollapsibleContent>
+					<ArtifactCodeBlocks artifact={artifact} />
+				</CollapsibleContent>
+			</Collapsible>
+			<Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
+				<DialogContent className="!fixed !inset-0 !top-0 !left-0 flex !h-[100dvh] !max-h-[100dvh] !w-[100vw] !max-w-[100vw] !translate-x-0 !translate-y-0 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden !rounded-none !border-0 bg-background p-0 sm:!max-w-[100vw]">
+					<div className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border/60 bg-background/95 px-5 py-4 pr-16 shadow-sm backdrop-blur md:px-7">
+						<div className="min-w-0">
+							<DialogTitle className="truncate text-base font-semibold">
+								{artifact.title}
+							</DialogTitle>
+							<p className="mt-1 text-xs text-muted-foreground">
+								Fullscreen HTML/CSS/JS preview
+							</p>
+						</div>
+						<div className="flex items-center gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className="h-9 px-3 text-xs"
+								onClick={copyCode}
+							>
+								{copied ? "Copied" : "Copy code"}
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-9 px-3 text-xs"
+								onClick={() => setFullscreenCodeOpen((current) => !current)}
+							>
+								{fullscreenCodeOpen ? "Hide code" : "View code"}
+							</Button>
+						</div>
+					</div>
+					<div
+						className={cn(
+							"grid min-h-0 gap-5 bg-muted/30 p-5 md:p-8",
+							fullscreenCodeOpen &&
+								"grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)] lg:grid-rows-1",
+						)}
+					>
+						<div className="min-h-0 overflow-hidden rounded-2xl border border-border/70 bg-white shadow-2xl shadow-black/10 ring-1 ring-black/5">
+							<iframe
+								title={`${artifact.title} fullscreen`}
+								srcDoc={fullscreenSrcDoc}
+								sandbox="allow-scripts"
+								className="h-full min-h-[82dvh] w-full bg-white lg:min-h-0"
+							/>
+						</div>
+						<Collapsible
+							open={fullscreenCodeOpen}
+							onOpenChange={setFullscreenCodeOpen}
+						>
+							<CollapsibleContent className="max-h-[34dvh] overflow-auto rounded-2xl border border-border/70 bg-background shadow-xl lg:h-full lg:max-h-none">
+								<ArtifactCodeBlocks artifact={artifact} />
+							</CollapsibleContent>
+						</Collapsible>
+					</div>
+				</DialogContent>
+			</Dialog>
+		</div>
+	);
+}
+
+function LiveToolInputCard({
+	toolName,
+	inputText,
+}: {
+	toolName: string;
+	inputText: string;
+}) {
+	return (
+		<div className="overflow-hidden rounded-xl border border-primary/20 bg-background text-xs shadow-sm">
+			<div className="flex items-center justify-between gap-2 border-b border-border/50 bg-muted/35 px-3 py-2.5">
+				<div>
+					<p className="font-medium text-foreground">{toolName}</p>
+					<p className="text-[11px] text-muted-foreground">
+						Generating interface code…
+					</p>
+				</div>
+				<span className="size-2 rounded-full bg-primary/70 animate-pulse" />
+			</div>
+			<pre className="max-h-72 overflow-auto bg-muted/20 p-3 font-mono text-[11px] leading-4 text-muted-foreground">
+				{inputText || "Waiting for streamed tool input…"}
+			</pre>
+		</div>
+	);
+}
+
 function ToolPartCard({
 	part,
 	approval,
@@ -185,6 +532,23 @@ function ToolPartCard({
 	const status = getToolStatus(parsed);
 	const hasResult = parsed.output !== undefined;
 	const approvalMatches = Boolean(approval);
+
+	const inputArtifact = htmlArtifactFromToolInput(parsed.input);
+	const streamingInputArtifact = htmlArtifactFromInputText(parsed.inputText);
+	if (isHtmlArtifactOutput(parsed.output)) {
+		return <HtmlArtifactCard artifact={parsed.output} />;
+	}
+	if (inputArtifact) {
+		return <HtmlArtifactCard artifact={inputArtifact} isLive />;
+	}
+	if (streamingInputArtifact) {
+		return <HtmlArtifactCard artifact={streamingInputArtifact} isLive />;
+	}
+	if (parsed.streamingInput && parsed.inputText !== undefined) {
+		return (
+			<LiveToolInputCard toolName={friendlyName} inputText={parsed.inputText} />
+		);
+	}
 
 	// Build a concise summary line
 	let summaryText = "";

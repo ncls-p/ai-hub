@@ -9,6 +9,7 @@ type StreamRun = {
 	events: StreamEvent[];
 	done: boolean;
 	subscribers: Set<Subscriber>;
+	abortController?: AbortController;
 };
 
 const globalStore = globalThis as typeof globalThis & {
@@ -35,9 +36,27 @@ export function publishChatStreamEvent(messageId: string, event: StreamEvent) {
 	}
 }
 
+export function registerChatStreamAbortController(
+	messageId: string,
+	abortController: AbortController,
+) {
+	const run = getRun(messageId);
+	run.abortController = abortController;
+}
+
+export function abortChatStream(messageId: string) {
+	const run = runs.get(messageId);
+	if (!run || run.done) return false;
+	run.abortController?.abort();
+	publishChatStreamEvent(messageId, { type: "done", stopped: true });
+	completeChatStream(messageId);
+	return true;
+}
+
 export function completeChatStream(messageId: string) {
 	const run = getRun(messageId);
 	run.done = true;
+	run.abortController = undefined;
 	for (const subscriber of run.subscribers) {
 		subscriber.close();
 	}

@@ -20,6 +20,7 @@ import {
 	completeChatStream,
 	createChatStreamResponse,
 	publishChatStreamEvent,
+	registerChatStreamAbortController,
 } from "@/modules/chat/stream-bus";
 import { searchBoundKnowledgeBases } from "@/modules/knowledge/use-cases";
 import { executeMcpTool } from "@/modules/mcp/executor";
@@ -406,6 +407,38 @@ async function findUserMessageForResend(input: {
 	return null;
 }
 
+function htmlArtifactCodeFromValue(value: unknown) {
+	if (typeof value !== "object" || value === null) return null;
+	const record = value as Record<string, unknown>;
+	const source =
+		record.kind === "html_artifact" && typeof record.html === "string"
+			? record
+			: typeof record.html === "string"
+				? record
+				: null;
+	if (!source) return null;
+
+	return [
+		`Title: ${typeof source.title === "string" ? source.title : "Interactive preview"}`,
+		"HTML:",
+		source.html,
+		"CSS:",
+		typeof source.css === "string" ? source.css : "",
+		"JavaScript:",
+		typeof source.js === "string" ? source.js : "",
+	].join("\n");
+}
+
+function htmlArtifactCodeFromToolMetadata(metadata: unknown) {
+	if (typeof metadata !== "object" || metadata === null) return null;
+	const record = metadata as Record<string, unknown>;
+	if (record.toolName !== "render_html_artifact") return null;
+	return (
+		htmlArtifactCodeFromValue(record.input) ??
+		htmlArtifactCodeFromValue(record.output)
+	);
+}
+
 async function loadConversationHistory(
 	conversationId: string,
 	maxMessages?: number,
@@ -431,6 +464,7 @@ async function loadConversationHistory(
 			.select({
 				type: messageParts.type,
 				contentEncrypted: messageParts.contentEncrypted,
+				metadataJson: messageParts.metadataJson,
 				sortOrder: messageParts.sortOrder,
 			})
 			.from(messageParts)
@@ -438,16 +472,31 @@ async function loadConversationHistory(
 			.orderBy(messageParts.sortOrder);
 
 		const textParts: string[] = [];
+		const artifactCodeBlocks = new Set<string>();
 		for (const part of parts) {
-			if (part.type !== "text" || !part.contentEncrypted) continue;
-			try {
-				textParts.push(await decryptValue(part.contentEncrypted));
-			} catch (error) {
-				logger.warn("Skipping undecryptable message part", {
-					messageId: message.id,
-					error: error instanceof Error ? error.message : String(error),
-				});
+			if (part.type === "text" && part.contentEncrypted) {
+				try {
+					textParts.push(await decryptValue(part.contentEncrypted));
+				} catch (error) {
+					logger.warn("Skipping undecryptable message part", {
+						messageId: message.id,
+						error: error instanceof Error ? error.message : String(error),
+					});
+				}
 			}
+
+			if (message.role === "assistant") {
+				const artifactCode = htmlArtifactCodeFromToolMetadata(
+					part.metadataJson,
+				);
+				if (artifactCode) artifactCodeBlocks.add(artifactCode);
+			}
+		}
+
+		for (const artifactCode of artifactCodeBlocks) {
+			textParts.push(
+				`Previously rendered HTML artifact code (available for follow-up edits or when the user asks for the code):\n${artifactCode}`,
+			);
 		}
 
 		const content = textParts.join("\n").trim();
@@ -782,6 +831,9 @@ export async function POST(
 						availableToolNames.includes("web_search")
 							? "For web or current-events searches, use web_search only."
 							: null,
+						availableToolNames.includes("render_html_artifact")
+							? "When the user asks for a visual design, diagram, UI mockup, chart-like schema, or interactive demo, use render_html_artifact with self-contained HTML, CSS, and optional JavaScript so it appears directly in the chat. The user can view and copy the code from the artifact card, so do not duplicate the full code in your final text unless explicitly asked."
+							: null,
 						`Use at most ${maxToolCalls} tool calls.`,
 						"When that limit is reached, do not call another tool; answer the user from the tool results and context already available. If the information is incomplete, say what is known and what remains uncertain.",
 					]
@@ -870,6 +922,12 @@ export async function POST(
 			streamedParts.push({ id: inserted.id, type, metadata });
 		}
 
+		const streamAbortController = new AbortController();
+		registerChatStreamAbortController(
+			assistantMessage.id,
+			streamAbortController,
+		);
+
 		const generationSettings = version.generationSettingsJson as {
 			topK?: number;
 			presencePenalty?: number;
@@ -881,6 +939,7 @@ export async function POST(
 		const result = streamText({
 			model,
 			system: systemPrompt,
+			abortSignal: streamAbortController.signal,
 			messages: history,
 			temperature: version.temperature
 				? Number.parseFloat(version.temperature)
@@ -945,6 +1004,23 @@ export async function POST(
 					} else if (part.type === "reasoning-delta") {
 						await appendStreamedTextPart("reasoning", part.text);
 						enqueueEvent({ type: "reasoning", delta: part.text });
+					} else if (part.type === "tool-input-start") {
+						enqueueEvent({
+							type: "tool_input_start",
+							toolCallId: part.id,
+							toolName: part.toolName,
+						});
+					} else if (part.type === "tool-input-delta") {
+						enqueueEvent({
+							type: "tool_input_delta",
+							toolCallId: part.id,
+							delta: part.delta,
+						});
+					} else if (part.type === "tool-input-end") {
+						enqueueEvent({
+							type: "tool_input_end",
+							toolCallId: part.id,
+						});
 					} else if (part.type === "tool-call") {
 						await appendStreamedMetadataPart("tool-call", part);
 						enqueueEvent({
@@ -1009,14 +1085,22 @@ export async function POST(
 				});
 				enqueueEvent({ type: "done" });
 			} catch (error) {
-				await db
-					.update(messages)
-					.set({ status: "failed", completedAt: new Date() })
-					.where(eq(messages.id, assistantMessage.id));
-				enqueueEvent({
-					type: "error",
-					error: error instanceof Error ? error.message : String(error),
-				});
+				if (streamAbortController.signal.aborted) {
+					await db
+						.update(messages)
+						.set({ status: "completed", completedAt: new Date() })
+						.where(eq(messages.id, assistantMessage.id));
+					enqueueEvent({ type: "done", stopped: true });
+				} else {
+					await db
+						.update(messages)
+						.set({ status: "failed", completedAt: new Date() })
+						.where(eq(messages.id, assistantMessage.id));
+					enqueueEvent({
+						type: "error",
+						error: error instanceof Error ? error.message : String(error),
+					});
+				}
 			} finally {
 				completeChatStream(assistantMessage.id);
 			}

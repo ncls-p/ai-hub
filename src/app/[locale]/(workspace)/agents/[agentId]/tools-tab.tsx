@@ -55,6 +55,7 @@ function BuiltinToolsSection({
 			const q = searchQuery.toLowerCase();
 			if (
 				!t.name.toLowerCase().includes(q) &&
+				!t.displayName.toLowerCase().includes(q) &&
 				!t.description.toLowerCase().includes(q)
 			)
 				return false;
@@ -99,7 +100,7 @@ function BuiltinToolsSection({
 						<ListRow key={tool.id} className="items-center justify-between">
 							<div className="min-w-0">
 								<div className="flex items-center gap-2">
-									<p className="font-medium">{tool.name}</p>
+									<p className="font-medium">{tool.displayName}</p>
 									<Badge
 										variant={
 											tool.riskLevel === "high"

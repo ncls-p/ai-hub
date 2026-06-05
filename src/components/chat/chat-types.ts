@@ -76,6 +76,20 @@ export type ChatStreamEvent =
 			input: unknown;
 	  }
 	| {
+			type: "tool_input_start";
+			toolCallId: string;
+			toolName: string;
+	  }
+	| {
+			type: "tool_input_delta";
+			toolCallId: string;
+			delta: string;
+	  }
+	| {
+			type: "tool_input_end";
+			toolCallId: string;
+	  }
+	| {
 			type: "tool_call";
 			toolCallId: string;
 			toolName: string;
@@ -188,6 +202,8 @@ export function parseToolPart(content: string): {
 	toolName?: string;
 	input?: unknown;
 	output?: unknown;
+	inputText?: string;
+	streamingInput?: boolean;
 	denied?: boolean;
 	message?: string;
 } {
@@ -293,6 +309,23 @@ export function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
 		typeof event.invocationId === "string" &&
 		typeof event.toolName === "string"
 	) {
+		return true;
+	}
+	if (
+		event.type === "tool_input_start" &&
+		typeof event.toolCallId === "string" &&
+		typeof event.toolName === "string"
+	) {
+		return true;
+	}
+	if (
+		event.type === "tool_input_delta" &&
+		typeof event.toolCallId === "string" &&
+		typeof event.delta === "string"
+	) {
+		return true;
+	}
+	if (event.type === "tool_input_end" && typeof event.toolCallId === "string") {
 		return true;
 	}
 	if (

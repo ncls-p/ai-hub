@@ -1,7 +1,12 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { Loader2, PaperclipIcon, SendIcon, SparklesIcon } from "lucide-react";
+import {
+	PaperclipIcon,
+	SendIcon,
+	SparklesIcon,
+	SquareIcon,
+} from "lucide-react";
 import { useRef, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +19,7 @@ interface ChatComposerProps {
 	sending: boolean;
 	onInputChange: (value: string) => void;
 	onSubmit: () => void;
+	onStop?: () => void;
 }
 
 export function ChatComposer({
@@ -22,6 +28,7 @@ export function ChatComposer({
 	sending,
 	onSubmit,
 	onInputChange,
+	onStop,
 }: ChatComposerProps) {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const [focused, setFocused] = useState(false);
@@ -88,24 +95,35 @@ export function ChatComposer({
 							className="max-h-40 min-h-10 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-base shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-3 sm:py-3 sm:text-sm placeholder:text-muted-foreground/60"
 						/>
 
-						<Button
-							type="submit"
-							size="icon"
-							disabled={sending || !input.trim() || !canChat}
-							aria-label="Send message"
-							className={cn(
-								"size-9 shrink-0 rounded-lg transition-colors sm:size-10 sm:rounded-xl",
-								input.trim() && canChat && !sending
-									? "bg-primary text-primary-foreground hover:bg-primary/90"
-									: "opacity-60",
-							)}
-						>
-							{sending ? (
-								<Loader2 className="size-4 animate-spin" aria-hidden="true" />
-							) : (
+						{sending ? (
+							<Button
+								type="button"
+								size="icon"
+								aria-label="Stop generation"
+								className="size-9 shrink-0 rounded-lg bg-destructive text-destructive-foreground transition-colors hover:bg-destructive/90 sm:size-10 sm:rounded-xl"
+								onClick={onStop}
+							>
+								<SquareIcon
+									className="size-3.5 fill-current"
+									aria-hidden="true"
+								/>
+							</Button>
+						) : (
+							<Button
+								type="submit"
+								size="icon"
+								disabled={!input.trim() || !canChat}
+								aria-label="Send message"
+								className={cn(
+									"size-9 shrink-0 rounded-lg transition-colors sm:size-10 sm:rounded-xl",
+									input.trim() && canChat
+										? "bg-primary text-primary-foreground hover:bg-primary/90"
+										: "opacity-60",
+								)}
+							>
 								<SendIcon className="size-4" aria-hidden="true" />
-							)}
-						</Button>
+							</Button>
+						)}
 					</div>
 				</div>
 

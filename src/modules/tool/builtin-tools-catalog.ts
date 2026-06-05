@@ -39,6 +39,14 @@ export const BUILTIN_TOOL_SUMMARIES: BuiltInToolSummary[] = [
 		description: "Search the web through the workspace SearXNG instance.",
 		riskLevel: "medium",
 	},
+	{
+		id: "00000000-0000-4000-8000-000000000005",
+		name: "render_html_artifact",
+		displayName: "HTML artifact",
+		description:
+			"Render self-contained HTML/CSS/JS in chat for designs, diagrams, and interactive demos. The user can inspect the source code.",
+		riskLevel: "medium",
+	},
 ];
 
 export function listBuiltInToolSummaries(): BuiltInToolSummary[] {

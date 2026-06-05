@@ -200,16 +200,107 @@ function applyStreamEvent(
 		return;
 	}
 
+	if (parsed.type === "tool_input_start") {
+		const content = JSON.stringify({
+			toolCallId: parsed.toolCallId,
+			toolName: parsed.toolName,
+			inputText: "",
+			streamingInput: true,
+		});
+		handlers.updateAssistant((message) => ({
+			...message,
+			parts: [...message.parts, { type: "tool-call", content }],
+		}));
+		return;
+	}
+
+	if (parsed.type === "tool_input_delta") {
+		handlers.updateAssistant((message) => {
+			const nextParts = [...message.parts];
+			for (let i = nextParts.length - 1; i >= 0; i--) {
+				if (nextParts[i].type !== "tool-call") continue;
+				try {
+					const parsedPart = JSON.parse(nextParts[i].content) as Record<
+						string,
+						unknown
+					>;
+					if (parsedPart.toolCallId === parsed.toolCallId) {
+						nextParts[i] = {
+							type: "tool-call",
+							content: JSON.stringify({
+								...parsedPart,
+								inputText: `${typeof parsedPart.inputText === "string" ? parsedPart.inputText : ""}${parsed.delta}`,
+								streamingInput: true,
+							}),
+						};
+						return { ...message, parts: nextParts };
+					}
+				} catch {
+					// skip unparseable parts
+				}
+			}
+			return message;
+		});
+		return;
+	}
+
+	if (parsed.type === "tool_input_end") {
+		handlers.updateAssistant((message) => {
+			const nextParts = [...message.parts];
+			for (let i = nextParts.length - 1; i >= 0; i--) {
+				if (nextParts[i].type !== "tool-call") continue;
+				try {
+					const parsedPart = JSON.parse(nextParts[i].content) as Record<
+						string,
+						unknown
+					>;
+					if (parsedPart.toolCallId === parsed.toolCallId) {
+						nextParts[i] = {
+							type: "tool-call",
+							content: JSON.stringify({
+								...parsedPart,
+								streamingInput: false,
+							}),
+						};
+						return { ...message, parts: nextParts };
+					}
+				} catch {
+					// skip unparseable parts
+				}
+			}
+			return message;
+		});
+		return;
+	}
+
 	if (parsed.type === "tool_call") {
 		const content = JSON.stringify({
 			toolCallId: parsed.toolCallId,
 			toolName: parsed.toolName,
 			input: parsed.input,
 		});
-		handlers.updateAssistant((message) => ({
-			...message,
-			parts: [...message.parts, { type: "tool-call", content }],
-		}));
+		handlers.updateAssistant((message) => {
+			const nextParts = [...message.parts];
+			for (let i = nextParts.length - 1; i >= 0; i--) {
+				if (nextParts[i].type !== "tool-call") continue;
+				try {
+					const parsedPart = JSON.parse(nextParts[i].content) as Record<
+						string,
+						unknown
+					>;
+					if (parsedPart.toolCallId === parsed.toolCallId) {
+						nextParts[i] = { type: "tool-call", content };
+						return { ...message, parts: nextParts };
+					}
+				} catch {
+					// skip unparseable parts
+				}
+			}
+			return {
+				...message,
+				parts: [...nextParts, { type: "tool-call", content }],
+			};
+		});
 		return;
 	}
 
@@ -299,6 +390,9 @@ export function useChatStream({
 		PendingToolApproval[]
 	>([]);
 	const [citations, setCitations] = useState<ChatCitation[]>([]);
+	const activeRequestControllerRef = useRef<AbortController | null>(null);
+	const activeConversationIdRef = useRef<string | null>(null);
+	const stopRequestedRef = useRef(false);
 	const resolvedApprovalIdsRef = useRef(new Set<string>());
 	const streamingMessageId = useMemo(() => {
 		return (
@@ -427,6 +521,8 @@ export function useChatStream({
 		const activeConversationId = conversationId;
 		const activeStreamingMessageId = streamingMessageId;
 		const controller = new AbortController();
+		activeRequestControllerRef.current = controller;
+		activeConversationIdRef.current = activeConversationId;
 		let completed = false;
 		queueMicrotask(() => setResuming(true));
 
@@ -554,6 +650,10 @@ export function useChatStream({
 				clearPendingApprovals();
 				clearStoredChatStreamDraft(activeConversationId);
 			} finally {
+				if (activeRequestControllerRef.current === controller) {
+					activeRequestControllerRef.current = null;
+					activeConversationIdRef.current = null;
+				}
 				if (!controller.signal.aborted) setResuming(false);
 			}
 		}
@@ -561,6 +661,10 @@ export function useChatStream({
 		void resumeStream();
 		return () => {
 			controller.abort();
+			if (activeRequestControllerRef.current === controller) {
+				activeRequestControllerRef.current = null;
+				activeConversationIdRef.current = null;
+			}
 			queueMicrotask(() => setResuming(false));
 		};
 	}, [
@@ -633,6 +737,7 @@ export function useChatStream({
 			persistDraft();
 		}
 
+		stopRequestedRef.current = false;
 		setMessages((current) => {
 			if (options.reuseUserMessage && options.resendFromMessageId) {
 				const messageIndex = current.findIndex(
@@ -649,9 +754,14 @@ export function useChatStream({
 		setCitations([]);
 		persistDraft();
 
+		const controller = new AbortController();
+		activeRequestControllerRef.current = controller;
+		activeConversationIdRef.current = activeConversationId;
+
 		try {
 			const res = await fetch(`/api/workspace/${agentId}/chat`, {
 				method: "POST",
+				signal: controller.signal,
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					content,
@@ -670,6 +780,7 @@ export function useChatStream({
 			const headerUserMessageId = res.headers.get("X-User-Message-Id");
 			if (headerConversationId) {
 				activeConversationId = headerConversationId;
+				activeConversationIdRef.current = headerConversationId;
 			}
 			if (headerAssistantMessageId) {
 				assistantMessageId = headerAssistantMessageId;
@@ -731,6 +842,16 @@ export function useChatStream({
 
 			await onConversationsRefresh();
 		} catch (err) {
+			if (err instanceof Error && err.name === "AbortError") {
+				updateAssistantDraft((message) => ({
+					...message,
+					status: "completed",
+				}));
+				clearPendingApprovals();
+				if (activeConversationId)
+					clearStoredChatStreamDraft(activeConversationId);
+				return;
+			}
 			toast.error(err instanceof Error ? err.message : "Chat request failed");
 			updateAssistantDraft((message) => ({
 				...message,
@@ -741,9 +862,48 @@ export function useChatStream({
 			if (activeConversationId)
 				clearStoredChatStreamDraft(activeConversationId);
 		} finally {
+			if (activeRequestControllerRef.current === controller) {
+				activeRequestControllerRef.current = null;
+				activeConversationIdRef.current = null;
+			}
+			stopRequestedRef.current = false;
 			setSending(false);
 		}
 	}
+
+	const stopGeneration = useCallback(async () => {
+		if (stopRequestedRef.current) return;
+		stopRequestedRef.current = true;
+		activeRequestControllerRef.current?.abort();
+
+		const targetConversationId =
+			activeConversationIdRef.current ?? conversationId;
+		if (targetConversationId) {
+			try {
+				await fetch(
+					`/api/workspace/conversations/${targetConversationId}/stop`,
+					{
+						method: "POST",
+					},
+				);
+			} catch {
+				// Local abort still stops rendering immediately; ignore network failures.
+			}
+			clearStoredChatStreamDraft(targetConversationId);
+		}
+
+		setMessages((current) =>
+			current.map((message) =>
+				message.role === "assistant" && message.status === "streaming"
+					? { ...message, status: "completed" }
+					: message,
+			),
+		);
+		setPendingApprovals([]);
+		setSending(false);
+		setResuming(false);
+		toast.success("Generation stopped");
+	}, [conversationId]);
 
 	async function resolveApproval(
 		action: "approve" | "reject",
@@ -834,6 +994,7 @@ export function useChatStream({
 		citations,
 		handleSubmit,
 		resolveApproval,
+		stopGeneration,
 		clearPendingApprovals: () => setPendingApprovals([]),
 	};
 }

@@ -37,6 +37,14 @@ const webSearchInputSchema = z.object({
 	language: z.string().trim().min(2).max(16).optional(),
 });
 
+const htmlArtifactInputSchema = z.object({
+	title: z.string().trim().min(1).max(120).default("Interactive preview"),
+	html: z.string().min(1).max(24_000),
+	css: z.string().max(24_000).default(""),
+	js: z.string().max(24_000).default(""),
+	height: z.number().int().min(160).max(900).default(420),
+});
+
 type SearxngResult = {
 	title?: unknown;
 	url?: unknown;
@@ -169,6 +177,23 @@ export const builtInTools = [
 		inputSchema: webSearchInputSchema,
 		execute: searchWebWithSearxng,
 	},
+	{
+		id: "00000000-0000-4000-8000-000000000005",
+		name: "render_html_artifact",
+		displayName: "HTML artifact",
+		description:
+			"Render a self-contained HTML/CSS/JS artifact in the chat for UI mockups, diagrams, cards, and interactive demos. The user can inspect the source code.",
+		riskLevel: "medium",
+		inputSchema: htmlArtifactInputSchema,
+		execute: ({ title, html, css, js, height }) => ({
+			kind: "html_artifact" as const,
+			title,
+			html,
+			css,
+			js,
+			height,
+		}),
+	},
 ] satisfies BuiltInToolDefinition[];
 
 export function listBuiltInTools() {
@@ -242,6 +267,42 @@ export function toolToJsonSchema(toolId: string) {
 				},
 			},
 			required: ["query"],
+		};
+	}
+	if (tool.name === "render_html_artifact") {
+		return {
+			type: "object",
+			properties: {
+				title: {
+					type: "string",
+					description: "Short title displayed above the preview.",
+					default: "Interactive preview",
+				},
+				html: {
+					type: "string",
+					description:
+						"HTML fragment to render inside the isolated preview. Do not include html/head/body tags unless necessary.",
+				},
+				css: {
+					type: "string",
+					description: "CSS for the preview.",
+					default: "",
+				},
+				js: {
+					type: "string",
+					description:
+						"Optional JavaScript for the preview. It runs only inside a sandboxed iframe.",
+					default: "",
+				},
+				height: {
+					type: "number",
+					description: "Preview height in pixels.",
+					default: 420,
+					minimum: 160,
+					maximum: 900,
+				},
+			},
+			required: ["html"],
 		};
 	}
 	return {

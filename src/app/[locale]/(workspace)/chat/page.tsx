@@ -10,7 +10,13 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { BotIcon, ChevronDownIcon, Loader2, PlusIcon, Settings2Icon } from "lucide-react";
+import {
+	BotIcon,
+	ChevronDownIcon,
+	Loader2,
+	PlusIcon,
+	Settings2Icon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatComposer } from "@/components/chat/chat-composer";
@@ -162,6 +168,7 @@ export default function ChatPage() {
 		pendingApprovals,
 		handleSubmit,
 		resolveApproval,
+		stopGeneration,
 	} = useChatStream({
 		agentId: selectedAgentId,
 		conversationId: activeConversationId,
@@ -402,8 +409,7 @@ export default function ChatPage() {
 
 			const scrollTop = c.scrollTop;
 			const previousScrollTop = lastScrollTopRef.current;
-			const distanceFromBottom =
-				c.scrollHeight - scrollTop - c.clientHeight;
+			const distanceFromBottom = c.scrollHeight - scrollTop - c.clientHeight;
 
 			if (scrollTop < previousScrollTop - 2) {
 				detachFromBottom();
@@ -766,6 +772,7 @@ export default function ChatPage() {
 				sending={sending}
 				onInputChange={setInput}
 				onSubmit={submitMessage}
+				onStop={stopGeneration}
 			/>
 		</ChatLayout>
 	);
