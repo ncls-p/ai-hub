@@ -37,6 +37,12 @@ export type McpTool = {
 	enabled: boolean;
 	requireApproval: boolean;
 };
+export type CustomTool = {
+	id: string;
+	name: string;
+	description: string | null;
+	status: string;
+};
 export type KnowledgeBase = { id: string; name: string };
 export type ToolBinding = {
 	toolSource: string;

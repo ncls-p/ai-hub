@@ -6,6 +6,7 @@ import { db } from "@/server/infrastructure/db";
 import {
 	agentToolBindings,
 	agentVersions,
+	customTools,
 	mcpServers,
 	mcpTools,
 	toolInvocations,
@@ -22,6 +23,11 @@ export const toolBindingInputSchema = z.discriminatedUnion("toolSource", [
 		toolSource: z.literal("mcp"),
 		toolId: z.uuid(),
 		mcpServerId: z.uuid(),
+		requireApproval: z.boolean().optional(),
+	}),
+	z.object({
+		toolSource: z.literal("custom"),
+		toolId: z.uuid(),
 		requireApproval: z.boolean().optional(),
 	}),
 ]);
@@ -53,6 +59,23 @@ export async function insertToolBindingsForVersion(
 
 	const values = await Promise.all(
 		bindings.map(async (binding) => {
+			if (binding.toolSource === "custom") {
+				const [customTool] = await db
+					.select()
+					.from(customTools)
+					.where(eq(customTools.id, binding.toolId))
+					.limit(1);
+				if (!customTool) throw new Error("Custom tool not found");
+
+				return {
+					agentVersionId,
+					toolSource: "custom" as const,
+					toolId: binding.toolId,
+					requireApproval: binding.requireApproval ?? true,
+					riskLevel: "medium",
+				};
+			}
+
 			if (binding.toolSource === "mcp") {
 				const [tool] = await db
 					.select()
@@ -101,6 +124,15 @@ export async function cloneToolBindings(
 	const inputs: ToolBindingInput[] = [];
 
 	for (const binding of existing) {
+		if (binding.toolSource === "custom") {
+			inputs.push({
+				toolSource: "custom",
+				toolId: binding.toolId,
+				requireApproval: binding.requireApproval,
+			});
+			continue;
+		}
+
 		if (binding.toolSource === "mcp") {
 			const [tool] = await db
 				.select({ mcpServerId: mcpTools.mcpServerId })
@@ -125,6 +157,41 @@ export async function cloneToolBindings(
 	}
 
 	await insertToolBindingsForVersion(toAgentVersionId, inputs);
+}
+
+export async function getCustomBindingContext(
+	agentVersionId: string,
+	toolId: string,
+	userId: string,
+	workspaceId: string,
+) {
+	const [binding] = await db
+		.select()
+		.from(agentToolBindings)
+		.where(
+			and(
+				eq(agentToolBindings.agentVersionId, agentVersionId),
+				eq(agentToolBindings.toolId, toolId),
+				eq(agentToolBindings.toolSource, "custom"),
+			),
+		)
+		.limit(1);
+
+	if (!binding) return null;
+
+	const [tool] = await db
+		.select()
+		.from(customTools)
+		.where(
+			and(
+				eq(customTools.id, toolId),
+				eq(customTools.workspaceId, workspaceId),
+				eq(customTools.createdById, userId),
+			),
+		)
+		.limit(1);
+
+	return tool ? { binding, tool } : null;
 }
 
 export async function getMcpBindingContext(

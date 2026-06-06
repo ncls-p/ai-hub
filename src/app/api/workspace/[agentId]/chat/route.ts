@@ -23,11 +23,13 @@ import {
 	registerChatStreamAbortController,
 } from "@/modules/chat/stream-bus";
 import { searchBoundKnowledgeBases } from "@/modules/knowledge/use-cases";
+import { executeCustomToolWorkflow } from "@/modules/custom-tools/use-cases";
 import { executeMcpTool } from "@/modules/mcp/executor";
 import { assertWorkspaceWithinTokenQuota } from "@/modules/usage/quota";
 import { getBuiltInTool, requiresApproval } from "@/modules/tool/builtin-tools";
 import {
 	canExecuteRestrictedTool,
+	getCustomBindingContext,
 	getMcpBindingContext,
 	getToolBindingsForVersion,
 	logToolInvocation,
@@ -96,6 +98,90 @@ async function buildBoundTools(input: {
 	}
 
 	for (const binding of bindings) {
+		if (binding.toolSource === "custom") {
+			const customContext = await getCustomBindingContext(
+				input.agentVersionId,
+				binding.toolId,
+				input.userId,
+				input.workspaceId,
+			);
+			if (!customContext) continue;
+			const customTool = customContext.tool;
+			const sanitizedName = customTool.name
+				.replace(/[^a-zA-Z0-9_]/g, "_")
+				.replace(/^_+|_+$/g, "");
+			const toolKey = `custom_${customTool.id.replace(/-/g, "_")}_${sanitizedName || "tool"}`;
+			const schema = (customTool.inputSchemaJson as Record<
+				string,
+				unknown
+			> | null) ?? { type: "object", properties: {} };
+
+			tools[toolKey] = {
+				description:
+					customTool.description ??
+					`Custom tool ${customTool.name} created by the current user.`,
+				inputSchema: jsonSchema(schema),
+				execute: async (toolInput: unknown) => {
+					const startedAt = Date.now();
+					if (!reserveToolCall()) {
+						await logToolInvocation({
+							workspaceId: input.workspaceId,
+							conversationId: input.conversationId,
+							messageId: input.messageId,
+							toolSource: "custom",
+							toolId: customTool.id,
+							toolName: customTool.name,
+							riskLevel: binding.riskLevel,
+							input: toolInput,
+							status: "denied",
+							latencyMs: Date.now() - startedAt,
+							errorMessage: "Tool call limit reached",
+						});
+						return toolLimitReachedResult();
+					}
+					try {
+						const output = await executeCustomToolWorkflow({
+							workspaceId: input.workspaceId,
+							userId: input.userId,
+							customToolId: customTool.id,
+							toolInput,
+						});
+						await logToolInvocation({
+							workspaceId: input.workspaceId,
+							conversationId: input.conversationId,
+							messageId: input.messageId,
+							toolSource: "custom",
+							toolId: customTool.id,
+							toolName: customTool.name,
+							riskLevel: binding.riskLevel,
+							input: toolInput,
+							output,
+							status: "success",
+							latencyMs: Date.now() - startedAt,
+						});
+						return output;
+					} catch (error) {
+						await logToolInvocation({
+							workspaceId: input.workspaceId,
+							conversationId: input.conversationId,
+							messageId: input.messageId,
+							toolSource: "custom",
+							toolId: customTool.id,
+							toolName: customTool.name,
+							riskLevel: binding.riskLevel,
+							input: toolInput,
+							status: "failed",
+							latencyMs: Date.now() - startedAt,
+							errorMessage:
+								error instanceof Error ? error.message : String(error),
+						});
+						throw error;
+					}
+				},
+			};
+			continue;
+		}
+
 		if (binding.toolSource === "mcp") {
 			const mcpContext = await getMcpBindingContext(
 				input.agentVersionId,

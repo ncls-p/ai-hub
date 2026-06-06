@@ -50,6 +50,13 @@
       "when": 1780000000003,
       "tag": "0006_agent_generation_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1780766749717,
+      "tag": "0007_custom_tool_builder",
+      "breakpoints": true
     }
   ]
 }

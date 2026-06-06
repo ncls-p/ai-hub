@@ -7,6 +7,7 @@ import {
 	PlugZapIcon,
 	ScrollTextIcon,
 	SettingsIcon,
+	SparklesIcon,
 	StoreIcon,
 	UsersIcon,
 	WrenchIcon,
@@ -45,6 +46,7 @@ export const primaryNavItems: NavItem[] = [
 export const capabilitiesNavItems: NavItem[] = [
 	{ href: "/knowledge", labelKey: "knowledge", icon: BookOpenIcon },
 	{ href: "/tools", labelKey: "toolsHub", icon: WrenchIcon },
+	{ href: "/custom-tools", labelKey: "customTools", icon: SparklesIcon },
 	{ href: "/marketplace", labelKey: "marketplace", icon: StoreIcon },
 ];
 
@@ -65,6 +67,7 @@ export const routeTitleKeys: Record<string, string> = {
 	"/providers": "aiConnections",
 	"/knowledge": "knowledge",
 	"/tools": "toolsHub",
+	"/custom-tools": "customTools",
 	"/marketplace": "marketplace",
 	"/api-keys": "apiKeys",
 	"/usage": "usage",

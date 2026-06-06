@@ -1,12 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import {
-	type SyntheticEvent,
-	useCallback,
-	useEffect,
-	useState,
-} from "react";
+import { type SyntheticEvent, useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -23,6 +18,7 @@ import type {
 	BuiltinTool,
 	McpServer,
 	McpTool,
+	CustomTool,
 	KnowledgeBase,
 	ToolBinding,
 	KnowledgeBinding,
@@ -52,6 +48,7 @@ export default function AgentConfigurePage() {
 	const [builtinTools, setBuiltinTools] = useState<BuiltinTool[]>([]);
 	const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
 	const [mcpTools, setMcpTools] = useState<McpTool[]>([]);
+	const [customTools, setCustomTools] = useState<CustomTool[]>([]);
 	const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
 
 	const [loading, setLoading] = useState(true);
@@ -61,6 +58,7 @@ export default function AgentConfigurePage() {
 	const [form, setForm] = useState<AgentForm>(createEmptyForm);
 	const [builtinBindings, setBuiltinBindings] = useState<ToolBindingState>({});
 	const [mcpBindings, setMcpBindings] = useState<ToolBindingState>({});
+	const [customBindings, setCustomBindings] = useState<ToolBindingState>({});
 	const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<string[]>(
 		[],
 	);
@@ -76,6 +74,7 @@ export default function AgentConfigurePage() {
 			providersRes,
 			toolsRes,
 			mcpRes,
+			customToolsRes,
 			kbRes,
 			bindingsRes,
 			knowledgeBindingsRes,
@@ -84,6 +83,7 @@ export default function AgentConfigurePage() {
 			fetch(`/api/workspace/providers?workspaceId=${workspaceId}`),
 			fetch(`/api/workspace/tools?workspaceId=${workspaceId}`),
 			fetch(`/api/workspace/mcp-servers?workspaceId=${workspaceId}`),
+			fetch(`/api/workspace/custom-tools?workspaceId=${workspaceId}`),
 			fetch(`/api/workspace/knowledge-bases?workspaceId=${workspaceId}`),
 			fetch(
 				`/api/workspace/agents/${agentId}/tools?workspaceId=${workspaceId}`,
@@ -98,6 +98,7 @@ export default function AgentConfigurePage() {
 			!providersRes.ok ||
 			!toolsRes.ok ||
 			!mcpRes.ok ||
+			!customToolsRes.ok ||
 			!kbRes.ok
 		) {
 			throw new Error("Unable to load agent settings");
@@ -130,6 +131,7 @@ export default function AgentConfigurePage() {
 		const providerRows = (await providersRes.json()) as Provider[];
 		const builtinRows = (await toolsRes.json()) as BuiltinTool[];
 		const mcpServerRows = (await mcpRes.json()) as McpServer[];
+		const customToolRows = (await customToolsRes.json()) as CustomTool[];
 		const kbRows = (await kbRes.json()) as KnowledgeBase[];
 		const toolBindings = bindingsRes.ok
 			? ((await bindingsRes.json()) as ToolBinding[])
@@ -170,6 +172,7 @@ export default function AgentConfigurePage() {
 		setBuiltinTools(builtinRows);
 		setMcpServers(mcpServerRows);
 		setMcpTools(mcpToolRows);
+		setCustomTools(customToolRows);
 		setKnowledgeBases(kbRows);
 
 		setForm(
@@ -200,30 +203,43 @@ export default function AgentConfigurePage() {
 			nextMcp[tool.id] = {
 				enabled: Boolean(binding),
 				requireApproval:
-					binding?.requireApproval ??
-					tool.requireApproval ??
-					false,
+					binding?.requireApproval ?? tool.requireApproval ?? false,
 			};
 		}
 		setMcpBindings(nextMcp);
+
+		const nextCustom: ToolBindingState = {};
+		for (const tool of customToolRows) {
+			const binding = toolBindings.find(
+				(b) => b.toolSource === "custom" && b.toolId === tool.id,
+			);
+			nextCustom[tool.id] = {
+				enabled: Boolean(binding),
+				requireApproval: binding?.requireApproval ?? true,
+			};
+		}
+		setCustomBindings(nextCustom);
 		setSelectedKnowledgeIds(knowledgeBindings.map((b) => b.knowledgeBaseId));
 	}, [agentId, workspaceId]);
 
 	useEffect(() => {
 		if (!agentId || !workspaceId) return;
 		let cancelled = false;
-		setLoading(true);
-		void loadData()
-			.catch((error) =>
-				toast.error(
-					error instanceof Error ? error.message : "Unable to load agent",
-				),
-			)
-			.finally(() => {
-				if (!cancelled) setLoading(false);
-			});
+		const timeout = window.setTimeout(() => {
+			setLoading(true);
+			void loadData()
+				.catch((error) =>
+					toast.error(
+						error instanceof Error ? error.message : "Unable to load agent",
+					),
+				)
+				.finally(() => {
+					if (!cancelled) setLoading(false);
+				});
+		}, 0);
 		return () => {
 			cancelled = true;
+			window.clearTimeout(timeout);
 		};
 	}, [agentId, workspaceId, loadData]);
 
@@ -358,6 +374,13 @@ export default function AgentConfigurePage() {
 							isMcpToolApprovalForced(tool, mcpServers) ||
 							mcpBindings[tool.id]?.requireApproval,
 					})),
+				...customTools
+					.filter((tool) => customBindings[tool.id]?.enabled)
+					.map((tool) => ({
+						toolSource: "custom" as const,
+						toolId: tool.id,
+						requireApproval: customBindings[tool.id]?.requireApproval ?? true,
+					})),
 			];
 			const [toolsRes, kbRes] = await Promise.all([
 				fetch(
@@ -429,9 +452,12 @@ export default function AgentConfigurePage() {
 	const enabledMcpCount = mcpTools.filter(
 		(tool) => tool.enabled && mcpBindings[tool.id]?.enabled,
 	).length;
-	const totalEnabledTools = enabledBuiltinCount + enabledMcpCount;
-	const capabilitiesCount =
-		totalEnabledTools + selectedKnowledgeIds.length;
+	const enabledCustomCount = customTools.filter(
+		(tool) => customBindings[tool.id]?.enabled,
+	).length;
+	const totalEnabledTools =
+		enabledBuiltinCount + enabledMcpCount + enabledCustomCount;
+	const capabilitiesCount = totalEnabledTools + selectedKnowledgeIds.length;
 
 	return (
 		<WorkspacePage
@@ -452,46 +478,49 @@ export default function AgentConfigurePage() {
 				/>
 
 				<div className="surface-panel animate-in-up stagger-2 px-5 pb-5 pt-5">
-						<Tabs value={activeTab} onValueChange={setActiveTab}>
-							<TabsList className="w-full flex-wrap sm:w-auto">
-								<TabsTrigger value="essential" className="gap-2">
-									{t("tabs.essential")}
-								</TabsTrigger>
-								<TabsTrigger value="capabilities" className="gap-2">
-									{t("tabs.capabilities")}
-									<TabBadge count={capabilitiesCount} />
-								</TabsTrigger>
-							</TabsList>
+					<Tabs value={activeTab} onValueChange={setActiveTab}>
+						<TabsList className="w-full flex-wrap sm:w-auto">
+							<TabsTrigger value="essential" className="gap-2">
+								{t("tabs.essential")}
+							</TabsTrigger>
+							<TabsTrigger value="capabilities" className="gap-2">
+								{t("tabs.capabilities")}
+								<TabBadge count={capabilitiesCount} />
+							</TabsTrigger>
+						</TabsList>
 
-							<TabsContent value="essential" className="mt-4">
-								<EssentialTab
-									form={form}
-									setForm={setForm}
-									providers={providers}
-									models={models}
-									saving={saving}
-									canAdminCurate={agent?.canAdminCurate ?? false}
-									onSave={saveEssential}
-								/>
-							</TabsContent>
+						<TabsContent value="essential" className="mt-4">
+							<EssentialTab
+								form={form}
+								setForm={setForm}
+								providers={providers}
+								models={models}
+								saving={saving}
+								canAdminCurate={agent?.canAdminCurate ?? false}
+								onSave={saveEssential}
+							/>
+						</TabsContent>
 
-							<TabsContent value="capabilities" className="mt-4">
-								<CapabilitiesTab
-									builtinTools={builtinTools}
-									builtinBindings={builtinBindings}
-									setBuiltinBindings={setBuiltinBindings}
-									mcpServers={mcpServers}
-									mcpTools={mcpTools}
-									mcpBindings={mcpBindings}
-									setMcpBindings={setMcpBindings}
-									knowledgeBases={knowledgeBases}
-									selectedKnowledgeIds={selectedKnowledgeIds}
-									setSelectedKnowledgeIds={setSelectedKnowledgeIds}
-									saving={saving}
-									onSave={() => void saveCapabilities()}
-								/>
-							</TabsContent>
-						</Tabs>
+						<TabsContent value="capabilities" className="mt-4">
+							<CapabilitiesTab
+								builtinTools={builtinTools}
+								builtinBindings={builtinBindings}
+								setBuiltinBindings={setBuiltinBindings}
+								mcpServers={mcpServers}
+								mcpTools={mcpTools}
+								mcpBindings={mcpBindings}
+								setMcpBindings={setMcpBindings}
+								customTools={customTools}
+								customBindings={customBindings}
+								setCustomBindings={setCustomBindings}
+								knowledgeBases={knowledgeBases}
+								selectedKnowledgeIds={selectedKnowledgeIds}
+								setSelectedKnowledgeIds={setSelectedKnowledgeIds}
+								saving={saving}
+								onSave={() => void saveCapabilities()}
+							/>
+						</TabsContent>
+					</Tabs>
 				</div>
 			</div>
 

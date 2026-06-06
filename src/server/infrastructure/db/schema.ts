@@ -1075,6 +1075,103 @@ export const marketplaceReports = pgTable("marketplace_reports", {
 		.defaultNow(),
 });
 
+// ─── Custom Tool Builder ───────────────────────────────────────────────
+
+export const customToolStatusEnum = pgEnum("custom_tool_status", [
+	"draft",
+	"awaiting_secrets",
+	"workflow_created",
+	"active",
+	"failed",
+	"disabled",
+]);
+
+export const customTools = pgTable(
+	"custom_tools",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		workspaceId: uuid("workspace_id")
+			.notNull()
+			.references(() => workspaces.id, { onDelete: "cascade" }),
+		createdById: uuid("created_by_user_id")
+			.notNull()
+			.references(() => users.id),
+		name: varchar("name", { length: 255 }).notNull(),
+		description: text("description"),
+		n8nWorkflowId: varchar("n8n_workflow_id", { length: 255 }),
+		n8nWorkflowUrl: text("n8n_workflow_url"),
+		status: customToolStatusEnum("status").notNull().default("draft"),
+		inputSchemaJson: jsonb("input_schema_json"),
+		outputSchemaJson: jsonb("output_schema_json"),
+		metadataJson: jsonb("metadata_json"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		archivedAt: timestamp("archived_at", { withTimezone: true }),
+	},
+	(t) => ({
+		workspace: index("custom_tools_workspace").on(t.workspaceId),
+	}),
+);
+
+export const customToolSecretRequests = pgTable(
+	"custom_tool_secret_requests",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		workspaceId: uuid("workspace_id")
+			.notNull()
+			.references(() => workspaces.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id),
+		customToolId: uuid("custom_tool_id").references(() => customTools.id, {
+			onDelete: "set null",
+		}),
+		title: varchar("title", { length: 255 }).notNull(),
+		description: text("description"),
+		fieldsJson: jsonb("fields_json").notNull(),
+		status: varchar("status", { length: 24 }).notNull().default("pending"),
+		credentialRefId: uuid("credential_ref_id"),
+		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		submittedAt: timestamp("submitted_at", { withTimezone: true }),
+	},
+	(t) => ({
+		workspace: index("custom_tool_secret_requests_workspace").on(t.workspaceId),
+		user: index("custom_tool_secret_requests_user").on(t.userId),
+	}),
+);
+
+export const customToolCredentialRefs = pgTable(
+	"custom_tool_credential_refs",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		workspaceId: uuid("workspace_id")
+			.notNull()
+			.references(() => workspaces.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id),
+		provider: varchar("provider", { length: 128 }).notNull(),
+		label: varchar("label", { length: 255 }).notNull(),
+		n8nCredentialId: varchar("n8n_credential_id", { length: 255 }),
+		encryptedPayload: text("encrypted_payload").notNull(),
+		metadataJson: jsonb("metadata_json"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => ({
+		workspace: index("custom_tool_credential_refs_workspace").on(t.workspaceId),
+		user: index("custom_tool_credential_refs_user").on(t.userId),
+	}),
+);
+
 // ─── Relations ─────────────────────────────────────────────────────────
 
 export const userRelations = relations(users, ({ many }) => ({
