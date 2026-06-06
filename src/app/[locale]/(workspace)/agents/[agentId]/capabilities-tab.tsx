@@ -7,6 +7,7 @@ import {
 	PlusIcon,
 	SaveIcon,
 	ServerIcon,
+	ShieldCheckIcon,
 	WrenchIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -39,11 +40,19 @@ function ToolRow({
 	description,
 	enabled,
 	onEnabledChange,
+	requireApproval,
+	approvalDisabled,
+	onApprovalChange,
+	approvalLabel,
 }: {
 	name: string;
 	description?: string;
 	enabled: boolean;
 	onEnabledChange: (enabled: boolean) => void;
+	requireApproval?: boolean;
+	approvalDisabled?: boolean;
+	onApprovalChange?: (checked: boolean) => void;
+	approvalLabel?: string;
 }) {
 	return (
 		<ListRow className="items-center justify-between gap-4">
@@ -55,7 +64,23 @@ function ToolRow({
 					</p>
 				) : null}
 			</div>
-			<Switch checked={enabled} onCheckedChange={onEnabledChange} />
+			<div className="flex items-center gap-4">
+				{onApprovalChange !== undefined && (
+					<label className="flex items-center gap-2 text-xs">
+						<ShieldCheckIcon
+							className="size-3 text-muted-foreground"
+							aria-hidden="true"
+						/>
+						{approvalLabel}
+						<Switch
+							checked={requireApproval ?? false}
+							disabled={approvalDisabled ?? false}
+							onCheckedChange={onApprovalChange}
+						/>
+					</label>
+				)}
+				<Switch checked={enabled} onCheckedChange={onEnabledChange} />
+			</div>
 		</ListRow>
 	);
 }
@@ -68,6 +93,12 @@ function McpServerCollapsible({
 	setMcpBindings,
 	noMcpToolsSyncedLabel,
 	disabledInMcpLabel,
+	allToolsLabel,
+	extraApprovalLabel,
+	approvalLabel,
+	partialLabel,
+	mixedApprovalLabel,
+	forcedLabel,
 }: {
 	server: McpServer;
 	mcpTools: McpTool[];
@@ -76,6 +107,12 @@ function McpServerCollapsible({
 	setMcpBindings: (fn: (prev: ToolBindingState) => ToolBindingState) => void;
 	noMcpToolsSyncedLabel: string;
 	disabledInMcpLabel: string;
+	allToolsLabel: string;
+	extraApprovalLabel: string;
+	approvalLabel: string;
+	partialLabel: string;
+	mixedApprovalLabel: string;
+	forcedLabel: string;
 }) {
 	const serverState = getMcpServerState(
 		server.id,
@@ -85,68 +122,158 @@ function McpServerCollapsible({
 	);
 	const serverTools = mcpTools.filter((tool) => tool.mcpServerId === server.id);
 
+	function setServerToolsEnabled(enabled: boolean) {
+		const serverTools = mcpTools.filter((t) => t.mcpServerId === server.id);
+		setMcpBindings((current) => {
+			const next = { ...current };
+			for (const tool of serverTools) {
+				const cb = current[tool.id];
+				next[tool.id] = {
+					enabled: enabled && tool.enabled,
+					requireApproval:
+						isMcpToolApprovalForced(tool, mcpServers) ||
+						(cb?.requireApproval ?? false),
+				};
+			}
+			return next;
+		});
+	}
+
+	function setServerApproval(requireApproval: boolean) {
+		const bindableTools = mcpTools
+			.filter((t) => t.mcpServerId === server.id && t.enabled)
+			.filter((t) => mcpBindings[t.id]?.enabled);
+		setMcpBindings((current) => {
+			const next = { ...current };
+			for (const tool of bindableTools) {
+				next[tool.id] = {
+					enabled: true,
+					requireApproval:
+						isMcpToolApprovalForced(tool, mcpServers) || requireApproval,
+				};
+			}
+			return next;
+		});
+	}
+
+	function setToolEnabled(tool: McpTool, enabled: boolean) {
+		setMcpBindings((current) => ({
+			...current,
+			[tool.id]: {
+				enabled: enabled && tool.enabled,
+				requireApproval:
+					isMcpToolApprovalForced(tool, mcpServers) ||
+					(current[tool.id]?.requireApproval ?? false),
+			},
+		}));
+	}
+
+	function setToolApproval(tool: McpTool, requireApproval: boolean) {
+		setMcpBindings((current) => ({
+			...current,
+			[tool.id]: {
+				enabled: current[tool.id]?.enabled ?? false,
+				requireApproval: tool.enabled
+					? isMcpToolApprovalForced(tool, mcpServers) || requireApproval
+					: false,
+			},
+		}));
+	}
+
 	return (
 		<Collapsible
 			defaultOpen={false}
 			className="rounded-xl border border-border bg-background p-3 transition-colors hover:border-primary/35 hover:bg-muted/40"
 		>
-			<div className="flex items-start gap-2">
-				<CollapsibleTrigger asChild>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="shrink-0"
-						aria-label={server.name}
-					>
-						<ChevronDownIcon
-							className="transition-transform data-[state=open]:rotate-180"
-							aria-hidden="true"
-						/>
-					</Button>
-				</CollapsibleTrigger>
-				<div className="min-w-0 flex-1">
-					<div className="flex flex-wrap items-center gap-2">
-						<p className="font-medium">{server.name}</p>
-						<Badge variant="secondary">
-							{serverState.selectedCount}/{serverState.bindableTools.length}
-						</Badge>
+			<div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+				<div className="flex min-w-0 gap-2">
+					<CollapsibleTrigger asChild>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							className="shrink-0"
+						>
+							<ChevronDownIcon
+								className="transition-transform data-[state=open]:rotate-180"
+								aria-hidden="true"
+							/>
+						</Button>
+					</CollapsibleTrigger>
+					<div className="min-w-0">
+						<div className="flex flex-wrap items-center gap-2">
+							<p className="font-medium">{server.name}</p>
+							<Badge variant="secondary">
+								{serverState.selectedCount}/{serverState.bindableTools.length}
+							</Badge>
+							{serverState.someSelected && (
+								<Badge variant="outline">{partialLabel}</Badge>
+							)}
+							{serverState.someApproval && (
+								<Badge variant="outline">{mixedApprovalLabel}</Badge>
+							)}
+							{serverState.forcedApprovalCount > 0 && (
+								<Badge variant="secondary">
+									{serverState.forcedApprovalCount} {forcedLabel}
+								</Badge>
+							)}
+						</div>
+						<p className="mt-1 text-xs text-muted-foreground">
+							{serverTools.length} {serverTools.length === 1 ? "tool" : "tools"}{" "}
+							· {serverState.selectedCount} enabled
+						</p>
 					</div>
-					<p className="mt-1 text-xs text-muted-foreground">
-						{serverTools.length}{" "}
-						{serverTools.length === 1 ? "tool" : "tools"} · {serverState.selectedCount}{" "}
-						enabled
-					</p>
+				</div>
+				<div className="flex flex-wrap items-center gap-4 text-xs">
+					<label className="flex items-center gap-2">
+						{allToolsLabel}
+						<Switch
+							checked={serverState.allSelected}
+							disabled={serverState.bindableTools.length === 0}
+							onCheckedChange={setServerToolsEnabled}
+						/>
+					</label>
+					<label className="flex items-center gap-2">
+						{extraApprovalLabel}
+						<Switch
+							checked={serverState.allApproval}
+							disabled={
+								serverState.selectedCount === 0 ||
+								serverState.selectedCount === serverState.forcedApprovalCount
+							}
+							onCheckedChange={setServerApproval}
+						/>
+					</label>
 				</div>
 			</div>
 			<CollapsibleContent className="flex flex-col gap-2 pt-3">
 				{serverTools.length === 0 ? (
-					<p className="text-xs text-muted-foreground">{noMcpToolsSyncedLabel}</p>
+					<p className="text-xs text-muted-foreground">
+						{noMcpToolsSyncedLabel}
+					</p>
 				) : (
 					serverTools.map((tool) => {
 						const binding = mcpBindings[tool.id];
 						const toolEnabled = tool.enabled && Boolean(binding?.enabled);
+						const approvalForced = isMcpToolApprovalForced(tool, mcpServers);
 						return (
 							<ToolRow
 								key={tool.id}
 								name={tool.name}
 								description={
 									tool.enabled
-										? tool.description ?? undefined
+										? (tool.description ?? undefined)
 										: disabledInMcpLabel
 								}
 								enabled={toolEnabled}
-								onEnabledChange={(enabled) =>
-									setMcpBindings((current) => ({
-										...current,
-										[tool.id]: {
-											enabled: enabled && tool.enabled,
-											requireApproval:
-												isMcpToolApprovalForced(tool, mcpServers) ||
-												(current[tool.id]?.requireApproval ?? false),
-										},
-									}))
+								onEnabledChange={(enabled) => setToolEnabled(tool, enabled)}
+								requireApproval={
+									toolEnabled &&
+									(approvalForced || Boolean(binding?.requireApproval))
 								}
+								approvalDisabled={!toolEnabled || approvalForced}
+								onApprovalChange={(checked) => setToolApproval(tool, checked)}
+								approvalLabel={approvalLabel}
 							/>
 						);
 					})
@@ -172,7 +299,9 @@ export function CapabilitiesTab({
 }: {
 	builtinTools: BuiltinTool[];
 	builtinBindings: ToolBindingState;
-	setBuiltinBindings: (fn: (prev: ToolBindingState) => ToolBindingState) => void;
+	setBuiltinBindings: (
+		fn: (prev: ToolBindingState) => ToolBindingState,
+	) => void;
 	mcpServers: McpServer[];
 	mcpTools: McpTool[];
 	mcpBindings: ToolBindingState;
@@ -250,6 +379,12 @@ export function CapabilitiesTab({
 								setMcpBindings={setMcpBindings}
 								noMcpToolsSyncedLabel={t("noMcpToolsSynced")}
 								disabledInMcpLabel={t("disabledInMcp")}
+								allToolsLabel={t("allTools")}
+								extraApprovalLabel={t("extraApproval")}
+								approvalLabel={t("approval")}
+								partialLabel={t("partial")}
+								mixedApprovalLabel={t("mixedApproval")}
+								forcedLabel={t("forced")}
 							/>
 						))}
 						<Button variant="outline" size="sm" asChild className="w-fit">
@@ -321,11 +456,7 @@ export function CapabilitiesTab({
 			</ConfigSection>
 
 			<CardFooter className="justify-end px-0 pb-0">
-				<Button
-					type="button"
-					disabled={saving}
-					onClick={onSave}
-				>
+				<Button type="button" disabled={saving} onClick={onSave}>
 					{saving ? (
 						<Spinner data-icon="inline-start" />
 					) : (
