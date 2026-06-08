@@ -555,6 +555,12 @@ export default function ChatPage() {
 		void handleSubmit(content);
 	}
 
+	function submitSuggestion(content: string) {
+		if (!content.trim() || !canChat || sending) return;
+		setInput("");
+		void handleSubmit(content.trim());
+	}
+
 	async function editMessage(message: ChatMessage, content: string) {
 		if (!activeConversationId) return;
 		await fetchJson(
@@ -763,6 +769,7 @@ export default function ChatPage() {
 						onRejectTool={(approval) =>
 							void resolveApproval("reject", approval.invocationId)
 						}
+						onSuggestionClick={submitSuggestion}
 					/>
 				</div>
 			</section>

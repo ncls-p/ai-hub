@@ -3,6 +3,7 @@ import { ShieldAlertIcon } from "lucide-react";
 
 import { WorkspacePage } from "@/components/workspace-page";
 import { SettingsLocaleCard } from "./settings-locale";
+import { ChatAutomationSettings } from "@/components/admin/chat-automation-settings";
 import { CustomToolBuilderSettings } from "@/components/admin/custom-tool-builder-settings";
 import { RegistrationSettings } from "@/components/admin/registration-settings";
 import { SystemHealthCard } from "@/components/admin/system-health-card";
@@ -55,6 +56,7 @@ export default async function SettingsPage() {
 		>
 			<SettingsLocaleCard />
 			<RegistrationSettings initialState={registration} />
+			<ChatAutomationSettings />
 			<CustomToolBuilderSettings />
 			<SystemHealthCard />
 		</WorkspacePage>

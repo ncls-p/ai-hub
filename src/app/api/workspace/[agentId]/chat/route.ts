@@ -22,6 +22,10 @@ import {
 	publishChatStreamEvent,
 	registerChatStreamAbortController,
 } from "@/modules/chat/stream-bus";
+import {
+	generateConversationTitle,
+	generateNextChatSuggestions,
+} from "@/modules/chat/automation";
 import { searchBoundKnowledgeBases } from "@/modules/knowledge/use-cases";
 import { executeCustomToolWorkflow } from "@/modules/custom-tools/use-cases";
 import { executeMcpTool } from "@/modules/mcp/executor";
@@ -670,6 +674,7 @@ export async function POST(
 		}
 
 		let conversation: typeof conversations.$inferSelect | null = null;
+		let createdConversation = false;
 		if (existingConversationId) {
 			const [existing] = await db
 				.select()
@@ -730,6 +735,7 @@ export async function POST(
 				})
 				.returning();
 			conversation = newConversation;
+			createdConversation = true;
 		}
 
 		// Existing conversations can reference archived/deleted versions; fail safely.
@@ -1137,6 +1143,30 @@ export async function POST(
 				}
 
 				const totalUsage = await result.totalUsage;
+				const assistantText = streamedParts
+					.flatMap((part) =>
+						part.type === "text" && "content" in part ? [part.content] : [],
+					)
+					.join("\n")
+					.trim();
+				const [generatedTitle, suggestions] = await Promise.all([
+					createdConversation
+						? generateConversationTitle({
+								userMessage: content,
+								fallback: conversation.title,
+							})
+						: Promise.resolve(conversation.title),
+					assistantText
+						? generateNextChatSuggestions({
+								userMessage: content,
+								assistantText,
+							})
+						: Promise.resolve<string[]>([]),
+				]);
+				if (suggestions.length > 0) {
+					enqueueEvent({ type: "suggestions", suggestions });
+				}
+
 				await db
 					.update(messages)
 					.set({
@@ -1152,6 +1182,7 @@ export async function POST(
 					.set({
 						agentId,
 						agentVersionId: version.id,
+						title: generatedTitle,
 						updatedAt: new Date(),
 					})
 					.where(eq(conversations.id, conversation.id));

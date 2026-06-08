@@ -348,6 +348,20 @@ function applyStreamEvent(
 		return;
 	}
 
+	if (parsed.type === "suggestions") {
+		handlers.updateAssistant((message) => ({
+			...message,
+			parts: [
+				...message.parts.filter((part) => part.type !== "suggestions"),
+				{
+					type: "suggestions",
+					content: JSON.stringify(parsed.suggestions),
+				},
+			],
+		}));
+		return;
+	}
+
 	if (parsed.type === "citations") {
 		const citationList =
 			"citations" in parsed

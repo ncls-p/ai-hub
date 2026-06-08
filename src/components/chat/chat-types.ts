@@ -69,6 +69,7 @@ export type ChatStreamEvent =
 	| { type: "text" | "reasoning"; delta: string }
 	| { type: "done" }
 	| { type: "error"; error: string }
+	| { type: "suggestions"; suggestions: string[] }
 	| {
 			type: "tool_approval_required";
 			invocationId: string;
@@ -177,7 +178,9 @@ function mergeToolParts(parts: ChatMessagePart[]): ChatMessagePart[] {
 
 export function renderablePartsFromMessage(message: ChatMessage) {
 	return mergeToolParts(message.parts).filter((part) =>
-		["text", "reasoning", "tool-call", "tool-result"].includes(part.type),
+		["text", "reasoning", "tool-call", "tool-result", "suggestions"].includes(
+			part.type,
+		),
 	);
 }
 
@@ -290,6 +293,7 @@ export function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
 		toolCallId?: unknown;
 		citations?: unknown;
 		sources?: unknown;
+		suggestions?: unknown;
 	};
 
 	if (
@@ -334,6 +338,9 @@ export function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
 		typeof event.toolName === "string"
 	) {
 		return true;
+	}
+	if (event.type === "suggestions" && Array.isArray(event.suggestions)) {
+		return event.suggestions.every((item) => typeof item === "string");
 	}
 	if (
 		event.type === "citations" &&

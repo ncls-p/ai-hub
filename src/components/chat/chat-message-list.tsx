@@ -688,6 +688,45 @@ function ToolPartCard({
 	);
 }
 
+function SuggestionsPart({
+	part,
+	onSuggestionClick,
+}: {
+	part: ChatMessagePart;
+	onSuggestionClick?: (suggestion: string) => void;
+}) {
+	let suggestions: string[] = [];
+	try {
+		const parsed = JSON.parse(part.content) as unknown;
+		if (Array.isArray(parsed)) {
+			suggestions = parsed.filter(
+				(value): value is string => typeof value === "string",
+			);
+		}
+	} catch {
+		return null;
+	}
+	if (suggestions.length === 0) return null;
+
+	return (
+		<div className="mt-1 flex flex-wrap gap-2">
+			{suggestions.map((suggestion) => (
+				<Button
+					key={suggestion}
+					type="button"
+					variant="outline"
+					size="sm"
+					className="h-auto rounded-full px-3 py-1.5 text-xs"
+					onClick={() => onSuggestionClick?.(suggestion)}
+				>
+					<SparklesIcon className="size-3" aria-hidden="true" />
+					{suggestion}
+				</Button>
+			))}
+		</div>
+	);
+}
+
 function ThinkingPart({ part }: { part: ChatMessagePart }) {
 	const [open, setOpen] = useState(false);
 	const preview = part.content.trim().slice(0, 180);
@@ -755,6 +794,7 @@ const MessageContent = memo(function MessageContent({
 	pendingApprovals,
 	onApproveTool,
 	onRejectTool,
+	onSuggestionClick,
 }: {
 	message: ChatMessage;
 	isEditing: boolean;
@@ -767,6 +807,7 @@ const MessageContent = memo(function MessageContent({
 	pendingApprovals: PendingToolApproval[];
 	onApproveTool?: (approval: PendingToolApproval) => void;
 	onRejectTool?: (approval: PendingToolApproval) => void;
+	onSuggestionClick?: (suggestion: string) => void;
 }) {
 	const content = textFromMessage(message);
 	const citations = citationsFromMessage(message);
@@ -832,6 +873,15 @@ const MessageContent = memo(function MessageContent({
 				: null}
 			{renderableParts.length > 0 ? (
 				renderableParts.map((part, partIndex) => {
+					if (part.type === "suggestions") {
+						return (
+							<SuggestionsPart
+								key={`${message.id}-${part.type}-${partIndex}`}
+								part={part}
+								onSuggestionClick={onSuggestionClick}
+							/>
+						);
+					}
 					if (part.type === "reasoning") {
 						return (
 							<ThinkingPart
@@ -892,6 +942,7 @@ interface ChatMessageListProps {
 	pendingApprovals?: PendingToolApproval[];
 	onApproveTool?: (approval: PendingToolApproval) => void;
 	onRejectTool?: (approval: PendingToolApproval) => void;
+	onSuggestionClick?: (suggestion: string) => void;
 }
 
 export function ChatMessageList({
@@ -906,6 +957,7 @@ export function ChatMessageList({
 	pendingApprovals = [],
 	onApproveTool,
 	onRejectTool,
+	onSuggestionClick,
 }: ChatMessageListProps) {
 	const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 	const [editingContent, setEditingContent] = useState("");
@@ -1033,6 +1085,7 @@ export function ChatMessageList({
 									pendingApprovals={pendingApprovals}
 									onApproveTool={onApproveTool}
 									onRejectTool={onRejectTool}
+									onSuggestionClick={onSuggestionClick}
 								/>
 							</div>
 
