@@ -1,7 +1,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
 	BotIcon,
 	MessageSquarePlusIcon,
@@ -41,6 +41,45 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+
+const HISTORY_WIDTH_STORAGE_KEY = "chat-history-sidebar-width";
+const HISTORY_WIDTH_STORAGE_EVENT = "chat-history-sidebar-width-change";
+const DEFAULT_HISTORY_WIDTH = 320;
+const MIN_HISTORY_WIDTH = 260;
+const MAX_HISTORY_WIDTH = 480;
+
+function clampHistoryWidth(value: number) {
+	return Math.min(
+		MAX_HISTORY_WIDTH,
+		Math.max(MIN_HISTORY_WIDTH, Math.round(value)),
+	);
+}
+
+function subscribeHistoryWidth(callback: () => void) {
+	window.addEventListener("storage", callback);
+	window.addEventListener(HISTORY_WIDTH_STORAGE_EVENT, callback);
+	return () => {
+		window.removeEventListener("storage", callback);
+		window.removeEventListener(HISTORY_WIDTH_STORAGE_EVENT, callback);
+	};
+}
+
+function getStoredHistoryWidth(): number {
+	const stored = window.localStorage.getItem(HISTORY_WIDTH_STORAGE_KEY);
+	const parsed = stored ? Number.parseInt(stored, 10) : DEFAULT_HISTORY_WIDTH;
+	return Number.isFinite(parsed)
+		? clampHistoryWidth(parsed)
+		: DEFAULT_HISTORY_WIDTH;
+}
+
+function setStoredHistoryWidth(width: number) {
+	window.localStorage.setItem(
+		HISTORY_WIDTH_STORAGE_KEY,
+		String(clampHistoryWidth(width)),
+	);
+	window.dispatchEvent(new Event(HISTORY_WIDTH_STORAGE_EVENT));
+}
 
 interface ChatLayoutProps {
 	agents: ChatAgent[];
@@ -78,6 +117,12 @@ export function ChatLayout({
 	const [setupOpen, setSetupOpen] = useState(false);
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+	const [resizingSidebar, setResizingSidebar] = useState(false);
+	const sidebarWidth = useSyncExternalStore(
+		subscribeHistoryWidth,
+		getStoredHistoryWidth,
+		() => DEFAULT_HISTORY_WIDTH,
+	);
 
 	useEffect(() => {
 		const stored = window.localStorage.getItem("chat-sidebar-open");
@@ -89,6 +134,35 @@ export function ChatLayout({
 	function updateSidebarOpen(open: boolean) {
 		setSidebarOpen(open);
 		window.localStorage.setItem("chat-sidebar-open", String(open));
+	}
+
+	function startSidebarResize(event: React.PointerEvent<HTMLDivElement>) {
+		if (!sidebarOpen) return;
+		event.preventDefault();
+		const startX = event.clientX;
+		const startWidth = sidebarWidth;
+		setResizingSidebar(true);
+		document.body.style.cursor = "col-resize";
+		document.body.style.userSelect = "none";
+
+		function onPointerMove(moveEvent: PointerEvent) {
+			setStoredHistoryWidth(startWidth + moveEvent.clientX - startX);
+		}
+
+		function onPointerUp() {
+			setResizingSidebar(false);
+			document.body.style.cursor = "";
+			document.body.style.userSelect = "";
+			document.removeEventListener("pointermove", onPointerMove);
+			document.removeEventListener("pointerup", onPointerUp);
+		}
+
+		document.addEventListener("pointermove", onPointerMove);
+		document.addEventListener("pointerup", onPointerUp, { once: true });
+	}
+
+	function adjustSidebarWidth(delta: number) {
+		setStoredHistoryWidth(sidebarWidth + delta);
 	}
 
 	const sidebarProps = {
@@ -165,15 +239,35 @@ export function ChatLayout({
 		<div className="flex h-full min-h-0">
 			{/* Desktop sidebar with smooth transition */}
 			<div
-				className="hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:block"
+				className={cn(
+					"hidden ease-[cubic-bezier(0.4,0,0.2,1)] md:block",
+					!resizingSidebar && "transition-all duration-300",
+				)}
 				style={{
-					width: sidebarOpen ? "20rem" : 0,
+					width: sidebarOpen ? `${sidebarWidth}px` : 0,
 					opacity: sidebarOpen ? 1 : 0,
 				}}
 			>
 				{sidebarOpen && (
-					<aside className="h-full w-80 border-r border-border bg-background">
+					<aside className="relative h-full w-full border-r border-border bg-background">
 						<ChatSidebar {...desktopSidebarProps} className="w-full" />
+						<div
+							role="separator"
+							aria-label="Resize conversations"
+							aria-orientation="vertical"
+							aria-valuemin={MIN_HISTORY_WIDTH}
+							aria-valuemax={MAX_HISTORY_WIDTH}
+							aria-valuenow={sidebarWidth}
+							tabIndex={0}
+							className="group absolute inset-y-0 right-0 z-20 w-2 translate-x-1 cursor-col-resize outline-none"
+							onPointerDown={startSidebarResize}
+							onKeyDown={(event) => {
+								if (event.key === "ArrowLeft") adjustSidebarWidth(-12);
+								if (event.key === "ArrowRight") adjustSidebarWidth(12);
+							}}
+						>
+							<div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-primary/40 group-focus-visible:bg-primary/60" />
+						</div>
 					</aside>
 				)}
 			</div>

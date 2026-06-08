@@ -48,6 +48,35 @@ import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "workspace-sidebar-collapsed";
 const STORAGE_EVENT = "workspace-sidebar-collapsed-change";
+const WIDTH_STORAGE_KEY = "workspace-sidebar-width";
+const WIDTH_STORAGE_EVENT = "workspace-sidebar-width-change";
+const DEFAULT_WIDTH = 256;
+const MIN_WIDTH = 208;
+const MAX_WIDTH = 360;
+
+function clampWidth(value: number) {
+	return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(value)));
+}
+
+function subscribeWidth(callback: () => void) {
+	window.addEventListener("storage", callback);
+	window.addEventListener(WIDTH_STORAGE_EVENT, callback);
+	return () => {
+		window.removeEventListener("storage", callback);
+		window.removeEventListener(WIDTH_STORAGE_EVENT, callback);
+	};
+}
+
+function getStoredWidth(): number {
+	const stored = window.localStorage.getItem(WIDTH_STORAGE_KEY);
+	const parsed = stored ? Number.parseInt(stored, 10) : DEFAULT_WIDTH;
+	return Number.isFinite(parsed) ? clampWidth(parsed) : DEFAULT_WIDTH;
+}
+
+function setStoredWidth(width: number) {
+	window.localStorage.setItem(WIDTH_STORAGE_KEY, String(clampWidth(width)));
+	window.dispatchEvent(new Event(WIDTH_STORAGE_EVENT));
+}
 
 function subscribeCollapsed(callback: () => void) {
 	window.addEventListener("storage", callback);
@@ -378,6 +407,41 @@ function SidebarPanel({
 
 export function WorkspaceSidebar({ shell }: { shell: WorkspaceShellState }) {
 	const { collapsed, isMobile } = useWorkspaceSidebar();
+	const width = useSyncExternalStore(
+		subscribeWidth,
+		getStoredWidth,
+		() => DEFAULT_WIDTH,
+	);
+	const [resizing, setResizing] = useState(false);
+
+	function startResize(event: React.PointerEvent<HTMLDivElement>) {
+		if (collapsed) return;
+		event.preventDefault();
+		const startX = event.clientX;
+		const startWidth = width;
+		setResizing(true);
+		document.body.style.cursor = "col-resize";
+		document.body.style.userSelect = "none";
+
+		function onPointerMove(moveEvent: PointerEvent) {
+			setStoredWidth(startWidth + moveEvent.clientX - startX);
+		}
+
+		function onPointerUp() {
+			setResizing(false);
+			document.body.style.cursor = "";
+			document.body.style.userSelect = "";
+			document.removeEventListener("pointermove", onPointerMove);
+			document.removeEventListener("pointerup", onPointerUp);
+		}
+
+		document.addEventListener("pointermove", onPointerMove);
+		document.addEventListener("pointerup", onPointerUp, { once: true });
+	}
+
+	function adjustWidth(delta: number) {
+		setStoredWidth(width + delta);
+	}
 
 	if (isMobile) {
 		return null;
@@ -387,11 +451,31 @@ export function WorkspaceSidebar({ shell }: { shell: WorkspaceShellState }) {
 		<aside
 			data-slot="workspace-sidebar"
 			className={cn(
-				"hidden h-full shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-200 md:flex md:flex-col",
-				collapsed ? "w-[3.25rem]" : "w-64",
+				"relative hidden h-full shrink-0 border-r border-sidebar-border bg-sidebar md:flex md:flex-col",
+				!resizing && "transition-[width] duration-200",
 			)}
+			style={{ width: collapsed ? "3.25rem" : `${width}px` }}
 		>
 			<SidebarPanel shell={shell} collapsed={collapsed} />
+			{!collapsed ? (
+				<div
+					role="separator"
+					aria-label="Resize navigation"
+					aria-orientation="vertical"
+					aria-valuemin={MIN_WIDTH}
+					aria-valuemax={MAX_WIDTH}
+					aria-valuenow={width}
+					tabIndex={0}
+					className="group absolute inset-y-0 right-0 z-20 w-2 translate-x-1 cursor-col-resize outline-none"
+					onPointerDown={startResize}
+					onKeyDown={(event) => {
+						if (event.key === "ArrowLeft") adjustWidth(-12);
+						if (event.key === "ArrowRight") adjustWidth(12);
+					}}
+				>
+					<div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-primary/40 group-focus-visible:bg-primary/60" />
+				</div>
+			) : null}
 		</aside>
 	);
 }
