@@ -26,7 +26,11 @@ export function ToolsHub() {
 	}
 
 	return (
-		<WorkspacePage title={t("title")} description={t("description")} width="wide">
+		<WorkspacePage
+			title={t("title")}
+			description={t("description")}
+			width="wide"
+		>
 			<Tabs value={tab} onValueChange={setTab}>
 				<TabsList className="w-full flex-wrap sm:w-auto">
 					<TabsTrigger value="builtin" className="gap-1.5">
@@ -78,7 +82,13 @@ export function ToolsHub() {
 										</p>
 									</div>
 									<Badge
-										variant={tool.riskLevel === "high" ? "destructive" : tool.riskLevel === "medium" ? "secondary" : "outline"}
+										variant={
+											tool.riskLevel === "high"
+												? "destructive"
+												: tool.riskLevel === "medium"
+													? "secondary"
+													: "outline"
+										}
 										className="shrink-0 text-[10px]"
 									>
 										{tool.riskLevel}

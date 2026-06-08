@@ -87,7 +87,9 @@ function BuiltinToolsSection({
 		if (filter === "disabled" && bindings[tool.id]?.enabled) return false;
 		return true;
 	});
-	const selectedCount = tools.filter((tool) => bindings[tool.id]?.enabled).length;
+	const selectedCount = tools.filter(
+		(tool) => bindings[tool.id]?.enabled,
+	).length;
 
 	return (
 		<Card className="animate-in-up stagger-3 overflow-hidden border-border/70 bg-card/80 shadow-sm">
@@ -99,8 +101,8 @@ function BuiltinToolsSection({
 							Built-in tools
 						</CardTitle>
 						<CardDescription className="mt-1">
-							Enable useful native capabilities. Advanced approval stays hidden by
-							default.
+							Enable useful native capabilities. Advanced approval stays hidden
+							by default.
 						</CardDescription>
 					</div>
 					<Badge variant="secondary" className="w-fit rounded-full">

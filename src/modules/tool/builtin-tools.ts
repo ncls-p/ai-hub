@@ -333,7 +333,10 @@ function jsonTool({ action, json }: z.infer<typeof jsonToolInputSchema>) {
 	}
 }
 
-function textStats({ text, wordsPerMinute }: z.infer<typeof textStatsInputSchema>) {
+function textStats({
+	text,
+	wordsPerMinute,
+}: z.infer<typeof textStatsInputSchema>) {
 	const words = text.trim() ? text.trim().split(/\s+/).length : 0;
 	return {
 		characters: text.length,
@@ -354,13 +357,21 @@ function base64Tool({ action, value }: z.infer<typeof base64ToolInputSchema>) {
 
 function convertTemperature(value: number, from: string, to: string) {
 	const celsius =
-		from === "c" ? value : from === "f" ? (value - 32) * (5 / 9) : value - 273.15;
+		from === "c"
+			? value
+			: from === "f"
+				? (value - 32) * (5 / 9)
+				: value - 273.15;
 	if (to === "c") return celsius;
 	if (to === "f") return celsius * (9 / 5) + 32;
 	return celsius + 273.15;
 }
 
-function unitConverter({ value, from, to }: z.infer<typeof unitConverterInputSchema>) {
+function unitConverter({
+	value,
+	from,
+	to,
+}: z.infer<typeof unitConverterInputSchema>) {
 	const fromUnit = unitFactors[from];
 	const toUnit = unitFactors[to];
 	if (fromUnit.kind !== toUnit.kind) {
@@ -381,7 +392,10 @@ function trimSlugSeparator(value: string, separator: "-" | "_") {
 	return value.slice(start, end);
 }
 
-function slugifyText({ text, separator }: z.infer<typeof slugifyTextInputSchema>) {
+function slugifyText({
+	text,
+	separator,
+}: z.infer<typeof slugifyTextInputSchema>) {
 	const slug = text
 		.normalize("NFKD")
 		.replace(/[\u0300-\u036f]/g, "")
@@ -422,8 +436,12 @@ function colorConverter({ hex }: z.infer<typeof colorConverterInputSchema>) {
 	};
 }
 
-function markdownTable({ columns, rows }: z.infer<typeof markdownTableInputSchema>) {
-	const escapeCell = (value: string) => value.replace(/\|/g, "\\|").replace(/\n/g, " ");
+function markdownTable({
+	columns,
+	rows,
+}: z.infer<typeof markdownTableInputSchema>) {
+	const escapeCell = (value: string) =>
+		value.replace(/\|/g, "\\|").replace(/\n/g, " ");
 	const normalizedRows = rows.map((row) =>
 		columns.map((_, index) => escapeCell(row[index] ?? "")),
 	);
@@ -662,7 +680,9 @@ export function requiresApproval(
 const commonSchemas: Record<string, unknown> = {
 	calculator: {
 		type: "object",
-		properties: { expression: { type: "string", description: "Arithmetic expression" } },
+		properties: {
+			expression: { type: "string", description: "Arithmetic expression" },
+		},
 		required: ["expression"],
 	},
 	current_time: {
@@ -687,7 +707,10 @@ const commonSchemas: Record<string, unknown> = {
 					"Search query. The tool automatically appends today's date to keep results current.",
 			},
 			limit: { type: "number", default: 5, minimum: 1, maximum: 10 },
-			language: { type: "string", description: "Optional language code, for example en or fr." },
+			language: {
+				type: "string",
+				description: "Optional language code, for example en or fr.",
+			},
 		},
 		required: ["query"],
 	},
@@ -695,7 +718,10 @@ const commonSchemas: Record<string, unknown> = {
 		type: "object",
 		properties: {
 			title: { type: "string", default: "Interactive preview" },
-			html: { type: "string", description: "HTML fragment for the isolated preview." },
+			html: {
+				type: "string",
+				description: "HTML fragment for the isolated preview.",
+			},
 			css: { type: "string", default: "" },
 			js: { type: "string", default: "" },
 			height: { type: "number", default: 420, minimum: 160, maximum: 900 },
@@ -714,7 +740,9 @@ const commonSchemas: Record<string, unknown> = {
 	},
 	uuid_generator: {
 		type: "object",
-		properties: { count: { type: "number", default: 1, minimum: 1, maximum: 50 } },
+		properties: {
+			count: { type: "number", default: 1, minimum: 1, maximum: 50 },
+		},
 		required: [],
 	},
 	date_math: {
@@ -724,14 +752,22 @@ const commonSchemas: Record<string, unknown> = {
 			date: { type: "string", description: "Start date, e.g. 2026-06-08" },
 			endDate: { type: "string", description: "End date for difference" },
 			amount: { type: "number", default: 0 },
-			unit: { type: "string", enum: ["days", "weeks", "months", "years"], default: "days" },
+			unit: {
+				type: "string",
+				enum: ["days", "weeks", "months", "years"],
+				default: "days",
+			},
 		},
 		required: ["operation", "date"],
 	},
 	json_tool: {
 		type: "object",
 		properties: {
-			action: { type: "string", enum: ["validate", "format", "minify", "inspect"], default: "format" },
+			action: {
+				type: "string",
+				enum: ["validate", "format", "minify", "inspect"],
+				default: "format",
+			},
 			json: { type: "string" },
 		},
 		required: ["json"],
@@ -756,7 +792,11 @@ const commonSchemas: Record<string, unknown> = {
 		type: "object",
 		properties: {
 			text: { type: "string" },
-			algorithm: { type: "string", enum: ["sha256", "sha1", "md5"], default: "sha256" },
+			algorithm: {
+				type: "string",
+				enum: ["sha256", "sha1", "md5"],
+				default: "sha256",
+			},
 		},
 		required: ["text"],
 	},
@@ -779,14 +819,19 @@ const commonSchemas: Record<string, unknown> = {
 	},
 	color_converter: {
 		type: "object",
-		properties: { hex: { type: "string", description: "6-digit hex color, e.g. #0ea5e9" } },
+		properties: {
+			hex: { type: "string", description: "6-digit hex color, e.g. #0ea5e9" },
+		},
 		required: ["hex"],
 	},
 	markdown_table: {
 		type: "object",
 		properties: {
 			columns: { type: "array", items: { type: "string" } },
-			rows: { type: "array", items: { type: "array", items: { type: "string" } } },
+			rows: {
+				type: "array",
+				items: { type: "array", items: { type: "string" } },
+			},
 		},
 		required: ["columns", "rows"],
 	},
@@ -795,5 +840,7 @@ const commonSchemas: Record<string, unknown> = {
 export function toolToJsonSchema(toolId: string) {
 	const tool = getBuiltInTool(toolId);
 	if (!tool) return null;
-	return commonSchemas[tool.name] ?? { type: "object", properties: {}, required: [] };
+	return (
+		commonSchemas[tool.name] ?? { type: "object", properties: {}, required: [] }
+	);
 }
