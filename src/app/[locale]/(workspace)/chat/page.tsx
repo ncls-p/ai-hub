@@ -182,6 +182,15 @@ export default function ChatPage() {
 			params.set("conversationId", conversationId);
 			window.history.replaceState(null, "", `/chat?${params.toString()}`);
 		},
+		onConversationTitle: (conversationId, title) => {
+			setConversations((current) =>
+				current.map((conversation) =>
+					conversation.id === conversationId
+						? { ...conversation, title }
+						: conversation,
+				),
+			);
+		},
 		onConversationsRefresh: refreshConversations,
 	});
 

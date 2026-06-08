@@ -131,8 +131,8 @@ export function ChatAutomationSettings() {
 							Chat automation
 						</CardTitle>
 						<CardDescription>
-							Choose the small model used for conversation titles and next-message
-							suggestions.
+							Choose the small model used for conversation titles and
+							next-message suggestions.
 						</CardDescription>
 					</div>
 					<Badge variant={ready ? "secondary" : "outline"}>

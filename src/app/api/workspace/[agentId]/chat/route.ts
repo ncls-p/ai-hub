@@ -22,10 +22,7 @@ import {
 	publishChatStreamEvent,
 	registerChatStreamAbortController,
 } from "@/modules/chat/stream-bus";
-import {
-	generateConversationTitle,
-	generateNextChatSuggestions,
-} from "@/modules/chat/automation";
+import { generateChatAutomationArtifacts } from "@/modules/chat/automation";
 import { searchBoundKnowledgeBases } from "@/modules/knowledge/use-cases";
 import { executeCustomToolWorkflow } from "@/modules/custom-tools/use-cases";
 import { executeMcpTool } from "@/modules/mcp/executor";
@@ -1149,22 +1146,24 @@ export async function POST(
 					)
 					.join("\n")
 					.trim();
-				const [generatedTitle, suggestions] = await Promise.all([
-					createdConversation
-						? generateConversationTitle({
-								userMessage: content,
-								fallback: conversation.title,
-							})
-						: Promise.resolve(conversation.title),
-					assistantText
-						? generateNextChatSuggestions({
-								userMessage: content,
-								assistantText,
-							})
-						: Promise.resolve<string[]>([]),
-				]);
-				if (suggestions.length > 0) {
-					enqueueEvent({ type: "suggestions", suggestions });
+				const artifacts = assistantText
+					? await generateChatAutomationArtifacts({
+							userMessage: content,
+							assistantText,
+							fallbackTitle: conversation.title,
+						})
+					: { title: conversation.title, suggestions: [] };
+				const generatedTitle = createdConversation
+					? artifacts.title
+					: conversation.title;
+				if (createdConversation && generatedTitle !== conversation.title) {
+					enqueueEvent({ type: "conversation_title", title: generatedTitle });
+				}
+				if (artifacts.suggestions.length > 0) {
+					enqueueEvent({
+						type: "suggestions",
+						suggestions: artifacts.suggestions,
+					});
 				}
 
 				await db

@@ -20,6 +20,7 @@ interface UseChatStreamOptions {
 	workspaceId: string | null;
 	canChat: boolean;
 	onConversationCreated: (conversationId: string) => void;
+	onConversationTitle?: (conversationId: string, title: string) => void;
 	onConversationsRefresh: () => Promise<void>;
 }
 
@@ -174,6 +175,7 @@ function applyStreamEvent(
 		addPendingApproval: (approval: PendingToolApproval) => void;
 		clearPendingApprovals: () => void;
 		setCitations: (citations: ChatCitation[]) => void;
+		onConversationTitle?: (title: string) => void;
 		onDone?: () => void;
 	},
 ) {
@@ -188,6 +190,11 @@ function applyStreamEvent(
 		}));
 		handlers.clearPendingApprovals();
 		handlers.onDone?.();
+		return;
+	}
+
+	if (parsed.type === "conversation_title") {
+		handlers.onConversationTitle?.(parsed.title);
 		return;
 	}
 
@@ -395,6 +402,7 @@ export function useChatStream({
 	workspaceId,
 	canChat,
 	onConversationCreated,
+	onConversationTitle,
 	onConversationsRefresh,
 }: UseChatStreamOptions) {
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -831,6 +839,12 @@ export function useChatStream({
 					addPendingApproval,
 					clearPendingApprovals,
 					setCitations,
+					onConversationTitle: (title) => {
+						const targetConversationId = activeConversationIdRef.current;
+						if (targetConversationId) {
+							onConversationTitle?.(targetConversationId, title);
+						}
+					},
 				});
 			}
 

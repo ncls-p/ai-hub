@@ -69,6 +69,7 @@ export type ChatStreamEvent =
 	| { type: "text" | "reasoning"; delta: string }
 	| { type: "done" }
 	| { type: "error"; error: string }
+	| { type: "conversation_title"; title: string }
 	| { type: "suggestions"; suggestions: string[] }
 	| {
 			type: "tool_approval_required";
@@ -294,6 +295,7 @@ export function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
 		citations?: unknown;
 		sources?: unknown;
 		suggestions?: unknown;
+		title?: unknown;
 	};
 
 	if (
@@ -337,6 +339,9 @@ export function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
 		typeof event.toolCallId === "string" &&
 		typeof event.toolName === "string"
 	) {
+		return true;
+	}
+	if (event.type === "conversation_title" && typeof event.title === "string") {
 		return true;
 	}
 	if (event.type === "suggestions" && Array.isArray(event.suggestions)) {

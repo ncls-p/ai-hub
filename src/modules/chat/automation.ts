@@ -5,7 +5,11 @@ import { z } from "zod";
 import { decryptValue } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
 import { db } from "@/server/infrastructure/db";
-import { aiModels, aiProviders, appSettings } from "@/server/infrastructure/db/schema";
+import {
+	aiModels,
+	aiProviders,
+	appSettings,
+} from "@/server/infrastructure/db/schema";
 import {
 	getAdapter,
 	type ProviderKind,
@@ -164,70 +168,96 @@ async function resolveRuntimeModel(
 	};
 }
 
-async function generateWithAutomationModel(prompt: string, maxOutputTokens: number) {
-	const config = await getChatAutomationConfig();
-	const runtime = await resolveRuntimeModel(config);
-	if (!runtime) return null;
-
-	const adapter = getAdapter(runtime.providerKind);
+async function generateWithRuntimeModel(input: {
+	runtime: RuntimeModel;
+	prompt: string;
+	maxOutputTokens: number;
+}) {
+	const adapter = getAdapter(input.runtime.providerKind);
 	const { text } = await generateText({
-		model: adapter.createChatModel(runtime.runtimeConfig, runtime.modelId),
-		prompt,
+		model: adapter.createChatModel(
+			input.runtime.runtimeConfig,
+			input.runtime.modelId,
+		),
+		prompt: input.prompt,
 		temperature: 0.2,
-		maxOutputTokens,
+		maxOutputTokens: input.maxOutputTokens,
 	});
 	return text.trim();
+}
+
+export async function generateChatAutomationArtifacts(input: {
+	userMessage: string;
+	assistantText: string;
+	fallbackTitle: string;
+}) {
+	const config = await getChatAutomationConfig();
+	const shouldGenerateTitle = config.enabled && config.generateTitles;
+	const shouldGenerateSuggestions =
+		config.enabled && config.generateSuggestions;
+	if (!shouldGenerateTitle && !shouldGenerateSuggestions) {
+		return { title: input.fallbackTitle, suggestions: [] };
+	}
+
+	const runtime = await resolveRuntimeModel(config);
+	if (!runtime) return { title: input.fallbackTitle, suggestions: [] };
+
+	try {
+		const text = await generateWithRuntimeModel({
+			runtime,
+			maxOutputTokens: 220,
+			prompt: [
+				"Generate chat metadata for this conversation using one consistent style.",
+				'Return JSON only with this exact shape: {"title": string, "suggestions": string[]}.',
+				"Title rules: 3 to 7 words, no quotes, no trailing punctuation, same language as the user if obvious.",
+				"Suggestions rules: exactly 3 useful next messages, each under 80 characters, same language as the conversation.",
+				shouldGenerateTitle ? null : "Set title to an empty string.",
+				shouldGenerateSuggestions ? null : "Set suggestions to an empty array.",
+				`User message: ${input.userMessage.slice(0, 1_500)}`,
+				`Assistant answer: ${input.assistantText.slice(0, 4_000)}`,
+			]
+				.filter(Boolean)
+				.join("\n\n"),
+		});
+		const parsed = parseArtifacts(text);
+		return {
+			title: shouldGenerateTitle
+				? sanitizeTitle(parsed.title, input.fallbackTitle)
+				: input.fallbackTitle,
+			suggestions: shouldGenerateSuggestions
+				? sanitizeSuggestions(parsed.suggestions)
+				: [],
+		};
+	} catch (error) {
+		logger.warn("Failed to generate chat automation artifacts", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return { title: input.fallbackTitle, suggestions: [] };
+	}
 }
 
 export async function generateConversationTitle(input: {
 	userMessage: string;
 	fallback: string;
 }) {
-	const config = await getChatAutomationConfig();
-	if (!config.enabled || !config.generateTitles) return input.fallback;
-
-	try {
-		const title = await generateWithAutomationModel(
-			[
-				"Generate a concise conversation title.",
-				"Rules: 3 to 7 words, no quotes, no trailing punctuation, same language as the user if obvious.",
-				`User message: ${input.userMessage.slice(0, 2_000)}`,
-			].join("\n"),
-			32,
-		);
-		return sanitizeTitle(title ?? input.fallback, input.fallback);
-	} catch (error) {
-		logger.warn("Failed to generate conversation title", {
-			error: error instanceof Error ? error.message : String(error),
-		});
-		return input.fallback;
-	}
+	const artifacts = await generateChatAutomationArtifacts({
+		userMessage: input.userMessage,
+		assistantText: "",
+		fallbackTitle: input.fallback,
+	});
+	return artifacts.title;
 }
 
 export async function generateNextChatSuggestions(input: {
 	userMessage: string;
 	assistantText: string;
 }) {
-	const config = await getChatAutomationConfig();
-	if (!config.enabled || !config.generateSuggestions) return [];
-
-	try {
-		const text = await generateWithAutomationModel(
-			[
-				"Generate 3 short follow-up chat suggestions for the user.",
-				"Rules: reply as a JSON array of strings only, each suggestion under 80 characters, no markdown.",
-				`User message: ${input.userMessage.slice(0, 1_500)}`,
-				`Assistant answer: ${input.assistantText.slice(0, 4_000)}`,
-			].join("\n\n"),
-			160,
-		);
-		return parseSuggestions(text ?? "");
-	} catch (error) {
-		logger.warn("Failed to generate next chat suggestions", {
-			error: error instanceof Error ? error.message : String(error),
-		});
-		return [];
-	}
+	const artifacts = await generateChatAutomationArtifacts({
+		userMessage: input.userMessage,
+		assistantText: input.assistantText,
+		fallbackTitle: "",
+	});
+	return artifacts.suggestions;
 }
 
 function sanitizeTitle(value: string, fallback: string) {
@@ -240,23 +270,26 @@ function sanitizeTitle(value: string, fallback: string) {
 	return (title || fallback).slice(0, 100);
 }
 
-function parseSuggestions(value: string) {
+function parseArtifacts(value: string) {
 	const cleaned = value
 		.replace(/^```(?:json)?/i, "")
 		.replace(/```$/i, "")
 		.trim();
 	try {
 		const parsed = JSON.parse(cleaned) as unknown;
-		if (Array.isArray(parsed)) return sanitizeSuggestions(parsed);
+		if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+			const record = parsed as Record<string, unknown>;
+			return {
+				title: typeof record.title === "string" ? record.title : "",
+				suggestions: Array.isArray(record.suggestions)
+					? record.suggestions
+					: [],
+			};
+		}
 	} catch {
-		// fall back to line parsing
+		// fall through to a safe empty shape
 	}
-	return sanitizeSuggestions(
-		cleaned
-			.split(/\r?\n/)
-			.map((line) => line.replace(/^[-*\d.)\s]+/, "").trim())
-			.filter(Boolean),
-	);
+	return { title: "", suggestions: [] };
 }
 
 function sanitizeSuggestions(values: unknown[]) {
