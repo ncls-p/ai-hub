@@ -5,6 +5,7 @@ import { WorkspacePage } from "@/components/workspace-page";
 import { ChatAutomationSettings } from "@/components/admin/chat-automation-settings";
 import { CustomToolBuilderSettings } from "@/components/admin/custom-tool-builder-settings";
 import { RegistrationSettings } from "@/components/admin/registration-settings";
+import { SidebarNavigationSettings } from "@/components/admin/sidebar-navigation-settings";
 import { SystemHealthCard } from "@/components/admin/system-health-card";
 import {
 	Empty,
@@ -56,6 +57,7 @@ export default async function AdminSettingsPage() {
 					<RegistrationSettings initialState={registration} />
 					<SystemHealthCard />
 				</div>
+				<SidebarNavigationSettings />
 				<ChatAutomationSettings />
 				<CustomToolBuilderSettings />
 			</div>

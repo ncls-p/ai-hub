@@ -8,6 +8,7 @@ import { WorkspaceProvider } from "@/components/workspace-provider";
 import { env } from "@/lib/env";
 import { ensureBootstrapAdmin, isAdminRole } from "@/modules/admin/use-cases";
 import { getSession } from "@/modules/auth/session";
+import { getSidebarNavConfig } from "@/modules/navigation/sidebar-config.server";
 import {
 	createWorkspace,
 	countWorkspaces,
@@ -80,6 +81,7 @@ export default async function WorkspaceLayout({
 	await ensureDefaultWorkspace(user);
 	const displayName = user.name || user.email;
 	const isAdmin = isAdminRole(user.role) || bootstrappedAdminId === user.id;
+	const sidebarNavConfig = await getSidebarNavConfig();
 
 	return (
 		<WorkspaceProvider>
@@ -88,6 +90,7 @@ export default async function WorkspaceLayout({
 				displayName={displayName}
 				currentUserId={user.id}
 				isAdmin={isAdmin}
+				sidebarNavConfig={sidebarNavConfig ?? undefined}
 			>
 				<div className="page-content h-full">{children}</div>
 			</AppShell>

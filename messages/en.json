@@ -516,6 +516,25 @@
         "database": "Database",
         "marketplacePending": "Marketplace pending review"
       },
+      "sidebarNavigation": {
+        "title": "Sidebar navigation",
+        "description": "Reorder workspace navigation items and choose which pages appear in the sidebar for everyone.",
+        "statusCustom": "Custom",
+        "statusDefault": "Default layout",
+        "hint": "Drag items to reorder them. Choose whether each page appears in the main sidebar or in the collapsible Advanced section. Disabled items stay available by direct URL but are hidden from the sidebar. Admin-only pages still respect role permissions.",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "section": "Section",
+        "sectionPrimary": "Main",
+        "sectionAdvanced": "Advanced",
+        "sectionFor": "Section for {item}",
+        "toggleVisibility": "Show or hide {item}",
+        "visibleCount": "{count} of {total} items visible",
+        "save": "Save navigation",
+        "saved": "Sidebar navigation saved",
+        "reset": "Restore default layout",
+        "resetDone": "Default sidebar layout restored"
+      },
       "chatAutomation": {
         "title": "Chat automation",
         "description": "Choose the small model used for conversation titles and next-message suggestions.",

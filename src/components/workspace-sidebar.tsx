@@ -38,12 +38,12 @@ import {
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
-	buildMenuGroups,
 	isNavItemActive,
 	type NavGroup,
 	type NavItem,
 	type WorkspaceShellState,
 } from "@/lib/workspace-nav";
+import { buildMenuGroups } from "@/modules/navigation/sidebar-config";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "workspace-sidebar-collapsed";

@@ -37,6 +37,13 @@ export type WorkspaceShellState = {
 	isAdmin?: boolean;
 	pendingToolCount: number;
 	permissions: WorkspacePermissions;
+	sidebarNavConfig?: {
+		items: Array<{
+			id: string;
+			visible: boolean;
+			section?: "primary" | "advanced";
+		}>;
+	};
 };
 
 export const primaryNavItems: NavItem[] = [
@@ -92,44 +99,6 @@ export function getRouteTitleKey(pathname: string): string {
 		.sort((a, b) => b[0].length - a[0].length)
 		.find(([href]) => pathname === href || pathname.startsWith(`${href}/`));
 	return match?.[1] ?? "workspace";
-}
-
-export function buildMenuGroups({
-	isAdmin,
-	pendingToolCount,
-	permissions,
-}: WorkspaceShellState): NavGroup[] {
-	const toolsItem: NavItem = {
-		href: "/tools",
-		labelKey: "toolsHub",
-		icon: WrenchIcon,
-		badge: pendingToolCount > 0 ? pendingToolCount : undefined,
-	};
-
-	const adminItems = adminNavItems.filter((item) => {
-		if (item.href === "/usage") return permissions.canViewUsage;
-		if (item.href === "/audit") return permissions.canViewAudit;
-		if (item.href === "/admin/settings") return isAdmin;
-		return true;
-	});
-
-	const capabilities = capabilitiesNavItems.map((item) =>
-		item.href === "/tools" ? toolsItem : item,
-	);
-
-	const groups: NavGroup[] = [
-		{ labelKey: "primary", items: [...primaryNavItems, ...capabilities] },
-		{
-			labelKey: "advanced",
-			items: [
-				...advancedCapabilityNavItems,
-				...configNavItems,
-				...adminItems,
-			],
-		},
-	];
-
-	return groups.filter((group) => group.items.length > 0);
 }
 
 export function isNavItemActive(pathname: string, href: string): boolean {

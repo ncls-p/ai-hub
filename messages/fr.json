@@ -516,6 +516,25 @@
         "database": "Base de données",
         "marketplacePending": "Marketplace en attente de revue"
       },
+      "sidebarNavigation": {
+        "title": "Navigation latérale",
+        "description": "Réordonnez les entrées de navigation et choisissez les pages visibles dans la sidebar pour tous les utilisateurs.",
+        "statusCustom": "Personnalisée",
+        "statusDefault": "Disposition par défaut",
+        "hint": "Glissez les entrées pour les réordonner. Choisissez si chaque page apparaît dans la navigation principale ou dans la section Advanced repliable. Les éléments masqués restent accessibles par URL directe mais n’apparaissent plus dans la sidebar. Les pages admin restent soumises aux permissions.",
+        "moveUp": "Monter",
+        "moveDown": "Descendre",
+        "section": "Section",
+        "sectionPrimary": "Principal",
+        "sectionAdvanced": "Advanced",
+        "sectionFor": "Section pour {item}",
+        "toggleVisibility": "Afficher ou masquer {item}",
+        "visibleCount": "{count} sur {total} éléments visibles",
+        "save": "Enregistrer la navigation",
+        "saved": "Navigation latérale enregistrée",
+        "reset": "Restaurer la disposition par défaut",
+        "resetDone": "Disposition par défaut restaurée"
+      },
       "chatAutomation": {
         "title": "Automatisation du chat",
         "description": "Choisissez le petit modèle utilisé pour les titres de conversation et les suggestions de messages.",

@@ -20,6 +20,7 @@ import {
 	type WorkspacePermissions,
 	type WorkspaceShellState,
 } from "@/lib/workspace-nav";
+import type { SidebarNavConfig } from "@/modules/navigation/sidebar-config";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
@@ -27,6 +28,7 @@ interface AppShellProps {
 	displayName?: string;
 	currentUserId?: string;
 	isAdmin?: boolean;
+	sidebarNavConfig?: SidebarNavConfig;
 }
 
 const WorkspaceShellContext = createContext<WorkspaceShellState | null>(null);
@@ -44,6 +46,7 @@ export function AppShell({
 	displayName,
 	currentUserId,
 	isAdmin,
+	sidebarNavConfig,
 }: AppShellProps) {
 	const pathname = usePathname();
 	const tNav = useTranslations("nav");
@@ -116,8 +119,16 @@ export function AppShell({
 			isAdmin,
 			pendingToolCount,
 			permissions,
+			sidebarNavConfig,
 		}),
-		[displayName, currentUserId, isAdmin, pendingToolCount, permissions],
+		[
+			displayName,
+			currentUserId,
+			isAdmin,
+			pendingToolCount,
+			permissions,
+			sidebarNavConfig,
+		],
 	);
 
 	return (
