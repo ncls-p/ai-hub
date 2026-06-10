@@ -257,6 +257,39 @@
       "approvals": "Approvals"
     },
     "builtinHelp": "Capabilities shipped with AI Hub.",
+    "builtin": {
+      "eyebrow": "Platform toolkit",
+      "title": "Built-in tools",
+      "description": "Native capabilities your assistants can call during conversations. Enable them per assistant from the Agents page.",
+      "enableCta": "Configure assistants",
+      "searchPlaceholder": "Search tools…",
+      "allCategories": "All",
+      "resultsCount": "{count, plural, one {# tool} other {# tools}}",
+      "noResults": "No tools match your search",
+      "noResultsHint": "Try another keyword or clear the category filter.",
+      "requiresApproval": "Requires human approval before running",
+      "stats": {
+        "total": "Tools",
+        "low": "Low risk",
+        "medium": "Medium risk",
+        "high": "High risk"
+      },
+      "risk": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "categories": {
+        "Think": "Reasoning",
+        "Time": "Time & dates",
+        "Web": "Web",
+        "Create": "Creation",
+        "Code": "Code & data",
+        "Write": "Writing",
+        "Design": "Design"
+      }
+    },
     "mcpHelp": "External tools connected via the Model Context Protocol.",
     "skillsHelp": "Install Markdown-only agent skills from skills.sh and attach them to assistants.",
     "approvalsHelp": "Review tool calls that need human approval.",

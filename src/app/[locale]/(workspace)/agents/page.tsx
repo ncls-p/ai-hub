@@ -21,6 +21,7 @@ import {
 	UsersIcon,
 	GlobeIcon,
 	StarIcon,
+	Store,
 	XIcon,
 	Share2,
 } from "lucide-react";
@@ -473,7 +474,9 @@ export default function AgentsPage() {
 													) : (
 														<ClockIcon className="size-3" aria-hidden="true" />
 													)}
-													{isReady ? t("statusReady") : tList("statusNeedsSetup")}
+													{isReady
+														? t("statusReady")
+														: tList("statusNeedsSetup")}
 												</Badge>
 											</div>
 											<p className="truncate font-mono text-xs text-muted-foreground">
@@ -590,6 +593,59 @@ export default function AgentsPage() {
 													<Share2 className="size-4" />
 													{tShare("action")}
 												</DropdownMenuItem>
+												<DropdownMenuItem
+													onClick={() =>
+														setShareResource({
+															kind: "agent",
+															id: agent.id,
+															name: agent.name,
+															description: agent.description,
+														})
+													}
+												>
+													<Share2 className="size-4" />
+													{tShare("action")}
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													onClick={async () => {
+														try {
+															const res = await fetch(
+																`/api/marketplace/items`,
+																{
+																	method: "POST",
+																	headers: {
+																		"Content-Type": "application/json",
+																	},
+																	body: JSON.stringify({
+																		workspaceId,
+																		agentId: agent.id,
+																		version: "1.0.0",
+																		name: agent.name,
+																		description: agent.description || "",
+																		draftOnly: true,
+																	}),
+																},
+															);
+															if (!res.ok) {
+																const err = await res.json();
+																throw new Error(
+																	err.error || "Publication échouée",
+																);
+															}
+															toast.success(tShare("publishedDraft"));
+															await refreshAgents();
+														} catch (err) {
+															toast.error(
+																err instanceof Error
+																	? err.message
+																	: "Une erreur est survenue",
+															);
+														}
+													}}
+												>
+													<Store className="size-4" />
+													{tShare("publish")}
+												</DropdownMenuItem>
 												<DropdownMenuSeparator />
 												<DropdownMenuItem
 													variant="destructive"
@@ -695,7 +751,9 @@ export default function AgentsPage() {
 								</div>
 								{form.sharingMode === "specific_user" ? (
 									<div className="flex flex-col gap-2">
-										<Label htmlFor="agent-share-email">{tList("userEmail")}</Label>
+										<Label htmlFor="agent-share-email">
+											{tList("userEmail")}
+										</Label>
 										<Input
 											id="agent-share-email"
 											type="email"
@@ -744,7 +802,9 @@ export default function AgentsPage() {
 													<SelectValue />
 												</SelectTrigger>
 												<SelectContent>
-													<SelectItem value="none">{tList("curationNone")}</SelectItem>
+													<SelectItem value="none">
+														{tList("curationNone")}
+													</SelectItem>
 													<SelectItem value="recommended">
 														{tList("badgeRecommended")}
 													</SelectItem>

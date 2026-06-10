@@ -257,6 +257,39 @@
       "approvals": "Approbations"
     },
     "builtinHelp": "Capacités fournies par AI Hub.",
+    "builtin": {
+      "eyebrow": "Boîte à outils plateforme",
+      "title": "Outils intégrés",
+      "description": "Capacités natives que vos assistants peuvent appeler en conversation. Activez-les par assistant depuis la page Assistants.",
+      "enableCta": "Configurer les assistants",
+      "searchPlaceholder": "Rechercher un outil…",
+      "allCategories": "Tout",
+      "resultsCount": "{count, plural, one {# outil} other {# outils}}",
+      "noResults": "Aucun outil ne correspond",
+      "noResultsHint": "Essayez un autre mot-clé ou retirez le filtre de catégorie.",
+      "requiresApproval": "Approbation humaine requise avant exécution",
+      "stats": {
+        "total": "Outils",
+        "low": "Risque faible",
+        "medium": "Risque moyen",
+        "high": "Risque élevé"
+      },
+      "risk": {
+        "low": "Faible",
+        "medium": "Moyen",
+        "high": "Élevé",
+        "critical": "Critique"
+      },
+      "categories": {
+        "Think": "Raisonnement",
+        "Time": "Temps & dates",
+        "Web": "Web",
+        "Create": "Création",
+        "Code": "Code & données",
+        "Write": "Rédaction",
+        "Design": "Design"
+      }
+    },
     "mcpHelp": "Outils externes via le Model Context Protocol.",
     "skillsHelp": "Installez des skills Markdown-only depuis skills.sh et attachez-les aux assistants.",
     "approvalsHelp": "Validez les appels d’outils sensibles.",
