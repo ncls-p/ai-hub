@@ -328,6 +328,7 @@ export function CapabilitiesTab({
 	onSave: () => void;
 }) {
 	const t = useTranslations("agents.configurePage");
+	const tCap = useTranslations("agents.capabilities");
 	const tCommon = useTranslations("common");
 
 	return (
@@ -410,18 +411,18 @@ export function CapabilitiesTab({
 			</ConfigSection>
 
 			<ConfigSection
-				title="Mes tools custom"
-				description="Tools créés par toi uniquement. Ils ne sont pas visibles par les autres utilisateurs."
+				title={tCap("customToolsTitle")}
+				description={tCap("customToolsHint")}
 				icon={WrenchIcon}
 				stagger="5"
 			>
 				{customTools.length === 0 ? (
 					<div className="flex flex-col items-center gap-3 py-6 text-center">
 						<p className="text-sm text-muted-foreground">
-							Aucun tool custom pour l’instant.
+							{tCap("noCustomTools")}
 						</p>
 						<Button variant="outline" size="sm" asChild>
-							<Link href="/custom-tools">Créer un tool</Link>
+							<Link href="/custom-tools">{tCap("createCustomTool")}</Link>
 						</Button>
 					</div>
 				) : (
@@ -463,8 +464,8 @@ export function CapabilitiesTab({
 			</ConfigSection>
 
 			<ConfigSection
-				title="Skills"
-				description="Instructions Markdown installées depuis skills.sh. Aucun fichier Python ou script n’est attaché aux assistants."
+				title={tCap("skillsTitle")}
+				description={tCap("skillsHint")}
 				icon={BookMarkedIcon}
 				stagger="5"
 			>
@@ -475,12 +476,12 @@ export function CapabilitiesTab({
 							aria-hidden="true"
 						/>
 						<p className="text-sm text-muted-foreground">
-							Aucun skill installé pour l’instant.
+							{tCap("noSkills")}
 						</p>
 						<Button variant="outline" size="sm" asChild>
 							<Link href="/tools?tab=skills">
 								<PlusIcon className="size-4" aria-hidden="true" />
-								Installer un skill
+								{tCap("installSkill")}
 							</Link>
 						</Button>
 					</div>

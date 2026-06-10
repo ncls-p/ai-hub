@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ClipboardListIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PageLoading, ListSkeleton } from "@/components/page-loading";
@@ -44,6 +45,8 @@ interface AuditEvent {
 }
 
 export default function AuditPage() {
+	const t = useTranslations("admin");
+	const tCommon = useTranslations("common");
 	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
 	const [events, setEvents] = useState<AuditEvent[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -111,13 +114,13 @@ export default function AuditPage() {
 	}, [loadEvents, workspaceId]);
 
 	if (workspaceLoading || !workspaceId) {
-		return <PageLoading label="Loading" />;
+		return <PageLoading label={tCommon("loading")} />;
 	}
 
 	return (
 		<WorkspacePage
-			title="Audit Log"
-			description="Track security-sensitive actions, changes, and access events."
+			title={t("auditTitle")}
+			description={t("auditDescription")}
 			width="default"
 		>
 			<Card size="sm">

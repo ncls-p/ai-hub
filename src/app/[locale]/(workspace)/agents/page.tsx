@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { AdvancedSection } from "@/components/ui/advanced-section";
 import {
@@ -104,21 +104,32 @@ function slugifyAgentName(value: string) {
 	);
 }
 
-function timeAgo(dateString: string): string {
+function timeAgo(
+	dateString: string,
+	tList: (key: string, values?: { count: number }) => string,
+	locale: string,
+): string {
 	const now = new Date();
 	const date = new Date(dateString);
 	const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-	if (seconds < 60) return "just now";
-	if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-	if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-	if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-	return date.toLocaleDateString();
+	if (seconds < 60) return tList("timeJustNow");
+	if (seconds < 3600)
+		return tList("timeMinutesAgo", { count: Math.floor(seconds / 60) });
+	if (seconds < 86400)
+		return tList("timeHoursAgo", { count: Math.floor(seconds / 3600) });
+	if (seconds < 604800)
+		return tList("timeDaysAgo", { count: Math.floor(seconds / 86400) });
+	return date.toLocaleDateString(locale);
 }
 
 export default function AgentsPage() {
+	const locale = useLocale();
 	const t = useTranslations("agents");
+	const tList = useTranslations("agents.list");
 	const tCommon = useTranslations("common");
+	const tShare = useTranslations("marketplace.share");
+	const tChat = useTranslations("chat");
 	const router = useRouter();
 	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
 	const [agents, setAgents] = useState<Agent[]>([]);
@@ -283,10 +294,10 @@ export default function AgentsPage() {
 
 			if (!res.ok) {
 				const err = await res.json();
-				throw new Error(err.error || "Failed to create agent");
+				throw new Error(err.error || tList("toastCreateFailed"));
 			}
 
-			toast.success("Agent created");
+			toast.success(tList("toastCreated"));
 			setShowCreateDialog(false);
 			setForm({
 				name: "",
@@ -301,7 +312,7 @@ export default function AgentsPage() {
 			await refreshAgents();
 		} catch (err) {
 			toast.error(
-				err instanceof Error ? err.message : "Failed to create agent",
+				err instanceof Error ? err.message : tList("toastCreateFailed"),
 			);
 		} finally {
 			setCreating(false);
@@ -321,15 +332,15 @@ export default function AgentsPage() {
 
 			if (!res.ok) {
 				const err = await res.json();
-				throw new Error(err.error || "Failed to delete agent");
+				throw new Error(err.error || tList("toastDeleteFailed"));
 			}
 
-			toast.success("Agent deleted");
+			toast.success(tList("toastDeleted"));
 			setDeleteAgentId(null);
 			await refreshAgents();
 		} catch (err) {
 			toast.error(
-				err instanceof Error ? err.message : "Failed to delete agent",
+				err instanceof Error ? err.message : tList("toastDeleteFailed"),
 			);
 		} finally {
 			setDeleting(false);
@@ -347,18 +358,18 @@ export default function AgentsPage() {
 	});
 
 	if (workspaceLoading || !workspaceId) {
-		return <PageLoading label="Loading" />;
+		return <PageLoading label={tCommon("loading")} />;
 	}
 
 	return (
 		<WorkspacePage
-			title="Assistants"
-			description="Manage your AI assistants — each one can have its own model, system prompt, tools, and knowledge bases."
+			title={t("title")}
+			description={tList("pageDescription")}
 			width="default"
 			actions={
 				<Button size="sm" onClick={() => setShowCreateDialog(true)}>
 					<PlusIcon className="size-4" aria-hidden="true" />
-					New assistant
+					{t("create")}
 				</Button>
 			}
 		>
@@ -368,10 +379,9 @@ export default function AgentsPage() {
 					{/* Toolbar */}
 					<div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
 						<div>
-							<h3 className="text-base font-semibold">Assistants</h3>
+							<h3 className="text-base font-semibold">{t("title")}</h3>
 							<p className="text-sm text-muted-foreground">
-								{agents.length} assistant{agents.length !== 1 ? "s" : ""}{" "}
-								configured
+								{tList("configuredCount", { count: agents.length })}
 							</p>
 						</div>
 						<div className="flex items-center gap-2">
@@ -379,7 +389,7 @@ export default function AgentsPage() {
 								<div className="relative w-48 sm:w-56">
 									<SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 									<Input
-										placeholder="Filter…"
+										placeholder={tList("filterPlaceholder")}
 										value={searchQuery}
 										onChange={(e) => setSearchQuery(e.target.value)}
 										className="h-8 pl-9 text-sm"
@@ -390,7 +400,7 @@ export default function AgentsPage() {
 											size="icon-sm"
 											className="absolute right-1 top-1/2 size-6 -translate-y-1/2"
 											onClick={() => setSearchQuery("")}
-											aria-label="Clear search"
+											aria-label={tList("clearSearch")}
 										>
 											<XIcon className="size-3" aria-hidden="true" />
 										</Button>
@@ -407,11 +417,9 @@ export default function AgentsPage() {
 						</div>
 					) : agents.length === 0 ? (
 						<div className="px-5 py-12 text-center">
-							<p className="text-sm font-medium">No assistants yet</p>
+							<p className="text-sm font-medium">{tList("emptyTitle")}</p>
 							<p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-								Create your first assistant to start chatting with AI. Each
-								assistant gets its own model, system prompt, tools, and
-								knowledge bases.
+								{tList("emptyDescription")}
 							</p>
 							<Button
 								size="sm"
@@ -419,12 +427,12 @@ export default function AgentsPage() {
 								onClick={() => setShowCreateDialog(true)}
 							>
 								<PlusIcon className="size-4" aria-hidden="true" />
-								Create your first assistant
+								{tList("emptyCta")}
 							</Button>
 						</div>
 					) : filteredAgents.length === 0 ? (
 						<div className="px-5 py-8 text-center text-sm text-muted-foreground">
-							No assistant matches &ldquo;{searchQuery}&rdquo;.
+							{tList("noMatch", { query: searchQuery })}
 						</div>
 					) : (
 						<div className="p-2 space-y-1">
@@ -465,13 +473,16 @@ export default function AgentsPage() {
 													) : (
 														<ClockIcon className="size-3" aria-hidden="true" />
 													)}
-													{isReady ? "Ready" : "Needs setup"}
+													{isReady ? t("statusReady") : tList("statusNeedsSetup")}
 												</Badge>
 											</div>
 											<p className="truncate font-mono text-xs text-muted-foreground">
 												{agent.description
 													? agent.description
-													: `slug: ${agent.slug} · created ${timeAgo(agent.createdAt)}`}
+													: tList("metaSlugCreated", {
+															slug: agent.slug,
+															date: timeAgo(agent.createdAt, tList, locale),
+														})}
 											</p>
 										</div>
 
@@ -480,25 +491,25 @@ export default function AgentsPage() {
 											{agent.sharingMode === "marketplace" && (
 												<Badge variant="secondary" className="gap-1">
 													<UsersIcon className="size-3" aria-hidden="true" />
-													Team
+													{tList("badgeTeam")}
 												</Badge>
 											)}
 											{agent.sharingMode === "specific_user" && (
 												<Badge variant="secondary" className="gap-1">
 													<ShieldIcon className="size-3" aria-hidden="true" />
-													Shared
+													{tList("badgeShared")}
 												</Badge>
 											)}
 											{agent.isGlobal && (
 												<Badge variant="secondary" className="gap-1">
 													<GlobeIcon className="size-3" aria-hidden="true" />
-													Global
+													{tList("badgeGlobal")}
 												</Badge>
 											)}
 											{agent.isRecommended && (
 												<Badge variant="secondary" className="gap-1">
 													<StarIcon className="size-3" aria-hidden="true" />
-													Recommended
+													{tList("badgeRecommended")}
 												</Badge>
 											)}
 										</div>
@@ -532,7 +543,7 @@ export default function AgentsPage() {
 												)
 											}
 										>
-											{isReady ? "Chat" : "Setup"}
+											{isReady ? t("chat") : tList("setup")}
 										</Button>
 
 										{/* Dropdown actions */}
@@ -542,7 +553,7 @@ export default function AgentsPage() {
 													size="icon-sm"
 													variant="ghost"
 													className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-													aria-label="Agent actions"
+													aria-label={tList("agentActions")}
 												>
 													<MoreHorizontal className="size-4" />
 												</Button>
@@ -558,13 +569,13 @@ export default function AgentsPage() {
 													}
 												>
 													<SparklesIcon className="size-4" />
-													{isReady ? "Chat now" : "Finish setup"}
+													{isReady ? tCommon("chatNow") : tChat("finishSetup")}
 												</DropdownMenuItem>
 												<DropdownMenuItem
 													onClick={() => router.push(`/agents/${agent.id}`)}
 												>
 													<PencilIcon className="size-4" />
-													Configure
+													{t("configure")}
 												</DropdownMenuItem>
 												<DropdownMenuItem
 													onClick={() =>
@@ -577,7 +588,7 @@ export default function AgentsPage() {
 													}
 												>
 													<Share2 className="size-4" />
-													Partager
+													{tShare("action")}
 												</DropdownMenuItem>
 												<DropdownMenuSeparator />
 												<DropdownMenuItem
@@ -585,7 +596,7 @@ export default function AgentsPage() {
 													onClick={() => setDeleteAgentId(agent.id)}
 												>
 													<Trash2Icon className="size-4" />
-													Delete agent
+													{t("configurePage.delete")}
 												</DropdownMenuItem>
 											</DropdownMenuContent>
 										</DropdownMenu>
@@ -642,10 +653,10 @@ export default function AgentsPage() {
 						>
 							<div className="flex flex-col gap-4">
 								<div className="flex flex-col gap-2">
-									<Label htmlFor="agent-slug">Slug</Label>
+									<Label htmlFor="agent-slug">{tList("slug")}</Label>
 									<Input
 										id="agent-slug"
-										placeholder="my-assistant"
+										placeholder={tList("slugPlaceholder")}
 										value={form.slug}
 										onChange={(e) =>
 											setForm({
@@ -656,7 +667,7 @@ export default function AgentsPage() {
 									/>
 								</div>
 								<div className="flex flex-col gap-2">
-									<Label htmlFor="agent-sharing">Access</Label>
+									<Label htmlFor="agent-sharing">{tList("access")}</Label>
 									<Select
 										value={form.sharingMode}
 										onValueChange={(value) =>
@@ -670,19 +681,21 @@ export default function AgentsPage() {
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="personal">Personal</SelectItem>
+											<SelectItem value="personal">
+												{t("configurePage.sharingPersonal")}
+											</SelectItem>
 											<SelectItem value="marketplace">
-												Share with team
+												{t("configurePage.sharingWorkspace")}
 											</SelectItem>
 											<SelectItem value="specific_user">
-												Specific user
+												{t("configurePage.sharingUser")}
 											</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
 								{form.sharingMode === "specific_user" ? (
 									<div className="flex flex-col gap-2">
-										<Label htmlFor="agent-share-email">User email</Label>
+										<Label htmlFor="agent-share-email">{tList("userEmail")}</Label>
 										<Input
 											id="agent-share-email"
 											type="email"
@@ -704,7 +717,7 @@ export default function AgentsPage() {
 														setForm({ ...form, isGlobal: checked === true })
 													}
 												/>
-												<label htmlFor="agent-global">Global</label>
+												<label htmlFor="agent-global">{tList("global")}</label>
 											</div>
 											<div className="flex items-center gap-2">
 												<Checkbox
@@ -717,7 +730,9 @@ export default function AgentsPage() {
 														})
 													}
 												/>
-												<label htmlFor="agent-recommended">Recommended</label>
+												<label htmlFor="agent-recommended">
+													{t("configurePage.recommended")}
+												</label>
 											</div>
 											<Select
 												value={form.curationLabel}
@@ -729,12 +744,12 @@ export default function AgentsPage() {
 													<SelectValue />
 												</SelectTrigger>
 												<SelectContent>
-													<SelectItem value="none">No label</SelectItem>
+													<SelectItem value="none">{tList("curationNone")}</SelectItem>
 													<SelectItem value="recommended">
-														Recommended
+														{tList("badgeRecommended")}
 													</SelectItem>
 													<SelectItem value="organization_created">
-														Organization created
+														{tList("curationOrgCreated")}
 													</SelectItem>
 												</SelectContent>
 											</Select>
@@ -749,7 +764,7 @@ export default function AgentsPage() {
 							variant="outline"
 							onClick={() => setShowCreateDialog(false)}
 						>
-							Cancel
+							{tCommon("cancel")}
 						</Button>
 						<Button
 							onClick={handleCreate}
@@ -764,10 +779,10 @@ export default function AgentsPage() {
 							{creating ? (
 								<>
 									<Loader2 className="size-4 animate-spin" aria-hidden="true" />
-									Creating…
+									{tList("creating")}
 								</>
 							) : (
-								"Create agent"
+								tList("createAgent")
 							)}
 						</Button>
 					</DialogFooter>
@@ -783,20 +798,21 @@ export default function AgentsPage() {
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Delete agent?</AlertDialogTitle>
+						<AlertDialogTitle>{tList("deleteTitle")}</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently removes the agent and its configuration versions.
-							This action cannot be undone.
+							{tList("deleteDescription")}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+						<AlertDialogCancel disabled={deleting}>
+							{tCommon("cancel")}
+						</AlertDialogCancel>
 						<AlertDialogAction
 							variant="destructive"
 							disabled={deleting}
 							onClick={() => void handleDelete()}
 						>
-							{deleting ? "Deleting…" : "Delete agent"}
+							{deleting ? tList("deleting") : t("configurePage.delete")}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

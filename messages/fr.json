@@ -152,23 +152,99 @@
       "knowledgeCount": "{count} bases de connaissances",
       "toolsCount": "{count} outils actifs",
       "notConfigured": "Non configuré"
+    },
+    "list": {
+      "pageDescription": "Gérez vos assistants IA — chacun peut avoir son propre modèle, instructions, outils et bases de connaissances.",
+      "configuredCount": "{count, plural, one {# assistant configuré} other {# assistants configurés}}",
+      "filterPlaceholder": "Filtrer…",
+      "clearSearch": "Effacer la recherche",
+      "emptyTitle": "Aucun assistant",
+      "emptyDescription": "Créez votre premier assistant pour discuter avec l’IA. Chaque assistant a son modèle, ses instructions, ses outils et ses bases de connaissances.",
+      "emptyCta": "Créer votre premier assistant",
+      "noMatch": "Aucun assistant ne correspond à « {query} ».",
+      "statusNeedsSetup": "À configurer",
+      "metaSlugCreated": "slug : {slug} · créé {date}",
+      "badgeTeam": "Équipe",
+      "badgeShared": "Partagé",
+      "badgeGlobal": "Global",
+      "badgeRecommended": "Recommandé",
+      "setup": "Configurer",
+      "agentActions": "Actions de l’assistant",
+      "deleteTitle": "Supprimer l’assistant ?",
+      "deleteDescription": "Cela supprime définitivement l’assistant et toutes ses versions de configuration. Cette action est irréversible.",
+      "deleting": "Suppression…",
+      "creating": "Création…",
+      "createAgent": "Créer l’assistant",
+      "slug": "Slug",
+      "slugPlaceholder": "mon-assistant",
+      "access": "Accès",
+      "userEmail": "E-mail de l’utilisateur",
+      "global": "Global",
+      "curationNone": "Aucun libellé",
+      "curationOrgCreated": "Créé par l’organisation",
+      "toastCreated": "Assistant créé",
+      "toastCreateFailed": "Échec de la création",
+      "toastDeleted": "Assistant supprimé",
+      "toastDeleteFailed": "Échec de la suppression",
+      "timeJustNow": "à l’instant",
+      "timeMinutesAgo": "il y a {count} min",
+      "timeHoursAgo": "il y a {count} h",
+      "timeDaysAgo": "il y a {count} j"
+    },
+    "capabilities": {
+      "customToolsTitle": "Mes outils personnalisés",
+      "customToolsHint": "Outils créés par vous uniquement. Ils ne sont pas visibles par les autres utilisateurs.",
+      "noCustomTools": "Aucun outil personnalisé pour l’instant.",
+      "createCustomTool": "Créer un outil",
+      "skillsTitle": "Compétences",
+      "skillsHint": "Instructions Markdown installées depuis skills.sh. Aucun fichier Python ni script n’est attaché aux assistants.",
+      "noSkills": "Aucune compétence installée pour l’instant.",
+      "installSkill": "Installer une compétence",
+      "mcpToolsSummary": "{total} outil(s) · {enabled} activé(s)"
     }
   },
   "providers": {
     "title": "Connexions IA",
-    "description": "Connectez des fournisseurs et gérez les modèles de l’espace.",
+    "description": "Connectez des fournisseurs IA et gérez les modèles disponibles pour vos assistants.",
+    "setupDescription": "Terminez la configuration avant de gérer les connexions IA.",
     "add": "Ajouter une connexion",
     "test": "Tester",
     "manageModels": "Modèles",
-    "advancedHint": "Type, authentification et en-têtes personnalisés"
+    "advancedHint": "Type, authentification et en-têtes personnalisés",
+    "loadFailed": "Impossible de charger les fournisseurs"
   },
   "knowledge": {
     "title": "Connaissances",
-    "description": "Documents que vos assistants peuvent interroger.",
+    "description": "Ajoutez des documents et liez-les aux assistants pour qu’ils puissent s’y référer.",
     "emptyTitle": "Aucune base de connaissances",
     "emptyStep1": "Créer une base",
     "emptyStep2": "Ajouter des documents",
-    "emptyStep3": "Lier à un assistant"
+    "emptyStep3": "Lier à un assistant",
+    "name": "Nom",
+    "descriptionLabel": "Description",
+    "newBase": "Nouvelle base",
+    "createBase": "Créer une base",
+    "createBaseTitle": "Créer une base de connaissances",
+    "basesTitle": "Bases",
+    "basesDescription": "Choisissez l’ensemble de sources à gérer.",
+    "emptyBasesDescription": "Créez une base pour y ajouter des documents pour vos assistants.",
+    "createBaseCta": "Créer une base",
+    "selectBaseTitle": "Sélectionnez une base",
+    "selectBaseDescription": "Choisissez ou créez une base à gauche pour gérer les documents.",
+    "documents": "Documents",
+    "documentsHint": "Collez du texte à indexer. Les documents en traitement se rafraîchissent automatiquement.",
+    "dropHint": "Glissez-déposez un fichier texte ici pour l’ingérer",
+    "documentTitle": "Titre du document",
+    "documentTitlePlaceholder": "Titre du document…",
+    "documentContent": "Contenu du document",
+    "documentContentPlaceholder": "Contenu du document…",
+    "ingestDocument": "Ingérer le document",
+    "search": "Rechercher",
+    "searchPlaceholder": "Rechercher dans le texte indexé…",
+    "searchAriaLabel": "Rechercher dans le texte indexé",
+    "editBase": "Modifier la base",
+    "editAria": "Modifier {name}",
+    "deleteAria": "Supprimer {name}"
   },
   "tools": {
     "title": "Outils & intégrations",
@@ -194,19 +270,251 @@
   },
   "marketplace": {
     "title": "Marketplace",
-    "description": "Installez et partagez des assistants dans l’organisation."
+    "description": "Découvrez, installez et partagez des assistants, compétences et outils avec votre équipe.",
+    "share": {
+      "action": "Partager",
+      "title": "Partager « {name} »",
+      "stepIndicator": "Étape {current} sur {total}",
+      "steps": {
+        "meta": "Vérifiez les informations avant de partager.",
+        "secrets": "Cette ressource utilise des identifiants de connexion.",
+        "choose": "Choisissez comment la partager.",
+        "user": "Sélectionnez une personne."
+      },
+      "resourceSubject": {
+        "agent": "cet assistant",
+        "skill": "cette compétence",
+        "custom_tool": "cet outil",
+        "mcp_server": "cette connexion MCP",
+        "mcp_tool": "cet outil MCP",
+        "marketplace_item": "cette publication"
+      },
+      "existingDraft": "Une version en brouillon sera mise à jour.",
+      "fields": {
+        "name": "Nom",
+        "description": "Description",
+        "version": "Numéro de version",
+        "versionHint": "Ex. 1.0.0 — pour suivre les mises à jour",
+        "visibility": "Qui peut le voir",
+        "tags": "Mots-clés (séparés par des virgules)",
+        "releaseNotes": "Notes de cette version",
+        "releaseNotesPlaceholder": "Ex. : ajout de nouveaux outils, instructions mises à jour…"
+      },
+      "contentPreview": "Ce qui sera partagé",
+      "options": {
+        "publish": {
+          "title": "Publier pour tout le monde",
+          "description": "Visible dans la marketplace — chacun peut l’installer."
+        },
+        "user": {
+          "title": "Envoyer à une personne",
+          "description": "Partage privé avec un collègue choisi."
+        }
+      },
+      "secrets": {
+        "warning": "Si vous incluez les identifiants, la personne qui installe n’aura rien à reconfigurer. Seules les personnes autorisées pourront les utiliser.",
+        "include": "Inclure les identifiants de connexion",
+        "fieldRequired": "obligatoire"
+      },
+      "searchUser": "Rechercher par nom ou e-mail…",
+      "noUsers": "Aucune personne trouvée",
+      "next": "Suivant",
+      "toast": {
+        "published": "« {name} » est maintenant sur la marketplace",
+        "shared": "« {name} » a été partagé avec succès",
+        "publishFailed": "La publication a échoué",
+        "shareFailed": "Le partage a échoué",
+        "loadFailed": "Impossible de charger les informations",
+        "usersFailed": "Impossible de charger la liste des personnes"
+      }
+    },
+    "list": {
+      "searchPlaceholder": "Rechercher une publication…",
+      "filterType": "Type",
+      "filterSort": "Trier",
+      "types": {
+        "all": "Tous",
+        "agent": "Assistants",
+        "skill": "Compétences",
+        "custom_tool": "Outils",
+        "mcp_preset": "MCP"
+      },
+      "sort": {
+        "featured": "À la une",
+        "newest": "Plus récent",
+        "downloads": "Plus installé"
+      },
+      "tabs": {
+        "all": "Découvrir ({count})",
+        "myItems": "Mes publications ({count})",
+        "shared": "Partagés avec moi ({count})"
+      },
+      "featured": "À la une",
+      "install": "Installer",
+      "share": "Partager",
+      "delete": "Supprimer",
+      "viewDetails": "Voir les détails",
+      "emptyAll": "Aucune publication pour le moment",
+      "emptyMy": "Vous n’avez encore rien publié",
+      "emptyShared": "Rien n’a encore été partagé avec vous",
+      "deleteConfirm": "Supprimer cette publication ?",
+      "toast": {
+        "installed": "Installé avec succès",
+        "installFailed": "L’installation a échoué",
+        "credentialsNeeded": "Ajoutez les identifiants de connexion pour terminer l’installation.",
+        "featured": "Mis à la une",
+        "unfeatured": "Retiré de la une",
+        "deleted": "Publication supprimée",
+        "loadFailed": "Impossible de charger la marketplace"
+      }
+    },
+    "detail": {
+      "back": "Retour à la marketplace",
+      "description": "Description",
+      "tags": "Mots-clés",
+      "downloads": "Installations",
+      "shares": "Partages",
+      "publishedOn": "Publié le",
+      "createdOn": "Créé le",
+      "install": "Installer",
+      "share": "Partager",
+      "status": {
+        "published": "Publié",
+        "draft": "Brouillon"
+      },
+      "version": "Version {version}",
+      "publisher": "Publié par",
+      "sharedWith": "Partagé avec",
+      "removeShare": "Retirer",
+      "technicalDetails": "Détails techniques",
+      "noManifest": "Aucun détail disponible.",
+      "toast": {
+        "installed": "Installé avec succès",
+        "installFailed": "L’installation a échoué",
+        "credentialsNeeded": "Ajoutez les identifiants de connexion pour terminer l’installation.",
+        "shareRemoved": "Partage retiré",
+        "shareRemoveFailed": "Impossible de retirer le partage",
+        "loadFailed": "Publication introuvable"
+      }
+    },
+    "itemTypes": {
+      "agent": "Assistant",
+      "skill": "Compétence",
+      "custom_tool": "Outil personnalisé",
+      "mcp_preset": "Connexion MCP",
+      "prompt_template": "Modèle de prompt",
+      "tool_pack": "Pack d’outils",
+      "workflow_template": "Workflow",
+      "knowledge_template": "Connaissances",
+      "provider_preset": "Fournisseur"
+    },
+    "toolSources": {
+      "builtin": "Intégré",
+      "mcp": "MCP",
+      "custom": "Personnalisé"
+    },
+    "visibility": {
+      "public": "Public",
+      "publicHint": "Visible par toute l’équipe dans la marketplace",
+      "private": "Privé",
+      "privateHint": "Visible uniquement par vous",
+      "unlisted": "Non listé",
+      "unlistedHint": "Accessible via un lien direct, pas dans la liste",
+      "organization": "Organisation",
+      "organizationHint": "Visible par les membres de l’organisation"
+    },
+    "manifest": {
+      "provider": "Fournisseur IA",
+      "model": "Modèle",
+      "maxTokens": "Longueur max. des réponses",
+      "maxToolCalls": "Nombre max. d’outils par message",
+      "temperature": "Créativité",
+      "toolChoice": "Choix d’outils",
+      "instructions": "Instructions",
+      "linkedTools": "Outils inclus",
+      "skills": "Compétences incluses",
+      "knowledgeRefs": "Bases de connaissances liées",
+      "guardrails": "Règles de sécurité",
+      "fileCount": "{count} fichier(s)",
+      "totalSize": "{size} Ko",
+      "installCommand": "Commande d’installation",
+      "status": "État",
+      "credentialsRequired": "Identifiants requis",
+      "credentialsIncluded": "Identifiants inclus",
+      "workflow": "Workflow",
+      "inputSchema": "Format d’entrée",
+      "outputSchema": "Format de sortie",
+      "transport": "Type de connexion",
+      "endpoint": "Adresse du serveur",
+      "args": "Paramètres",
+      "toolsCount": "{count} outil(s)",
+      "scope": "Portée",
+      "scopeServer": "Serveur complet",
+      "scopeTool": "Un outil",
+      "enabled": "Activé",
+      "disabled": "Désactivé",
+      "approval": "Validation requise",
+      "files": "Fichiers",
+      "preview": {
+        "agentModel": "Modèle : {model}",
+        "agentProvider": "Fournisseur : {provider}",
+        "agentTools": "{count} outil(s) lié(s)",
+        "agentSkills": "{count} compétence(s)",
+        "agentKnowledge": "{count} base(s) de connaissances",
+        "agentPrompt": "Instructions incluses",
+        "skillFiles": "{count} fichier(s)",
+        "skillPackage": "Paquet : {package}",
+        "toolStatus": "État : {status}",
+        "toolSchemas": "Formats d’entrée/sortie définis",
+        "toolWorkflow": "Workflow automatisé",
+        "toolCredentials": "Identifiants de connexion requis",
+        "mcpTransport": "Connexion : {transport}",
+        "mcpTools": "{count} outil(s) MCP",
+        "mcpEnabled": "Serveur activé",
+        "mcpCredentials": "Identifiants de connexion requis"
+      }
+    },
+    "errors": {
+      "notFound": "Élément introuvable",
+      "forbidden": "Vous n’avez pas l’autorisation",
+      "generic": "Une erreur est survenue"
+    }
   },
   "admin": {
     "settingsTitle": "Paramètres",
     "settingsDescription": "Inscription et santé du système.",
     "membersTitle": "Équipe",
+    "membersDescription": "Invitez des membres, gérez les rôles et contrôlez les accès.",
+    "signInRequired": "Connexion requise",
+    "signInRequiredDescription": "Connectez-vous pour gérer l’équipe.",
+    "platformAccounts": "Comptes plateforme",
+    "platformAccountsDescription": "Créez des comptes de connexion. Les nouveaux utilisateurs peuvent être ajoutés automatiquement à l’équipe.",
+    "adminRequired": "Accès administrateur requis",
+    "adminRequiredDescription": "Seuls les administrateurs peuvent modifier les paramètres du compte et de l’inscription.",
     "usageTitle": "Usage",
+    "usageDescription": "Suivez la consommation de tokens, l’usage API et les quotas.",
     "auditTitle": "Journal d’activité",
-    "apiKeysTitle": "Clés API"
+    "auditDescription": "Suivez les actions sensibles, les changements et les événements d’accès.",
+    "apiKeysTitle": "Clés API",
+    "apiKeysDescription": "Créez et gérez des clés API pour scripts externes, pipelines CI et intégrations."
+  },
+  "customTools": {
+    "title": "Outils personnalisés",
+    "description": "Créez des outils personnalisés avec un assistant, visualisez le workflow en construction et connectez les identifiants sans les exposer."
   },
   "shell": {
     "returnToChat": "Retour au chat",
-    "workspace": "App"
+    "workspace": "App",
+    "theme": "Thème",
+    "toggleTheme": "Changer de thème",
+    "signOut": "Déconnexion",
+    "navigation": "Navigation",
+    "openNavigation": "Ouvrir la navigation",
+    "expandSidebar": "Développer la barre latérale",
+    "collapseSidebar": "Réduire la barre latérale",
+    "resizeNavigation": "Redimensionner la navigation",
+    "setupRequired": "Configuration requise",
+    "loadingConnections": "Chargement des connexions"
   },
   "auth": {
     "signIn": "Connexion",

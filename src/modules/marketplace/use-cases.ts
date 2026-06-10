@@ -4,7 +4,6 @@ import { db } from "@/server/infrastructure/db";
 import {
 	agents,
 	agentSkills,
-	agentVersions,
 	customTools,
 	marketplaceInstalls,
 	marketplaceItems,
@@ -14,192 +13,37 @@ import {
 	mcpTools,
 	users,
 } from "@/server/infrastructure/db/schema";
+import { upsertMarketplaceDraft } from "./draft-helpers";
+import {
+	installAgentManifest,
+	installCustomTool,
+	installMcpPreset,
+	installPostInstallFlags,
+} from "./install-helpers";
+import {
+	buildAgentManifest,
+	buildCustomToolManifest,
+	buildMcpPresetManifest,
+	buildSkillManifest,
+} from "./manifest-builders";
+import type {
+	AgentMarketplaceManifest,
+	MarketplaceManifest,
+	McpPresetMarketplaceManifest,
+	SkillMarketplaceManifest,
+	ToolMarketplaceManifest,
+} from "./manifest-types";
 
-// ─── Types ─────────────────────────────────────────────────────────────
+export type {
+	AgentMarketplaceManifest,
+	MarketplaceManifest,
+	McpPresetMarketplaceManifest,
+	SkillMarketplaceManifest,
+	ToolMarketplaceManifest,
+} from "./manifest-types";
 
-export interface AgentMarketplaceManifest {
-	type: "agent";
-	name: string;
-	description?: string;
-	agent: {
-		systemPrompt?: string;
-		tools?: string[];
-		mcpRequirements?: unknown[];
-	};
-	permissions?: Record<string, unknown>;
-}
-
-export interface SkillMarketplaceManifest {
-	type: "skill";
-	name: string;
-	description?: string;
-	skill: {
-		markdownFiles: Array<{ path: string; content: string }>;
-		sourcePackage?: string;
-		sourceSkillName?: string;
-		installCommand?: string;
-		metadata?: Record<string, unknown>;
-	};
-}
-
-export interface ToolMarketplaceManifest {
-	type: "custom_tool";
-	name: string;
-	description?: string;
-	tool: {
-		inputSchema?: Record<string, unknown>;
-		outputSchema?: Record<string, unknown>;
-		n8nWorkflowId?: string;
-		n8nWorkflowUrl?: string;
-		metadata?: Record<string, unknown>;
-	};
-}
-
-export interface McpPresetMarketplaceManifest {
-	type: "mcp_preset";
-	name: string;
-	description?: string;
-	preset: {
-		scope: "server" | "tool";
-		serverName: string;
-		transport: "stdio" | "sse" | "streamable-http";
-		command?: string;
-		args?: string[];
-		url?: string;
-		requireApproval: boolean;
-		requiresCredentials: boolean;
-		tools: Array<{
-			name: string;
-			description?: string | null;
-			inputSchema?: Record<string, unknown> | null;
-			outputSchema?: Record<string, unknown> | null;
-			requireApproval: boolean;
-			enabled: boolean;
-		}>;
-	};
-}
-
-export type MarketplaceManifest =
-	| AgentMarketplaceManifest
-	| SkillMarketplaceManifest
-	| ToolMarketplaceManifest
-	| McpPresetMarketplaceManifest;
-
-function buildMcpPresetManifest(
-	name: string,
-	description: string | null | undefined,
-	server: typeof mcpServers.$inferSelect,
-	tools: Array<typeof mcpTools.$inferSelect>,
-	scope: "server" | "tool",
-): McpPresetMarketplaceManifest {
-	const args = Array.isArray(server.argsJson)
-		? (server.argsJson as string[])
-		: undefined;
-
-	return {
-		type: "mcp_preset",
-		name,
-		description: description ?? undefined,
-		preset: {
-			scope,
-			serverName: server.name,
-			transport: server.transport,
-			command: server.command ?? undefined,
-			args,
-			url: server.url ?? undefined,
-			requireApproval: server.requireApproval,
-			requiresCredentials: Boolean(
-				server.encryptedHeadersJson || server.encryptedEnvJson,
-			),
-			tools: tools.map((tool) => ({
-				name: tool.name,
-				description: tool.description,
-				inputSchema:
-					tool.inputSchemaJson && typeof tool.inputSchemaJson === "object"
-						? (tool.inputSchemaJson as Record<string, unknown>)
-						: null,
-				outputSchema:
-					tool.outputSchemaJson && typeof tool.outputSchemaJson === "object"
-						? (tool.outputSchemaJson as Record<string, unknown>)
-						: null,
-				requireApproval: tool.requireApproval,
-				enabled: tool.enabled,
-			})),
-		},
-	};
-}
-
-async function insertMcpPresetDraft(input: {
-	workspaceId: string;
-	userId: string;
-	version: string;
-	name: string;
-	description?: string | null;
-	visibility?: "public" | "private" | "unlisted" | "organization";
-	tags?: string[];
-	manifest: McpPresetMarketplaceManifest;
-	metadata: Record<string, unknown>;
-}) {
-	const { item, version } = await db.transaction(async (tx) => {
-		const [item] = await tx
-			.insert(marketplaceItems)
-			.values({
-				publisherUserId: input.userId,
-				publisherWorkspaceId: input.workspaceId,
-				type: "mcp_preset",
-				slug: `${slugify(input.name)}-${Date.now().toString(36)}`,
-				name: input.name,
-				description: input.description,
-				visibility: input.visibility ?? "private",
-				status: "draft",
-				pricingModel: "free",
-				tagsJson: input.tags ?? [],
-			})
-			.returning();
-
-		const [version] = await tx
-			.insert(marketplaceItemVersions)
-			.values({
-				itemId: item.id,
-				version: input.version,
-				manifestJson: input.manifest,
-				changelog: "Initial marketplace draft",
-				compatibilityJson: { app: "ai-hub", schema: 1 },
-				securityReviewStatus: "pending",
-				createdById: input.userId,
-			})
-			.returning();
-
-		await tx
-			.update(marketplaceItems)
-			.set({ latestVersionId: version.id, updatedAt: new Date() })
-			.where(eq(marketplaceItems.id, item.id));
-
-		return { item, version };
-	});
-
-	await audit.emit({
-		workspaceId: input.workspaceId,
-		actorPrincipalType: "user",
-		actorPrincipalId: input.userId,
-		action: "marketplace.draftCreated",
-		resourceType: "marketplace_item",
-		resourceId: item.id,
-		outcome: "success",
-		metadata: { ...input.metadata, versionId: version.id },
-	});
-
-	return { item, version };
-}
-
-function slugify(value: string) {
-	return value
-		.toLowerCase()
-		.trim()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 96);
-}
+export { getPublishPreview } from "./publish-preview";
+export type { PublishPreviewResult } from "./publish-preview";
 
 // ─── List / Search ─────────────────────────────────────────────────────
 
@@ -316,6 +160,67 @@ export async function getMarketplaceItemWithShares(itemId: string) {
 	return { ...item, shareCount };
 }
 
+export async function getMarketplaceItemDetail(
+	itemId: string,
+	userId?: string,
+) {
+	const item = await getMarketplaceItemWithShares(itemId);
+	if (!item) return null;
+
+	const latestVersion = await getLatestVersion(itemId);
+
+	const [publisher] = await db
+		.select({
+			id: users.id,
+			name: users.name,
+			email: users.email,
+		})
+		.from(users)
+		.where(eq(users.id, item.publisherUserId))
+		.limit(1);
+
+	const shareRows = await db
+		.select({
+			userId: marketplaceItemShares.sharedWithUserId,
+			sharedAt: marketplaceItemShares.sharedAt,
+			name: users.name,
+			email: users.email,
+		})
+		.from(marketplaceItemShares)
+		.innerJoin(users, eq(users.id, marketplaceItemShares.sharedWithUserId))
+		.where(eq(marketplaceItemShares.itemId, itemId));
+
+	const isOwner = userId ? item.publisherUserId === userId : false;
+	const canInstall = userId
+		? await canUserInstallMarketplaceItem(item, userId)
+		: item.status === "published" && item.visibility === "public";
+
+	return {
+		...item,
+		latestVersion: latestVersion
+			? {
+					id: latestVersion.id,
+					version: latestVersion.version,
+					changelog: latestVersion.changelog,
+					manifestJson: latestVersion.manifestJson as MarketplaceManifest,
+					compatibilityJson: latestVersion.compatibilityJson,
+					createdAt: latestVersion.createdAt,
+				}
+			: null,
+		publisher: publisher ?? null,
+		shares: isOwner
+			? shareRows.map((s) => ({
+					userId: s.userId,
+					name: s.name,
+					email: s.email,
+					sharedAt: s.sharedAt,
+				}))
+			: [],
+		isOwner,
+		canInstall,
+	};
+}
+
 export async function getLatestVersion(itemId: string) {
 	const [version] = await db
 		.select()
@@ -362,16 +267,23 @@ export async function canUserInstallMarketplaceItem(
 
 // ─── Create / Publish ──────────────────────────────────────────────────
 
-export async function publishAgentDraft(input: {
-	workspaceId: string;
-	userId: string;
-	agentId: string;
-	version: string;
-	name?: string;
-	description?: string;
-	visibility?: "public" | "private" | "unlisted" | "organization";
+type DraftInputExtras = {
+	changelog?: string;
+	includeSecrets?: boolean;
 	tags?: string[];
-}) {
+};
+
+export async function publishAgentDraft(
+	input: {
+		workspaceId: string;
+		userId: string;
+		agentId: string;
+		version: string;
+		name?: string;
+		description?: string;
+		visibility?: "public" | "private" | "unlisted" | "organization";
+	} & DraftInputExtras,
+) {
 	const [agent] = await db
 		.select()
 		.from(agents)
@@ -384,87 +296,45 @@ export async function publishAgentDraft(input: {
 		.limit(1);
 	if (!agent) throw new Error("Agent not found");
 
-	const [agentVersion] = await db
-		.select()
-		.from(agentVersions)
-		.where(eq(agentVersions.agentId, input.agentId))
-		.orderBy(desc(agentVersions.versionNumber))
-		.limit(1);
-
 	const name = input.name || agent.name;
-
-	const manifest: AgentMarketplaceManifest = {
-		type: "agent",
+	const manifest = await buildAgentManifest(
+		input.agentId,
+		input.workspaceId,
 		name,
-		description: input.description || agent.description || undefined,
-		agent: {
-			systemPrompt: agentVersion?.systemPrompt || undefined,
-		},
-	};
+		input.description ?? agent.description,
+		input.includeSecrets,
+	);
 
-	const { item, version } = await db.transaction(async (tx) => {
-		const [item] = await tx
-			.insert(marketplaceItems)
-			.values({
-				publisherUserId: input.userId,
-				publisherWorkspaceId: input.workspaceId,
-				type: "agent",
-				slug: `${slugify(name)}-${Date.now().toString(36)}`,
-				name,
-				description: input.description || agent.description,
-				visibility: input.visibility ?? "public",
-				status: "published",
-				pricingModel: "free",
-				publishedAt: new Date(),
-				tagsJson: input.tags ?? [],
-			})
-			.returning();
-
-		const [version] = await tx
-			.insert(marketplaceItemVersions)
-			.values({
-				itemId: item.id,
-				version: input.version,
-				manifestJson: manifest,
-				changelog: "Initial marketplace publish",
-				compatibilityJson: { app: "ai-hub", schema: 1 },
-				requestedPermissionsJson: manifest.permissions,
-				securityReviewStatus: "pending",
-				createdById: input.userId,
-			})
-			.returning();
-
-		await tx
-			.update(marketplaceItems)
-			.set({ latestVersionId: version.id, updatedAt: new Date() })
-			.where(eq(marketplaceItems.id, item.id));
-
-		return { item, version };
-	});
-
-	await audit.emit({
+	return upsertMarketplaceDraft({
 		workspaceId: input.workspaceId,
-		actorPrincipalType: "user",
-		actorPrincipalId: input.userId,
-		action: "marketplace.published",
-		resourceType: "marketplace_item",
-		resourceId: item.id,
-		outcome: "success",
-		metadata: { agentId: input.agentId, versionId: version.id },
+		userId: input.userId,
+		type: "agent",
+		sourceResourceType: "agent",
+		sourceResourceId: input.agentId,
+		version: input.version,
+		changelog: input.changelog ?? "Initial marketplace publish",
+		name,
+		description: input.description ?? agent.description,
+		visibility: input.visibility ?? "public",
+		tags: input.tags,
+		manifest,
+		metadata: { agentId: input.agentId },
+		status: "published",
+		publishedAt: new Date(),
 	});
-
-	return { item, version };
 }
 
-export async function createMarketplaceDraft(input: {
-	workspaceId: string;
-	userId: string;
-	agentId: string;
-	version: string;
-	name?: string;
-	description?: string;
-	visibility?: "public" | "private" | "unlisted" | "organization";
-}) {
+export async function createMarketplaceDraft(
+	input: {
+		workspaceId: string;
+		userId: string;
+		agentId: string;
+		version: string;
+		name?: string;
+		description?: string;
+		visibility?: "public" | "private" | "unlisted" | "organization";
+	} & DraftInputExtras,
+) {
 	const [agent] = await db
 		.select()
 		.from(agents)
@@ -477,86 +347,43 @@ export async function createMarketplaceDraft(input: {
 		.limit(1);
 	if (!agent) throw new Error("Agent not found");
 
-	const [agentVersion] = await db
-		.select()
-		.from(agentVersions)
-		.where(eq(agentVersions.agentId, input.agentId))
-		.orderBy(desc(agentVersions.versionNumber))
-		.limit(1);
-
 	const name = input.name || agent.name;
-
-	const manifest: AgentMarketplaceManifest = {
-		type: "agent",
+	const manifest = await buildAgentManifest(
+		input.agentId,
+		input.workspaceId,
 		name,
-		description: input.description || agent.description || undefined,
-		agent: {
-			systemPrompt: agentVersion?.systemPrompt || undefined,
-		},
-	};
+		input.description ?? agent.description,
+		input.includeSecrets,
+	);
 
-	const { item, version } = await db.transaction(async (tx) => {
-		const [item] = await tx
-			.insert(marketplaceItems)
-			.values({
-				publisherUserId: input.userId,
-				publisherWorkspaceId: input.workspaceId,
-				type: "agent",
-				slug: `${slugify(name)}-${Date.now().toString(36)}`,
-				name,
-				description: input.description || agent.description,
-				visibility: input.visibility ?? "private",
-				status: "draft",
-				pricingModel: "free",
-			})
-			.returning();
-
-		const [version] = await tx
-			.insert(marketplaceItemVersions)
-			.values({
-				itemId: item.id,
-				version: input.version,
-				manifestJson: manifest,
-				changelog: "Initial marketplace draft",
-				compatibilityJson: { app: "ai-hub", schema: 1 },
-				requestedPermissionsJson: manifest.permissions,
-				securityReviewStatus: "pending",
-				createdById: input.userId,
-			})
-			.returning();
-
-		await tx
-			.update(marketplaceItems)
-			.set({ latestVersionId: version.id, updatedAt: new Date() })
-			.where(eq(marketplaceItems.id, item.id));
-
-		return { item, version };
-	});
-
-	await audit.emit({
+	return upsertMarketplaceDraft({
 		workspaceId: input.workspaceId,
-		actorPrincipalType: "user",
-		actorPrincipalId: input.userId,
-		action: "marketplace.draftCreated",
-		resourceType: "marketplace_item",
-		resourceId: item.id,
-		outcome: "success",
-		metadata: { agentId: input.agentId, versionId: version.id },
+		userId: input.userId,
+		type: "agent",
+		sourceResourceType: "agent",
+		sourceResourceId: input.agentId,
+		version: input.version,
+		changelog: input.changelog,
+		name,
+		description: input.description ?? agent.description,
+		visibility: input.visibility,
+		tags: input.tags,
+		manifest,
+		metadata: { agentId: input.agentId },
 	});
-
-	return { item, version };
 }
 
-export async function createSkillMarketplaceDraft(input: {
-	workspaceId: string;
-	userId: string;
-	skillId: string;
-	version: string;
-	name?: string;
-	description?: string;
-	visibility?: "public" | "private" | "unlisted" | "organization";
-	tags?: string[];
-}) {
+export async function createSkillMarketplaceDraft(
+	input: {
+		workspaceId: string;
+		userId: string;
+		skillId: string;
+		version: string;
+		name?: string;
+		description?: string;
+		visibility?: "public" | "private" | "unlisted" | "organization";
+	} & DraftInputExtras,
+) {
 	const [skill] = await db
 		.select()
 		.from(agentSkills)
@@ -570,88 +397,40 @@ export async function createSkillMarketplaceDraft(input: {
 	if (!skill) throw new Error("Skill not found");
 
 	const name = input.name || skill.name;
-	const markdownFiles = Array.isArray(skill.markdownFilesJson)
-		? (skill.markdownFilesJson as SkillMarketplaceManifest["skill"]["markdownFiles"])
-		: [];
-
-	const manifest: SkillMarketplaceManifest = {
-		type: "skill",
+	const manifest = buildSkillManifest(
+		skill,
 		name,
-		description: input.description || skill.description || undefined,
-		skill: {
-			markdownFiles,
-			sourcePackage: skill.sourcePackage ?? undefined,
-			sourceSkillName: skill.sourceSkillName ?? undefined,
-			installCommand: skill.installCommand ?? undefined,
-			metadata:
-				skill.metadataJson && typeof skill.metadataJson === "object"
-					? (skill.metadataJson as Record<string, unknown>)
-					: undefined,
-		},
-	};
+		input.description ?? skill.description,
+	);
 
-	const { item, version } = await db.transaction(async (tx) => {
-		const [item] = await tx
-			.insert(marketplaceItems)
-			.values({
-				publisherUserId: input.userId,
-				publisherWorkspaceId: input.workspaceId,
-				type: "skill",
-				slug: `${slugify(name)}-${Date.now().toString(36)}`,
-				name,
-				description: input.description || skill.description,
-				visibility: input.visibility ?? "private",
-				status: "draft",
-				pricingModel: "free",
-				tagsJson: input.tags ?? [],
-			})
-			.returning();
-
-		const [version] = await tx
-			.insert(marketplaceItemVersions)
-			.values({
-				itemId: item.id,
-				version: input.version,
-				manifestJson: manifest,
-				changelog: "Initial marketplace draft",
-				compatibilityJson: { app: "ai-hub", schema: 1 },
-				securityReviewStatus: "pending",
-				createdById: input.userId,
-			})
-			.returning();
-
-		await tx
-			.update(marketplaceItems)
-			.set({ latestVersionId: version.id, updatedAt: new Date() })
-			.where(eq(marketplaceItems.id, item.id));
-
-		return { item, version };
-	});
-
-	await audit.emit({
+	return upsertMarketplaceDraft({
 		workspaceId: input.workspaceId,
-		actorPrincipalType: "user",
-		actorPrincipalId: input.userId,
-		action: "marketplace.draftCreated",
-		resourceType: "marketplace_item",
-		resourceId: item.id,
-		outcome: "success",
-		metadata: { skillId: input.skillId, versionId: version.id },
+		userId: input.userId,
+		type: "skill",
+		sourceResourceType: "skill",
+		sourceResourceId: input.skillId,
+		version: input.version,
+		changelog: input.changelog,
+		name,
+		description: input.description ?? skill.description,
+		visibility: input.visibility,
+		tags: input.tags,
+		manifest,
+		metadata: { skillId: input.skillId },
 	});
-
-	return { item, version };
 }
 
-export async function createCustomToolMarketplaceDraft(input: {
-	workspaceId: string;
-	userId: string;
-	customToolId: string;
-	version: string;
-	name?: string;
-	description?: string;
-	visibility?: "public" | "private" | "unlisted" | "organization";
-	tags?: string[];
-}) {
+export async function createCustomToolMarketplaceDraft(
+	input: {
+		workspaceId: string;
+		userId: string;
+		customToolId: string;
+		version: string;
+		name?: string;
+		description?: string;
+		visibility?: "public" | "private" | "unlisted" | "organization";
+	} & DraftInputExtras,
+) {
 	const [tool] = await db
 		.select()
 		.from(customTools)
@@ -665,91 +444,41 @@ export async function createCustomToolMarketplaceDraft(input: {
 	if (!tool) throw new Error("Custom tool not found");
 
 	const name = input.name || tool.name;
-
-	const manifest: ToolMarketplaceManifest = {
-		type: "custom_tool",
+	const manifest = await buildCustomToolManifest(
+		tool,
 		name,
-		description: input.description || tool.description || undefined,
-		tool: {
-			inputSchema:
-				tool.inputSchemaJson && typeof tool.inputSchemaJson === "object"
-					? (tool.inputSchemaJson as Record<string, unknown>)
-					: undefined,
-			outputSchema:
-				tool.outputSchemaJson && typeof tool.outputSchemaJson === "object"
-					? (tool.outputSchemaJson as Record<string, unknown>)
-					: undefined,
-			n8nWorkflowId: tool.n8nWorkflowId ?? undefined,
-			n8nWorkflowUrl: tool.n8nWorkflowUrl ?? undefined,
-			metadata:
-				tool.metadataJson && typeof tool.metadataJson === "object"
-					? (tool.metadataJson as Record<string, unknown>)
-					: undefined,
-		},
-	};
+		input.description ?? tool.description,
+		input.includeSecrets,
+	);
 
-	const { item, version } = await db.transaction(async (tx) => {
-		const [item] = await tx
-			.insert(marketplaceItems)
-			.values({
-				publisherUserId: input.userId,
-				publisherWorkspaceId: input.workspaceId,
-				type: "custom_tool",
-				slug: `${slugify(name)}-${Date.now().toString(36)}`,
-				name,
-				description: input.description || tool.description,
-				visibility: input.visibility ?? "private",
-				status: "draft",
-				pricingModel: "free",
-				tagsJson: input.tags ?? [],
-			})
-			.returning();
-
-		const [version] = await tx
-			.insert(marketplaceItemVersions)
-			.values({
-				itemId: item.id,
-				version: input.version,
-				manifestJson: manifest,
-				changelog: "Initial marketplace draft",
-				compatibilityJson: { app: "ai-hub", schema: 1 },
-				securityReviewStatus: "pending",
-				createdById: input.userId,
-			})
-			.returning();
-
-		await tx
-			.update(marketplaceItems)
-			.set({ latestVersionId: version.id, updatedAt: new Date() })
-			.where(eq(marketplaceItems.id, item.id));
-
-		return { item, version };
-	});
-
-	await audit.emit({
+	return upsertMarketplaceDraft({
 		workspaceId: input.workspaceId,
-		actorPrincipalType: "user",
-		actorPrincipalId: input.userId,
-		action: "marketplace.draftCreated",
-		resourceType: "marketplace_item",
-		resourceId: item.id,
-		outcome: "success",
-		metadata: { customToolId: input.customToolId, versionId: version.id },
+		userId: input.userId,
+		type: "custom_tool",
+		sourceResourceType: "custom_tool",
+		sourceResourceId: input.customToolId,
+		version: input.version,
+		changelog: input.changelog,
+		name,
+		description: input.description ?? tool.description,
+		visibility: input.visibility,
+		tags: input.tags,
+		manifest,
+		metadata: { customToolId: input.customToolId },
 	});
-
-	return { item, version };
 }
 
-export async function createMcpServerMarketplaceDraft(input: {
-	workspaceId: string;
-	userId: string;
-	mcpServerId: string;
-	version: string;
-	name?: string;
-	description?: string;
-	visibility?: "public" | "private" | "unlisted" | "organization";
-	tags?: string[];
-}) {
+export async function createMcpServerMarketplaceDraft(
+	input: {
+		workspaceId: string;
+		userId: string;
+		mcpServerId: string;
+		version: string;
+		name?: string;
+		description?: string;
+		visibility?: "public" | "private" | "unlisted" | "organization";
+	} & DraftInputExtras,
+) {
 	const [server] = await db
 		.select()
 		.from(mcpServers)
@@ -774,12 +503,17 @@ export async function createMcpServerMarketplaceDraft(input: {
 		server,
 		tools,
 		"server",
+		input.includeSecrets,
 	);
 
-	return insertMcpPresetDraft({
+	return upsertMarketplaceDraft({
 		workspaceId: input.workspaceId,
 		userId: input.userId,
+		type: "mcp_preset",
+		sourceResourceType: "mcp_server",
+		sourceResourceId: input.mcpServerId,
 		version: input.version,
+		changelog: input.changelog,
 		name,
 		description: input.description ?? null,
 		visibility: input.visibility,
@@ -789,16 +523,17 @@ export async function createMcpServerMarketplaceDraft(input: {
 	});
 }
 
-export async function createMcpToolMarketplaceDraft(input: {
-	workspaceId: string;
-	userId: string;
-	mcpToolId: string;
-	version: string;
-	name?: string;
-	description?: string;
-	visibility?: "public" | "private" | "unlisted" | "organization";
-	tags?: string[];
-}) {
+export async function createMcpToolMarketplaceDraft(
+	input: {
+		workspaceId: string;
+		userId: string;
+		mcpToolId: string;
+		version: string;
+		name?: string;
+		description?: string;
+		visibility?: "public" | "private" | "unlisted" | "organization";
+	} & DraftInputExtras,
+) {
 	const [tool] = await db
 		.select()
 		.from(mcpTools)
@@ -825,12 +560,17 @@ export async function createMcpToolMarketplaceDraft(input: {
 		server,
 		[tool],
 		"tool",
+		input.includeSecrets,
 	);
 
-	return insertMcpPresetDraft({
+	return upsertMarketplaceDraft({
 		workspaceId: input.workspaceId,
 		userId: input.userId,
+		type: "mcp_preset",
+		sourceResourceType: "mcp_tool",
+		sourceResourceId: input.mcpToolId,
 		version: input.version,
+		changelog: input.changelog,
 		name,
 		description: input.description ?? tool.description,
 		visibility: input.visibility,
@@ -1208,6 +948,7 @@ export async function installMarketplaceItem(input: {
 	if (!version) throw new Error("Marketplace item has no version");
 
 	const manifest = version.manifestJson as MarketplaceManifest;
+	const postInstall = installPostInstallFlags(manifest);
 
 	const { installedResource, install } = await db.transaction(async (tx) => {
 		let installedResource: { id: string } | null = null;
@@ -1215,39 +956,15 @@ export async function installMarketplaceItem(input: {
 
 		switch (manifest.type) {
 			case "agent": {
-				const [installedAgent] = await tx
-					.insert(agents)
-					.values({
-						workspaceId: input.workspaceId,
-						name: manifest.name,
-						slug: `${slugify(manifest.name)}-${Date.now().toString(36)}`,
-						description: manifest.description ?? item.description,
-						visibility: "workspace",
-						sourceType: "marketplace_install",
-						marketplaceItemId: item.id,
-						marketplaceVersionId: version.id,
-						createdById: input.userId,
-					})
-					.returning();
-
-				const [agentVersion] = await tx
-					.insert(agentVersions)
-					.values({
-						agentId: installedAgent.id,
-						versionNumber: 1,
-						name: `Installed from marketplace ${version.version}`,
-						systemPrompt: manifest.agent.systemPrompt ?? null,
-						maxOutputTokens: 30_000,
-						createdById: input.userId,
-					})
-					.returning();
-
-				await tx
-					.update(agents)
-					.set({ activeVersionId: agentVersion.id })
-					.where(eq(agents.id, installedAgent.id));
-
-				installedResource = installedAgent;
+				installedResource = await installAgentManifest(tx, {
+					workspaceId: input.workspaceId,
+					userId: input.userId,
+					itemId: item.id,
+					versionId: version.id,
+					versionLabel: version.version,
+					manifest,
+					itemDescription: item.description,
+				});
 				resourceType = "agent";
 				break;
 			}
@@ -1274,61 +991,25 @@ export async function installMarketplaceItem(input: {
 			}
 
 			case "custom_tool": {
-				const [installedTool] = await tx
-					.insert(customTools)
-					.values({
-						workspaceId: input.workspaceId,
-						createdById: input.userId,
-						name: manifest.name,
-						description: manifest.description ?? item.description,
-						n8nWorkflowId: manifest.tool.n8nWorkflowId ?? null,
-						n8nWorkflowUrl: manifest.tool.n8nWorkflowUrl ?? null,
-						status: "active",
-						inputSchemaJson: manifest.tool.inputSchema ?? null,
-						outputSchemaJson: manifest.tool.outputSchema ?? null,
-						metadataJson: manifest.tool.metadata ?? null,
-					})
-					.returning();
-
-				installedResource = installedTool;
+				const { tool } = await installCustomTool(tx, {
+					workspaceId: input.workspaceId,
+					userId: input.userId,
+					manifest,
+					itemDescription: item.description,
+				});
+				installedResource = tool;
 				resourceType = "custom_tool";
 				break;
 			}
 
 			case "mcp_preset": {
-				const [installedServer] = await tx
-					.insert(mcpServers)
-					.values({
-						workspaceId: input.workspaceId,
-						createdById: input.userId,
-						name: manifest.preset.serverName,
-						transport: manifest.preset.transport,
-						command: manifest.preset.command ?? null,
-						argsJson: manifest.preset.args ?? null,
-						url: manifest.preset.url ?? null,
-						enabled: true,
-						requireApproval: manifest.preset.requireApproval,
-						healthStatus: manifest.preset.requiresCredentials
-							? "unknown"
-							: "healthy",
-					})
-					.returning();
-
-				if (manifest.preset.tools.length > 0) {
-					await tx.insert(mcpTools).values(
-						manifest.preset.tools.map((tool) => ({
-							mcpServerId: installedServer.id,
-							name: tool.name,
-							description: tool.description ?? null,
-							inputSchemaJson: tool.inputSchema ?? null,
-							outputSchemaJson: tool.outputSchema ?? null,
-							enabled: tool.enabled,
-							requireApproval: tool.requireApproval,
-						})),
-					);
-				}
-
-				installedResource = installedServer;
+				const { server } = await installMcpPreset(tx, {
+					workspaceId: input.workspaceId,
+					userId: input.userId,
+					manifest,
+					itemDescription: item.description,
+				});
+				installedResource = server;
 				resourceType = "mcp_preset";
 				break;
 			}
@@ -1379,6 +1060,7 @@ export async function installMarketplaceItem(input: {
 	return {
 		install,
 		[manifest.type]: installedResource,
+		requiresCredentials: postInstall.requiresCredentials,
 	};
 }
 

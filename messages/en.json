@@ -152,23 +152,99 @@
       "knowledgeCount": "{count} knowledge bases",
       "toolsCount": "{count} tools enabled",
       "notConfigured": "Not configured"
+    },
+    "list": {
+      "pageDescription": "Manage your AI assistants — each one can have its own model, instructions, tools, and knowledge bases.",
+      "configuredCount": "{count, plural, one {# assistant configured} other {# assistants configured}}",
+      "filterPlaceholder": "Filter…",
+      "clearSearch": "Clear search",
+      "emptyTitle": "No assistants yet",
+      "emptyDescription": "Create your first assistant to start chatting with AI. Each assistant gets its own model, instructions, tools, and knowledge bases.",
+      "emptyCta": "Create your first assistant",
+      "noMatch": "No assistant matches \"{query}\".",
+      "statusNeedsSetup": "Needs setup",
+      "metaSlugCreated": "slug: {slug} · created {date}",
+      "badgeTeam": "Team",
+      "badgeShared": "Shared",
+      "badgeGlobal": "Global",
+      "badgeRecommended": "Recommended",
+      "setup": "Setup",
+      "agentActions": "Agent actions",
+      "deleteTitle": "Delete agent?",
+      "deleteDescription": "This permanently removes the agent and its configuration versions. This action cannot be undone.",
+      "deleting": "Deleting…",
+      "creating": "Creating…",
+      "createAgent": "Create agent",
+      "slug": "Slug",
+      "slugPlaceholder": "my-assistant",
+      "access": "Access",
+      "userEmail": "User email",
+      "global": "Global",
+      "curationNone": "No label",
+      "curationOrgCreated": "Organization created",
+      "toastCreated": "Agent created",
+      "toastCreateFailed": "Failed to create agent",
+      "toastDeleted": "Agent deleted",
+      "toastDeleteFailed": "Failed to delete agent",
+      "timeJustNow": "just now",
+      "timeMinutesAgo": "{count}m ago",
+      "timeHoursAgo": "{count}h ago",
+      "timeDaysAgo": "{count}d ago"
+    },
+    "capabilities": {
+      "customToolsTitle": "My custom tools",
+      "customToolsHint": "Tools you created. They are only visible to you.",
+      "noCustomTools": "No custom tools yet.",
+      "createCustomTool": "Create a tool",
+      "skillsTitle": "Skills",
+      "skillsHint": "Markdown instructions installed from skills.sh. No Python files or scripts are attached to assistants.",
+      "noSkills": "No skills installed yet.",
+      "installSkill": "Install a skill",
+      "mcpToolsSummary": "{total} tool(s) · {enabled} enabled"
     }
   },
   "providers": {
     "title": "AI connections",
-    "description": "Connect providers and manage available models.",
+    "description": "Connect to AI providers and manage available models for your assistants.",
+    "setupDescription": "Finish setup before configuring AI connections.",
     "add": "Add connection",
     "test": "Test",
     "manageModels": "Models",
-    "advancedHint": "Provider type, auth, and custom headers"
+    "advancedHint": "Provider type, auth, and custom headers",
+    "loadFailed": "Failed to load providers"
   },
   "knowledge": {
     "title": "Knowledge",
-    "description": "Documents your assistants can search during conversations.",
+    "description": "Upload documents and attach them to assistants so they can reference your data.",
     "emptyTitle": "No knowledge bases yet",
     "emptyStep1": "Create a knowledge base",
     "emptyStep2": "Add documents",
-    "emptyStep3": "Attach to an assistant"
+    "emptyStep3": "Attach to an assistant",
+    "name": "Name",
+    "descriptionLabel": "Description",
+    "newBase": "New knowledge base",
+    "createBase": "Create knowledge base",
+    "createBaseTitle": "Create knowledge base",
+    "basesTitle": "Bases",
+    "basesDescription": "Choose the source set to manage.",
+    "emptyBasesDescription": "Create a base to upload documents for your assistants.",
+    "createBaseCta": "Create base",
+    "selectBaseTitle": "Select a knowledge base",
+    "selectBaseDescription": "Choose or create a base on the left to manage documents.",
+    "documents": "Documents",
+    "documentsHint": "Paste text to index. Processing documents refresh automatically.",
+    "dropHint": "Drag and drop a text file here to ingest",
+    "documentTitle": "Document title",
+    "documentTitlePlaceholder": "Document title…",
+    "documentContent": "Document content",
+    "documentContentPlaceholder": "Document content…",
+    "ingestDocument": "Ingest document",
+    "search": "Search",
+    "searchPlaceholder": "Search indexed text…",
+    "searchAriaLabel": "Search indexed text",
+    "editBase": "Edit knowledge base",
+    "editAria": "Edit {name}",
+    "deleteAria": "Delete {name}"
   },
   "tools": {
     "title": "Tools & integrations",
@@ -194,19 +270,251 @@
   },
   "marketplace": {
     "title": "Marketplace",
-    "description": "Install and share assistants across your organization."
+    "description": "Discover, install, and share assistants, skills, and tools with your team.",
+    "share": {
+      "action": "Share",
+      "title": "Share “{name}”",
+      "stepIndicator": "Step {current} of {total}",
+      "steps": {
+        "meta": "Review the details before sharing.",
+        "secrets": "This resource uses connection credentials.",
+        "choose": "Choose how to share it.",
+        "user": "Pick someone to share with."
+      },
+      "resourceSubject": {
+        "agent": "this assistant",
+        "skill": "this skill",
+        "custom_tool": "this tool",
+        "mcp_server": "this MCP connection",
+        "mcp_tool": "this MCP tool",
+        "marketplace_item": "this listing"
+      },
+      "existingDraft": "An existing draft will be updated.",
+      "fields": {
+        "name": "Name",
+        "description": "Description",
+        "version": "Version number",
+        "versionHint": "e.g. 1.0.0 — to track updates",
+        "visibility": "Who can see it",
+        "tags": "Keywords (comma-separated)",
+        "releaseNotes": "Release notes",
+        "releaseNotesPlaceholder": "e.g. new tools added, updated instructions…"
+      },
+      "contentPreview": "What will be shared",
+      "options": {
+        "publish": {
+          "title": "Publish for everyone",
+          "description": "Listed in the marketplace — anyone can install it."
+        },
+        "user": {
+          "title": "Send to one person",
+          "description": "Private share with a chosen teammate."
+        }
+      },
+      "secrets": {
+        "warning": "If you include credentials, the installer won’t need to reconfigure anything. Only authorized people can use them.",
+        "include": "Include connection credentials",
+        "fieldRequired": "required"
+      },
+      "searchUser": "Search by name or email…",
+      "noUsers": "No one found",
+      "next": "Next",
+      "toast": {
+        "published": "“{name}” is now on the marketplace",
+        "shared": "“{name}” was shared successfully",
+        "publishFailed": "Publishing failed",
+        "shareFailed": "Sharing failed",
+        "loadFailed": "Could not load details",
+        "usersFailed": "Could not load people list"
+      }
+    },
+    "list": {
+      "searchPlaceholder": "Search listings…",
+      "filterType": "Type",
+      "filterSort": "Sort",
+      "types": {
+        "all": "All",
+        "agent": "Assistants",
+        "skill": "Skills",
+        "custom_tool": "Tools",
+        "mcp_preset": "MCP"
+      },
+      "sort": {
+        "featured": "Featured",
+        "newest": "Newest",
+        "downloads": "Most installed"
+      },
+      "tabs": {
+        "all": "Discover ({count})",
+        "myItems": "My listings ({count})",
+        "shared": "Shared with me ({count})"
+      },
+      "featured": "Featured",
+      "install": "Install",
+      "share": "Share",
+      "delete": "Delete",
+      "viewDetails": "View details",
+      "emptyAll": "No listings yet",
+      "emptyMy": "You haven’t published anything yet",
+      "emptyShared": "Nothing has been shared with you yet",
+      "deleteConfirm": "Delete this listing?",
+      "toast": {
+        "installed": "Installed successfully",
+        "installFailed": "Installation failed",
+        "credentialsNeeded": "Add connection credentials to finish setup.",
+        "featured": "Marked as featured",
+        "unfeatured": "Removed from featured",
+        "deleted": "Listing deleted",
+        "loadFailed": "Could not load marketplace"
+      }
+    },
+    "detail": {
+      "back": "Back to marketplace",
+      "description": "Description",
+      "tags": "Keywords",
+      "downloads": "Installs",
+      "shares": "Shares",
+      "publishedOn": "Published",
+      "createdOn": "Created",
+      "install": "Install",
+      "share": "Share",
+      "status": {
+        "published": "Published",
+        "draft": "Draft"
+      },
+      "version": "Version {version}",
+      "publisher": "Published by",
+      "sharedWith": "Shared with",
+      "removeShare": "Remove",
+      "technicalDetails": "Technical details",
+      "noManifest": "No details available.",
+      "toast": {
+        "installed": "Installed successfully",
+        "installFailed": "Installation failed",
+        "credentialsNeeded": "Add connection credentials to finish setup.",
+        "shareRemoved": "Share removed",
+        "shareRemoveFailed": "Could not remove share",
+        "loadFailed": "Listing not found"
+      }
+    },
+    "itemTypes": {
+      "agent": "Assistant",
+      "skill": "Skill",
+      "custom_tool": "Custom tool",
+      "mcp_preset": "MCP connection",
+      "prompt_template": "Prompt template",
+      "tool_pack": "Tool pack",
+      "workflow_template": "Workflow",
+      "knowledge_template": "Knowledge",
+      "provider_preset": "Provider"
+    },
+    "toolSources": {
+      "builtin": "Built-in",
+      "mcp": "MCP",
+      "custom": "Custom"
+    },
+    "visibility": {
+      "public": "Public",
+      "publicHint": "Visible to everyone in the marketplace",
+      "private": "Private",
+      "privateHint": "Only visible to you",
+      "unlisted": "Unlisted",
+      "unlistedHint": "Accessible via direct link, not in the list",
+      "organization": "Organization",
+      "organizationHint": "Visible to organization members"
+    },
+    "manifest": {
+      "provider": "AI provider",
+      "model": "Model",
+      "maxTokens": "Max response length",
+      "maxToolCalls": "Max tools per message",
+      "temperature": "Creativity",
+      "toolChoice": "Tool selection",
+      "instructions": "Instructions",
+      "linkedTools": "Included tools",
+      "skills": "Included skills",
+      "knowledgeRefs": "Linked knowledge bases",
+      "guardrails": "Safety rules",
+      "fileCount": "{count} file(s)",
+      "totalSize": "{size} KB",
+      "installCommand": "Install command",
+      "status": "Status",
+      "credentialsRequired": "Credentials required",
+      "credentialsIncluded": "Credentials included",
+      "workflow": "Workflow",
+      "inputSchema": "Input format",
+      "outputSchema": "Output format",
+      "transport": "Connection type",
+      "endpoint": "Server address",
+      "args": "Parameters",
+      "toolsCount": "{count} tool(s)",
+      "scope": "Scope",
+      "scopeServer": "Full server",
+      "scopeTool": "Single tool",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "approval": "Approval required",
+      "files": "Files",
+      "preview": {
+        "agentModel": "Model: {model}",
+        "agentProvider": "Provider: {provider}",
+        "agentTools": "{count} linked tool(s)",
+        "agentSkills": "{count} skill(s)",
+        "agentKnowledge": "{count} knowledge base(s)",
+        "agentPrompt": "Instructions included",
+        "skillFiles": "{count} file(s)",
+        "skillPackage": "Package: {package}",
+        "toolStatus": "Status: {status}",
+        "toolSchemas": "Input/output formats defined",
+        "toolWorkflow": "Automated workflow",
+        "toolCredentials": "Connection credentials required",
+        "mcpTransport": "Connection: {transport}",
+        "mcpTools": "{count} MCP tool(s)",
+        "mcpEnabled": "Server enabled",
+        "mcpCredentials": "Connection credentials required"
+      }
+    },
+    "errors": {
+      "notFound": "Item not found",
+      "forbidden": "You don’t have permission",
+      "generic": "Something went wrong"
+    }
   },
   "admin": {
     "settingsTitle": "Settings",
     "settingsDescription": "Registration and system health.",
     "membersTitle": "Team",
+    "membersDescription": "Invite members, manage roles, and control who has access.",
+    "signInRequired": "Sign in required",
+    "signInRequiredDescription": "Sign in to manage team members.",
+    "platformAccounts": "Platform accounts",
+    "platformAccountsDescription": "Create sign-in accounts. New users can be added to the team automatically.",
+    "adminRequired": "Admin access required",
+    "adminRequiredDescription": "Only admins can change account and registration settings.",
     "usageTitle": "Usage",
+    "usageDescription": "Monitor token consumption, API usage, and quota.",
     "auditTitle": "Activity log",
-    "apiKeysTitle": "API keys"
+    "auditDescription": "Track security-sensitive actions, changes, and access events.",
+    "apiKeysTitle": "API keys",
+    "apiKeysDescription": "Create and manage API keys for external scripts, CI pipelines, and integrations."
+  },
+  "customTools": {
+    "title": "Custom tools",
+    "description": "Create custom tools with an assistant, preview the workflow as it’s built, and connect secrets without exposing them."
   },
   "shell": {
     "returnToChat": "Back to chat",
-    "workspace": "App"
+    "workspace": "App",
+    "theme": "Theme",
+    "toggleTheme": "Toggle theme",
+    "signOut": "Sign out",
+    "navigation": "Navigation",
+    "openNavigation": "Open navigation",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "resizeNavigation": "Resize navigation",
+    "setupRequired": "Setup required",
+    "loadingConnections": "Loading connections"
   },
   "auth": {
     "signIn": "Sign in",

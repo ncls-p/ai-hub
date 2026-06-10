@@ -1,4 +1,7 @@
+"use client";
+
 import { type Dispatch, type SetStateAction } from "react";
+import { useTranslations } from "next-intl";
 import {
 	ChevronDownIcon,
 	MoreHorizontal,
@@ -451,6 +454,8 @@ function ServerActions({
 	| "onSyncServer"
 	| "onShareServer"
 > & { server: McpServer }) {
+	const tShare = useTranslations("marketplace.share");
+
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
@@ -475,7 +480,7 @@ function ServerActions({
 				</DropdownMenuItem>
 				<DropdownMenuItem onClick={() => onShareServer(server)}>
 					<Share2 className="size-4" />
-					Partager
+					{tShare("action")}
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem onClick={() => onEditServer(server)}>
@@ -602,6 +607,7 @@ function ToolRow({
 	server: McpServer;
 	tool: McpTool;
 }) {
+	const tShare = useTranslations("marketplace.share");
 	const isApprovalForced = server.requireApproval || tool.requireApproval;
 
 	return (
@@ -651,7 +657,7 @@ function ToolRow({
 					size="icon-sm"
 					variant="ghost"
 					className="size-7 shrink-0"
-					aria-label={`Partager ${tool.name}`}
+					aria-label={`${tShare("action")} ${tool.name}`}
 					onClick={() => onShareTool(server, tool)}
 				>
 					<Share2 className="size-3.5" aria-hidden="true" />

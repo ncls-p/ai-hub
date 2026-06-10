@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { PlugZapIcon } from "lucide-react";
 
 import { PageLoading } from "@/components/page-loading";
@@ -23,6 +24,9 @@ type ProviderModel = Parameters<
 >[0]["initialModels"][number];
 
 export function ProvidersPageClient() {
+	const t = useTranslations("providers");
+	const tCommon = useTranslations("common");
+	const tShell = useTranslations("shell");
 	const { workspaceId, workspaces, isLoading } = useWorkspace();
 	const [providers, setProviders] = useState<SafeProvider[]>([]);
 	const [models, setModels] = useState<ProviderModel[]>([]);
@@ -37,7 +41,7 @@ export function ProvidersPageClient() {
 			const providerRes = await fetch(
 				`/api/workspace/providers?workspaceId=${workspaceId}`,
 			);
-			if (!providerRes.ok) throw new Error("Failed to load providers");
+			if (!providerRes.ok) throw new Error(t("loadFailed"));
 			const providerRows = (await providerRes.json()) as SafeProvider[];
 			setProviders(providerRows);
 
@@ -53,7 +57,7 @@ export function ProvidersPageClient() {
 		} finally {
 			setLoading(false);
 		}
-	}, [workspaceId]);
+	}, [workspaceId, t]);
 
 	useEffect(() => {
 		if (!workspaceId) return;
@@ -62,21 +66,19 @@ export function ProvidersPageClient() {
 	}, [load, workspaceId]);
 
 	if (isLoading || !workspaceId) {
-		return <PageLoading label="Loading" />;
+		return <PageLoading label={tCommon("loading")} />;
 	}
 
 	if (!activeWorkspace) {
 		return (
-			<WorkspacePage title="AI Connections" width="default">
+			<WorkspacePage title={t("title")} width="default">
 				<Empty className="min-h-80 border border-border/70 bg-background/55">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
 							<PlugZapIcon aria-hidden="true" />
 						</EmptyMedia>
-						<EmptyTitle>Setup required</EmptyTitle>
-						<EmptyDescription>
-							Finish setup before configuring AI connections.
-						</EmptyDescription>
+						<EmptyTitle>{tShell("setupRequired")}</EmptyTitle>
+						<EmptyDescription>{t("setupDescription")}</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
 			</WorkspacePage>
@@ -85,12 +87,12 @@ export function ProvidersPageClient() {
 
 	return (
 		<WorkspacePage
-			title="Providers"
-			description="Connect to AI providers and manage available models for your assistants."
+			title={t("title")}
+			description={t("description")}
 			width="default"
 		>
 			{loading ? (
-				<PageLoading className="min-h-64" label="Loading connections" />
+				<PageLoading className="min-h-64" label={tShell("loadingConnections")} />
 			) : (
 				<ProviderManager
 					key={workspaceId}

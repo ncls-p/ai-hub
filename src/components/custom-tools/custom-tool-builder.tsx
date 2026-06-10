@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useEffect, useMemo, useState, useCallback } from "react";
 import {
 	ArrowRightIcon,
@@ -103,6 +105,7 @@ function userSafeText(value: string) {
 }
 
 export function CustomToolBuilder() {
+	const tShare = useTranslations("marketplace.share");
 	const { workspaceId } = useWorkspace();
 	const [shareResource, setShareResource] = useState<ShareableResource | null>(
 		null,
@@ -586,12 +589,12 @@ export function CustomToolBuilder() {
 													kind: "custom_tool",
 													id: tool.id,
 													name: tool.name,
-													description: tool.description,
+													description: tool.description ?? null,
 												})
 											}
 										>
 											<Share2 className="size-3" aria-hidden="true" />
-											Partager
+											{tShare("action")}
 										</Button>
 										<Button
 											type="button"

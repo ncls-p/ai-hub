@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { CustomToolBuilder } from "@/components/custom-tools/custom-tool-builder";
 import { WorkspacePage } from "@/components/workspace-page";
 
-export const metadata: Metadata = {
-	title: "Custom tools",
-};
+export async function generateMetadata(): Promise<Metadata> {
+	const t = await getTranslations("customTools");
+	return { title: t("title") };
+}
 
-export default function CustomToolsPage() {
+export default async function CustomToolsPage() {
+	const t = await getTranslations("customTools");
+
 	return (
-		<WorkspacePage
-			title="Custom tools"
-			description="Crée des tools custom avec un assistant, visualise le workflow en construction, et connecte les secrets sans les exposer."
-			width="wide"
-		>
+		<WorkspacePage title={t("title")} description={t("description")} width="wide">
 			<CustomToolBuilder />
 		</WorkspacePage>
 	);

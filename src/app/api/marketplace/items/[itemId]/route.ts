@@ -3,11 +3,10 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getSession } from "@/modules/auth/session";
 import {
-	getMarketplaceItemWithShares,
+	getMarketplaceItemDetail,
 	updateMarketplaceItem,
 	deleteMarketplaceItem,
 } from "@/modules/marketplace/use-cases";
-import { isAdminRole } from "@/modules/admin/use-cases";
 
 const updateSchema = z.object({
 	name: z.string().min(1).max(255).optional(),
@@ -20,8 +19,9 @@ export async function GET(
 	{ params }: { params: Promise<{ itemId: string }> },
 ) {
 	try {
+		const session = await getSession();
 		const { itemId } = await params;
-		const item = await getMarketplaceItemWithShares(itemId);
+		const item = await getMarketplaceItemDetail(itemId, session?.user.id);
 		if (!item)
 			return NextResponse.json({ error: "Not found" }, { status: 404 });
 		return NextResponse.json(item);

@@ -304,6 +304,8 @@ function SidebarPanel({
 	showCollapseControl?: boolean;
 }) {
 	const { toggleCollapsed } = useWorkspaceSidebar();
+	const tShell = useTranslations("shell");
+	const tCommon = useTranslations("common");
 	const groups = buildMenuGroups(shell);
 
 	return (
@@ -335,7 +337,9 @@ function SidebarPanel({
 							size="icon"
 							className="size-8 shrink-0"
 							onClick={toggleCollapsed}
-							aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+							aria-label={
+								collapsed ? tShell("expandSidebar") : tShell("collapseSidebar")
+							}
 						>
 							{collapsed ? (
 								<ChevronRightIcon aria-hidden="true" />
@@ -353,7 +357,7 @@ function SidebarPanel({
 			/>
 			<div
 				className={cn(
-					"mt-auto shrink-0 border-t border-sidebar-border p-3",
+					"relative z-30 mt-auto shrink-0 border-t border-sidebar-border p-3",
 					collapsed && "flex flex-col items-center gap-2 overflow-hidden px-2",
 				)}
 			>
@@ -367,13 +371,21 @@ function SidebarPanel({
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<span className="inline-flex">
+									<LocaleSwitcher compact className="shrink-0" />
+								</span>
+							</TooltipTrigger>
+							<TooltipContent side="right">{tCommon("language")}</TooltipContent>
+						</Tooltip>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<span className="inline-flex">
 									<ThemeToggleButton
 										iconOnly
 										className="size-9 shrink-0 rounded-lg"
 									/>
 								</span>
 							</TooltipTrigger>
-							<TooltipContent side="right">Theme</TooltipContent>
+							<TooltipContent side="right">{tShell("theme")}</TooltipContent>
 						</Tooltip>
 						{shell.displayName ? (
 							<Tooltip>
@@ -385,16 +397,14 @@ function SidebarPanel({
 										/>
 									</span>
 								</TooltipTrigger>
-								<TooltipContent side="right">Sign out</TooltipContent>
+								<TooltipContent side="right">{tShell("signOut")}</TooltipContent>
 							</Tooltip>
 						) : null}
 					</div>
 				) : (
 					<div className="grid gap-2">
-						<div className="grid grid-cols-[minmax(0,1fr)_3.75rem] gap-2">
-							<ThemeToggleButton className="min-w-0 justify-start rounded-lg" />
-							<LocaleSwitcher className="h-9 w-full justify-center rounded-lg px-2" />
-						</div>
+						<LocaleSwitcher />
+						<ThemeToggleButton className="w-full justify-start rounded-lg" />
 						{shell.displayName ? (
 							<SignOutButton className="w-full justify-start rounded-lg" />
 						) : null}
@@ -406,6 +416,7 @@ function SidebarPanel({
 }
 
 export function WorkspaceSidebar({ shell }: { shell: WorkspaceShellState }) {
+	const tShell = useTranslations("shell");
 	const { collapsed, isMobile } = useWorkspaceSidebar();
 	const width = useSyncExternalStore(
 		subscribeWidth,
@@ -460,13 +471,13 @@ export function WorkspaceSidebar({ shell }: { shell: WorkspaceShellState }) {
 			{!collapsed ? (
 				<div
 					role="separator"
-					aria-label="Resize navigation"
+					aria-label={tShell("resizeNavigation")}
 					aria-orientation="vertical"
 					aria-valuemin={MIN_WIDTH}
 					aria-valuemax={MAX_WIDTH}
 					aria-valuenow={width}
 					tabIndex={0}
-					className="group absolute inset-y-0 right-0 z-20 w-2 translate-x-1 cursor-col-resize outline-none"
+					className="group absolute inset-y-0 bottom-24 right-0 z-10 w-2 translate-x-1 cursor-col-resize outline-none"
 					onPointerDown={startResize}
 					onKeyDown={(event) => {
 						if (event.key === "ArrowLeft") adjustWidth(-12);
@@ -487,6 +498,7 @@ export function WorkspaceSidebarMobileTrigger({
 	className?: string;
 	shell: WorkspaceShellState;
 }) {
+	const tShell = useTranslations("shell");
 	const { mobileOpen, setMobileOpen } = useWorkspaceSidebar();
 	const hasPending = shell.pendingToolCount > 0;
 
@@ -498,7 +510,7 @@ export function WorkspaceSidebarMobileTrigger({
 					variant="ghost"
 					size="icon"
 					className={cn("relative md:hidden", className)}
-					aria-label="Open navigation"
+					aria-label={tShell("openNavigation")}
 				>
 					<MenuIcon aria-hidden="true" />
 					{hasPending ? (
@@ -513,7 +525,7 @@ export function WorkspaceSidebarMobileTrigger({
 			</SheetTrigger>
 			<SheetContent side="left" className="w-[min(100vw-2rem,18rem)] p-0">
 				<SheetHeader className="sr-only">
-					<SheetTitle>Navigation</SheetTitle>
+					<SheetTitle>{tShell("navigation")}</SheetTitle>
 				</SheetHeader>
 				<SidebarPanel
 					shell={shell}

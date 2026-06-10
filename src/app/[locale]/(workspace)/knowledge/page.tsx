@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type DragEvent } from "react";
+import { useTranslations } from "next-intl";
 import {
 	BookOpenIcon,
 	Loader2,
@@ -64,6 +65,8 @@ function statusVariant(status: string) {
 }
 
 export default function KnowledgePage() {
+	const t = useTranslations("knowledge");
+	const tCommon = useTranslations("common");
 	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
 	const [bases, setBases] = useState<KnowledgeBase[]>([]);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -269,28 +272,28 @@ export default function KnowledgePage() {
 	}
 
 	if (workspaceLoading || !workspaceId) {
-		return <PageLoading label="Loading" />;
+		return <PageLoading label={tCommon("loading")} />;
 	}
 
 	return (
 		<WorkspacePage
-			title="Knowledge"
-			description="Upload documents and attach them to assistants so they can reference your data."
+			title={t("title")}
+			description={t("description")}
 			width="wide"
 			actions={
 				<Button type="button" onClick={() => setShowCreateDialog(true)}>
 					<PlusIcon data-icon="inline-start" />
-					New knowledge base
+					{t("newBase")}
 				</Button>
 			}
 		>
 			<Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Create knowledge base</DialogTitle>
+						<DialogTitle>{t("createBaseTitle")}</DialogTitle>
 					</DialogHeader>
 					<div className="grid gap-3">
-						<Label htmlFor="knowledge-name">Name</Label>
+						<Label htmlFor="knowledge-name">{t("name")}</Label>
 						<Input
 							id="knowledge-name"
 							value={baseForm.name}
@@ -298,7 +301,7 @@ export default function KnowledgePage() {
 								setBaseForm({ ...baseForm, name: e.target.value })
 							}
 						/>
-						<Label htmlFor="knowledge-description">Description</Label>
+						<Label htmlFor="knowledge-description">{t("descriptionLabel")}</Label>
 						<Input
 							id="knowledge-description"
 							value={baseForm.description}
@@ -312,13 +315,13 @@ export default function KnowledgePage() {
 							variant="outline"
 							onClick={() => setShowCreateDialog(false)}
 						>
-							Cancel
+							{tCommon("cancel")}
 						</Button>
 						<Button
 							onClick={() => void createBase()}
 							disabled={!baseForm.name.trim()}
 						>
-							Create
+							{tCommon("create")}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
@@ -326,16 +329,16 @@ export default function KnowledgePage() {
 			<div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
 				<section className="flex flex-col gap-4">
 					<SectionHeader
-						title="Bases"
-						description="Choose the source set to manage."
+						title={t("basesTitle")}
+						description={t("basesDescription")}
 					/>
 					{loading ? (
 						<Loader2 className="animate-spin" />
 					) : bases.length === 0 ? (
 						<PageEmptyState
 							icon={BookOpenIcon}
-							title="No knowledge bases yet"
-							description="Create a base to upload documents for your assistants."
+							title={t("emptyTitle")}
+							description={t("emptyBasesDescription")}
 						>
 							<Button
 								type="button"
@@ -343,7 +346,7 @@ export default function KnowledgePage() {
 								onClick={() => setShowCreateDialog(true)}
 							>
 								<PlusIcon data-icon="inline-start" />
-								Create base
+								{t("createBaseCta")}
 							</Button>
 						</PageEmptyState>
 					) : (
@@ -373,7 +376,7 @@ export default function KnowledgePage() {
 											type="button"
 											size="icon-sm"
 											variant="ghost"
-											aria-label={`Edit ${base.name}`}
+											aria-label={t("editAria", { name: base.name })}
 											onClick={() => {
 												setEditingBase(base);
 												setEditBaseForm({
@@ -388,7 +391,7 @@ export default function KnowledgePage() {
 											type="button"
 											size="icon-sm"
 											variant="ghost"
-											aria-label={`Delete ${base.name}`}
+											aria-label={t("deleteAria", { name: base.name })}
 											onClick={() => void deleteBase(base.id)}
 										>
 											<Trash2Icon aria-hidden="true" />
@@ -403,8 +406,8 @@ export default function KnowledgePage() {
 					{!selectedId ? (
 						<PageEmptyState
 							icon={BookOpenIcon}
-							title="Select a knowledge base"
-							description="Choose or create a base on the left to manage documents."
+							title={t("selectBaseTitle")}
+							description={t("selectBaseDescription")}
 						/>
 					) : (
 						<>
@@ -412,12 +415,9 @@ export default function KnowledgePage() {
 								<CardHeader>
 									<CardTitle className="flex items-center gap-2">
 										<BookOpenIcon className="size-5" aria-hidden="true" />
-										Documents
+										{t("documents")}
 									</CardTitle>
-									<CardDescription>
-										Paste text to index. Processing documents refresh
-										automatically.
-									</CardDescription>
+									<CardDescription>{t("documentsHint")}</CardDescription>
 								</CardHeader>
 								<CardContent className="grid gap-3">
 									<div
@@ -434,24 +434,24 @@ export default function KnowledgePage() {
 										onDragLeave={() => setDragActive(false)}
 										onDrop={handleFileDrop}
 									>
-										Drag and drop a text file here to ingest
+										{t("dropHint")}
 									</div>
 									<Input
-										aria-label="Document title"
+										aria-label={t("documentTitle")}
 										name="document-title"
 										autoComplete="off"
-										placeholder="Document title…"
+										placeholder={t("documentTitlePlaceholder")}
 										value={docForm.title}
 										onChange={(e) =>
 											setDocForm({ ...docForm, title: e.target.value })
 										}
 									/>
 									<Textarea
-										aria-label="Document content"
+										aria-label={t("documentContent")}
 										name="document-content"
 										autoComplete="off"
 										className="min-h-40"
-										placeholder="Document content…"
+										placeholder={t("documentContentPlaceholder")}
 										value={docForm.content}
 										onChange={(e) =>
 											setDocForm({ ...docForm, content: e.target.value })
@@ -463,7 +463,7 @@ export default function KnowledgePage() {
 										onClick={() => void ingestDocument()}
 										disabled={!selectedId}
 									>
-										Ingest Document
+										{t("ingestDocument")}
 									</Button>
 								</CardFooter>
 							</Card>
@@ -494,21 +494,21 @@ export default function KnowledgePage() {
 							</div>
 							<Card>
 								<CardHeader>
-									<CardTitle>Search</CardTitle>
+									<CardTitle>{t("search")}</CardTitle>
 								</CardHeader>
 								<CardContent className="grid gap-3">
 									<div className="flex flex-col gap-2 sm:flex-row">
 										<Input
-											aria-label="Search indexed text"
+											aria-label={t("searchAriaLabel")}
 											name="knowledge-search"
 											autoComplete="off"
 											value={query}
 											onChange={(e) => setQuery(e.target.value)}
-											placeholder="Search indexed text…"
+											placeholder={t("searchPlaceholder")}
 										/>
 										<Button onClick={() => void search()}>
 											<SearchIcon data-icon="inline-start" aria-hidden="true" />
-											Search
+											{t("search")}
 										</Button>
 									</div>
 									{results.map((result) => (

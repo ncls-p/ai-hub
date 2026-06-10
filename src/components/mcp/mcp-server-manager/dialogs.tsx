@@ -205,6 +205,11 @@ export function EditServerDialog({
 						Update the configuration for{" "}
 						<span className="font-medium">{server?.name}</span>.
 					</DialogDescription>
+					{server?.hasHeaders || server?.hasEnv ? (
+						<Badge variant="secondary" className="w-fit">
+							Credentials configurés (valeurs masquées)
+						</Badge>
+					) : null}
 				</DialogHeader>
 				<div className="grid min-w-0 gap-4">
 					<div className="grid min-w-0 gap-2">

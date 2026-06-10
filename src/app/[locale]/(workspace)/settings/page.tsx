@@ -36,10 +36,8 @@ export default async function SettingsPage() {
 						<EmptyMedia variant="icon">
 							<ShieldAlertIcon aria-hidden="true" />
 						</EmptyMedia>
-						<EmptyTitle>Admin access required</EmptyTitle>
-						<EmptyDescription>
-							Only admins can change account and registration settings.
-						</EmptyDescription>
+						<EmptyTitle>{t("adminRequired")}</EmptyTitle>
+						<EmptyDescription>{t("adminRequiredDescription")}</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
 			</WorkspacePage>

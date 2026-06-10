@@ -1015,6 +1015,8 @@ export const marketplaceItems = pgTable(
 		publishedAt: timestamp("published_at", { withTimezone: true }),
 		totalDownloads: integer("total_downloads").notNull().default(0),
 		tagsJson: jsonb("tags_json"),
+		sourceResourceType: varchar("source_resource_type", { length: 32 }),
+		sourceResourceId: uuid("source_resource_id"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
@@ -1032,6 +1034,10 @@ export const marketplaceItems = pgTable(
 			t.status,
 			t.visibility,
 			t.publishedAt,
+		),
+		sourceResourceIdx: index("marketplace_items_source_resource").on(
+			t.sourceResourceType,
+			t.sourceResourceId,
 		),
 	}),
 );

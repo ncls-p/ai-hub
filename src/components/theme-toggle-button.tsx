@@ -1,6 +1,7 @@
 "use client";
 
 import { MoonStarIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useTheme } from "@teispace/next-themes";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ export function ThemeToggleButton({
   className?: string;
   iconOnly?: boolean;
 }) {
+  const t = useTranslations("shell");
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
@@ -25,7 +27,7 @@ export function ThemeToggleButton({
         "rounded-full text-muted-foreground transition-colors hover:text-foreground",
         className,
       )}
-      aria-label="Toggle theme"
+      aria-label={t("toggleTheme")}
       onClick={() => setTheme(isDark ? "light" : "dark")}
     >
       <MoonStarIcon
@@ -33,7 +35,7 @@ export function ThemeToggleButton({
         aria-hidden="true"
         className="transition-transform duration-300"
       />
-      {iconOnly ? <span className="sr-only">Theme</span> : "Theme"}
+      {iconOnly ? <span className="sr-only">{t("theme")}</span> : t("theme")}
     </Button>
   );
 }

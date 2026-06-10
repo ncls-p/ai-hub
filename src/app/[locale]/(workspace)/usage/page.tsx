@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { BarChart3Icon } from "lucide-react";
 import { toast } from "sonner";
 import { PageLoading, ListSkeleton } from "@/components/page-loading";
@@ -38,6 +39,8 @@ interface UsageResponse {
 }
 
 export default function UsagePage() {
+	const t = useTranslations("admin");
+	const tCommon = useTranslations("common");
 	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
 	const [data, setData] = useState<UsageResponse | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -87,13 +90,13 @@ export default function UsagePage() {
 	}, [loadUsage, workspaceId]);
 
 	if (workspaceLoading || !workspaceId) {
-		return <PageLoading label="Loading" />;
+		return <PageLoading label={tCommon("loading")} />;
 	}
 
 	return (
 		<WorkspacePage
-			title="Usage"
-			description="Monitor token consumption, API usage, and quota."
+			title={t("usageTitle")}
+			description={t("usageDescription")}
 			width="wide"
 		>
 			{data?.quota ? (

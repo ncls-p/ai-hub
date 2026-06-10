@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
 	BookMarkedIcon,
@@ -625,6 +627,7 @@ function PreviewPanel({
 // ─── Main Skill Manager ────────────────────────────────────────────────
 
 export function SkillManager() {
+	const tShare = useTranslations("marketplace.share");
 	const { workspaceId } = useWorkspace();
 	const [shareResource, setShareResource] = useState<ShareableResource | null>(
 		null,
@@ -860,7 +863,7 @@ export function SkillManager() {
 											variant="ghost"
 											size="icon"
 											className="h-7 w-7"
-											aria-label={`Partager ${skill.name}`}
+											aria-label={`${tShare("action")} ${skill.name}`}
 											onClick={() =>
 												setShareResource({
 													kind: "skill",
