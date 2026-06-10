@@ -58,9 +58,17 @@ vi.mock("@/server/infrastructure/db", () => {
 	const buildChain = (): ChainMock => {
 		const c = {} as Record<string, ChainFn>;
 		const keys = [
-			"select", "insert", "update", "delete",
-			"from", "where", "innerJoin", "orderBy",
-			"values", "set", "onConflictDoNothing",
+			"select",
+			"insert",
+			"update",
+			"delete",
+			"from",
+			"where",
+			"innerJoin",
+			"orderBy",
+			"values",
+			"set",
+			"onConflictDoNothing",
 		] as const;
 		for (const k of keys) {
 			c[k] = vi.fn().mockReturnThis();
@@ -271,7 +279,12 @@ describe("listWorkspaceMembers", () => {
 describe("createWorkspace", () => {
 	it("creates workspace via transaction, returning workspace object", async () => {
 		const fakeOrg = { id: "org-1", name: "Acme", slug: "acme" };
-		const fakeWs = { id: "ws-2", name: "Main", slug: "main", organizationId: "org-1" };
+		const fakeWs = {
+			id: "ws-2",
+			name: "Main",
+			slug: "main",
+			organizationId: "org-1",
+		};
 		const seedRole = { id: "role-owner", name: "workspace.owner" };
 
 		// tx.select().from(organizations).where().limit(1) → finds existing org
@@ -304,7 +317,11 @@ describe("createWorkspace", () => {
 describe("addWorkspaceMember", () => {
 	it("throws when workspace not found", async () => {
 		await expect(
-			addWorkspaceMember({ workspaceId: "ws-1", userId: "user-2", invitedBy: "user-1" }),
+			addWorkspaceMember({
+				workspaceId: "ws-1",
+				userId: "user-2",
+				invitedBy: "user-1",
+			}),
 		).rejects.toThrow("Workspace not found");
 	});
 
@@ -314,7 +331,11 @@ describe("addWorkspaceMember", () => {
 			.mockResolvedValueOnce([{ ...fakeMember, status: "active" }]);
 
 		await expect(
-			addWorkspaceMember({ workspaceId: "ws-1", userId: "user-2", invitedBy: "user-1" }),
+			addWorkspaceMember({
+				workspaceId: "ws-1",
+				userId: "user-2",
+				invitedBy: "user-1",
+			}),
 		).rejects.toThrow("already a workspace member");
 	});
 
@@ -343,7 +364,11 @@ describe("addWorkspaceMember", () => {
 		// tx: check existing binding
 		dbModule._tx.limit.mockResolvedValueOnce([]); // no existing binding
 
-		await addWorkspaceMember({ workspaceId: "ws-1", userId: "user-2", invitedBy: "user-1" });
+		await addWorkspaceMember({
+			workspaceId: "ws-1",
+			userId: "user-2",
+			invitedBy: "user-1",
+		});
 
 		expect(dbModule.db.transaction).toHaveBeenCalledOnce();
 	});
@@ -357,7 +382,11 @@ describe("addWorkspaceMember", () => {
 		// tx: check existing binding
 		dbModule._tx.limit.mockResolvedValueOnce([]);
 
-		await addWorkspaceMember({ workspaceId: "ws-1", userId: "user-2", invitedBy: "user-1" });
+		await addWorkspaceMember({
+			workspaceId: "ws-1",
+			userId: "user-2",
+			invitedBy: "user-1",
+		});
 
 		expect(dbModule.db.transaction).toHaveBeenCalledOnce();
 	});
@@ -366,7 +395,11 @@ describe("addWorkspaceMember", () => {
 describe("removeWorkspaceMember", () => {
 	it("throws when workspace not found", async () => {
 		await expect(
-			removeWorkspaceMember({ workspaceId: "ws-1", userId: "user-2", removedBy: "user-1" }),
+			removeWorkspaceMember({
+				workspaceId: "ws-1",
+				userId: "user-2",
+				removedBy: "user-1",
+			}),
 		).rejects.toThrow("Workspace not found");
 	});
 
@@ -376,7 +409,11 @@ describe("removeWorkspaceMember", () => {
 			.mockResolvedValueOnce([]);
 
 		await expect(
-			removeWorkspaceMember({ workspaceId: "ws-1", userId: "user-2", removedBy: "user-1" }),
+			removeWorkspaceMember({
+				workspaceId: "ws-1",
+				userId: "user-2",
+				removedBy: "user-1",
+			}),
 		).rejects.toThrow("Member not found");
 	});
 
@@ -385,7 +422,11 @@ describe("removeWorkspaceMember", () => {
 			.mockResolvedValueOnce([fakeWorkspace])
 			.mockResolvedValueOnce([fakeMember]);
 
-		await removeWorkspaceMember({ workspaceId: "ws-1", userId: "user-2", removedBy: "user-1" });
+		await removeWorkspaceMember({
+			workspaceId: "ws-1",
+			userId: "user-2",
+			removedBy: "user-1",
+		});
 
 		expect(dbModule.db.update).toHaveBeenCalled();
 	});

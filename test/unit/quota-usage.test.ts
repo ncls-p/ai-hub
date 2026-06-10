@@ -7,6 +7,15 @@ type SelectChain = {
 	where: ReturnType<typeof vi.fn>;
 };
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_selectChain: SelectChain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const selectChain: SelectChain = {
 		from: vi.fn().mockReturnThis(),
@@ -14,17 +23,14 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(selectChain),
+			select: vi.fn(),
 		},
 		_selectChain: selectChain,
 	};
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _selectChain: SelectChain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import {
 	assertWorkspaceWithinTokenQuota,
 	getWorkspaceMonthlyTokenUsage,
@@ -32,6 +38,7 @@ import {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	dbModule.db.select.mockReturnValue(dbModule._selectChain);
 	dbModule._selectChain.from.mockReturnThis();
 	dbModule._selectChain.where.mockResolvedValue([{ total: 0 }]);
 	delete process.env.WORKSPACE_MONTHLY_TOKEN_LIMIT;

@@ -64,29 +64,51 @@ vi.mock("@/server/infrastructure/db", () => {
 		where: vi.fn().mockResolvedValue(undefined),
 	};
 
+	type DbMock = {
+		select: ReturnType<typeof vi.fn>;
+		insert: ReturnType<typeof vi.fn>;
+		update: ReturnType<typeof vi.fn>;
+		delete: ReturnType<typeof vi.fn>;
+		transaction: ReturnType<typeof vi.fn>;
+	};
+
+	type DbModule = {
+		db: DbMock;
+		_selectChain: SelectChain;
+		_updateChain: UpdateChain;
+		_insertChain: InsertChain;
+		_deleteChain: DeleteChain;
+	};
+
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(selectChain),
-			insert: vi.fn().mockReturnValue(insertChain),
-			update: vi.fn().mockReturnValue(updateChain),
-			delete: vi.fn().mockReturnValue(deleteChain),
+			select: vi.fn(),
+			insert: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
 			transaction: vi.fn(),
 		},
 		_selectChain: selectChain,
 		_updateChain: updateChain,
 		_insertChain: insertChain,
 		_deleteChain: deleteChain,
-	};
+	} as DbModule;
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _selectChain: SelectChain;
-	export const _updateChain: UpdateChain;
-	export const _insertChain: InsertChain;
-	export const _deleteChain: DeleteChain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as {
+	_selectChain: SelectChain;
+	_updateChain: UpdateChain;
+	_insertChain: InsertChain;
+	_deleteChain: DeleteChain;
+	db: {
+		select: ReturnType<typeof vi.fn>;
+		insert: ReturnType<typeof vi.fn>;
+		update: ReturnType<typeof vi.fn>;
+		delete: ReturnType<typeof vi.fn>;
+		transaction: ReturnType<typeof vi.fn>;
+	};
+};
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
@@ -134,6 +156,10 @@ describe("marketplace use-cases", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		resetChains();
+		dbModule.db.select.mockReturnValue(dbModule._selectChain);
+		dbModule.db.insert.mockReturnValue(dbModule._insertChain);
+		dbModule.db.update.mockReturnValue(dbModule._updateChain);
+		dbModule.db.delete.mockReturnValue(dbModule._deleteChain);
 	});
 
 	describe("listMarketplaceItems", () => {

@@ -14,6 +14,15 @@ type SelectChain = {
 	limit: ReturnType<typeof vi.fn>;
 };
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_selectChain: SelectChain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const selectChain: SelectChain = {
 		from: vi.fn().mockReturnThis(),
@@ -22,15 +31,11 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(selectChain),
+			select: vi.fn(),
 		},
 		_selectChain: selectChain,
 	};
 });
-
-declare module "@/server/infrastructure/db" {
-	export const _selectChain: SelectChain;
-}
 
 vi.mock("@/modules/marketplace/manifest-builders", () => ({
 	buildAgentManifest: vi.fn(),
@@ -43,7 +48,8 @@ vi.mock("@/modules/marketplace/draft-helpers", () => ({
 	findExistingDraft: vi.fn().mockResolvedValue(null),
 }));
 
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import * as manifestBuilders from "@/modules/marketplace/manifest-builders";
 import * as draftHelpers from "@/modules/marketplace/draft-helpers";
 import { getPublishPreview } from "@/modules/marketplace/publish-preview";
@@ -52,7 +58,7 @@ const mockBuildAgent = vi.mocked(manifestBuilders.buildAgentManifest);
 const mockBuildSkill = vi.mocked(manifestBuilders.buildSkillManifest);
 const mockBuildTool = vi.mocked(manifestBuilders.buildCustomToolManifest);
 const mockBuildMcp = vi.mocked(manifestBuilders.buildMcpPresetManifest);
-const mockFindDraft = vi.mocked(draftHelpers.findExistingDraft);
+const mockFindDraft = vi.mocked(draftHelpers.findExistingDraft) as ReturnType<typeof vi.fn<() => Promise<unknown>>>;
 
 function resetChains() {
 	dbModule._selectChain.from.mockReset().mockReturnThis();
@@ -63,6 +69,7 @@ function resetChains() {
 beforeEach(() => {
 	vi.clearAllMocks();
 	resetChains();
+	dbModule.db.select.mockReturnValue(dbModule._selectChain);
 	mockFindDraft.mockResolvedValue(null);
 });
 

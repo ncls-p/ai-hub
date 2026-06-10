@@ -13,6 +13,17 @@ type InsertChain = {
 	onConflictDoUpdate: ReturnType<typeof vi.fn>;
 };
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+	insert: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_sc: SelectChain;
+	_ic: InsertChain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const sc: SelectChain = {
 		from: vi.fn().mockReturnThis(),
@@ -25,20 +36,16 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(sc),
-			insert: vi.fn().mockReturnValue(ic),
+			select: vi.fn(),
+			insert: vi.fn(),
 		},
 		_sc: sc,
 		_ic: ic,
 	};
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _sc: SelectChain;
-	export const _ic: InsertChain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import {
 	isOnboardingComplete,
 	markOnboardingComplete,
@@ -46,6 +53,8 @@ import {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	dbModule.db.select.mockReturnValue(dbModule._sc);
+	dbModule.db.insert.mockReturnValue(dbModule._ic);
 	dbModule._sc.from.mockReturnThis();
 	dbModule._sc.where.mockReturnThis();
 	dbModule._sc.limit.mockResolvedValue([]);

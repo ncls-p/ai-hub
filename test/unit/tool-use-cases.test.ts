@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ─── Mocks ────────────────────────────────────────────────────────────
 
 vi.mock("@/lib/crypto", () => ({
-	encryptValue: vi.fn().mockResolvedValue('{"ct":"enc","iv":"iv","kid":"default"}'),
+	encryptValue: vi
+		.fn()
+		.mockResolvedValue('{"ct":"enc","iv":"iv","kid":"default"}'),
 }));
 
 vi.mock("@/server/domain/services/authorization", () => ({
@@ -28,6 +30,19 @@ type DeleteChain = {
 	where: ReturnType<typeof vi.fn>;
 };
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+	insert: ReturnType<typeof vi.fn>;
+	delete: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_sc: SelectChain;
+	_ic: InsertChain;
+	_dc: DeleteChain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const sc: SelectChain = {
 		from: vi.fn().mockReturnThis(),
@@ -44,9 +59,9 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(sc),
-			insert: vi.fn().mockReturnValue(ic),
-			delete: vi.fn().mockReturnValue(dc),
+			select: vi.fn(),
+			insert: vi.fn(),
+			delete: vi.fn(),
 		},
 		_sc: sc,
 		_ic: ic,
@@ -54,13 +69,8 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _sc: SelectChain;
-	export const _ic: InsertChain;
-	export const _dc: DeleteChain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import { authorization } from "@/server/domain/services/authorization";
 import {
 	canExecuteRestrictedTool,
@@ -88,6 +98,9 @@ function reset() {
 beforeEach(() => {
 	vi.clearAllMocks();
 	reset();
+	dbModule.db.select.mockReturnValue(dbModule._sc);
+	dbModule.db.insert.mockReturnValue(dbModule._ic);
+	dbModule.db.delete.mockReturnValue(dbModule._dc);
 });
 
 describe("toolBindingInputSchema", () => {
@@ -287,7 +300,9 @@ describe("logToolInvocation", () => {
 	});
 
 	it("handles missing optional fields", async () => {
-		dbModule._ic.returning.mockResolvedValueOnce([{ id: "inv-2", status: "failed" }]);
+		dbModule._ic.returning.mockResolvedValueOnce([
+			{ id: "inv-2", status: "failed" },
+		]);
 
 		const result = await logToolInvocation({
 			workspaceId: "ws-1",
@@ -338,8 +353,8 @@ describe("getAgentVersionToolContext", () => {
 		// Q2: db.select().from(agentToolBindings).where(and(...))        — .where() terminal
 		// Q1's .where() must return chain so .limit() can be called
 		dbModule._sc.where
-			.mockReturnValueOnce(dbModule._sc)  // Q1: keep chain for limit
-			.mockResolvedValueOnce([{ toolSource: "builtin", toolId: "tool-1" }]);  // Q2
+			.mockReturnValueOnce(dbModule._sc) // Q1: keep chain for limit
+			.mockResolvedValueOnce([{ toolSource: "builtin", toolId: "tool-1" }]); // Q2
 		dbModule._sc.limit.mockResolvedValueOnce([{ agentId: "agent-1" }]);
 
 		const result = await getAgentVersionToolContext("v1");
@@ -352,7 +367,12 @@ describe("getCustomBindingContext", () => {
 	it("returns null when binding not found", async () => {
 		dbModule._sc.limit.mockResolvedValueOnce([]);
 
-		const result = await getCustomBindingContext("v1", "tool-1", "user-1", "ws-1");
+		const result = await getCustomBindingContext(
+			"v1",
+			"tool-1",
+			"user-1",
+			"ws-1",
+		);
 		expect(result).toBeNull();
 	});
 
@@ -361,7 +381,12 @@ describe("getCustomBindingContext", () => {
 			.mockResolvedValueOnce([{ toolSource: "custom", toolId: "tool-1" }])
 			.mockResolvedValueOnce([]);
 
-		const result = await getCustomBindingContext("v1", "tool-1", "user-1", "ws-1");
+		const result = await getCustomBindingContext(
+			"v1",
+			"tool-1",
+			"user-1",
+			"ws-1",
+		);
 		expect(result).toBeNull();
 	});
 
@@ -372,7 +397,12 @@ describe("getCustomBindingContext", () => {
 			.mockResolvedValueOnce([binding])
 			.mockResolvedValueOnce([tool]);
 
-		const result = await getCustomBindingContext("v1", "tool-1", "user-1", "ws-1");
+		const result = await getCustomBindingContext(
+			"v1",
+			"tool-1",
+			"user-1",
+			"ws-1",
+		);
 		expect(result).not.toBeNull();
 		expect(result?.binding).toEqual(binding);
 		expect(result?.tool).toEqual(tool);

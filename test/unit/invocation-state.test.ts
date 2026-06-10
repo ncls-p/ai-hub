@@ -13,6 +13,17 @@ type UpdateChain = {
 	where: ReturnType<typeof vi.fn>;
 };
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+	update: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_selectChain: SelectChain;
+	_updateChain: UpdateChain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const selectChain: SelectChain = {
 		from: vi.fn().mockReturnThis(),
@@ -25,33 +36,26 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(selectChain),
-			update: vi.fn().mockReturnValue(updateChain),
+			select: vi.fn(),
+			update: vi.fn(),
 		},
 		_selectChain: selectChain,
 		_updateChain: updateChain,
 	};
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _selectChain: SelectChain;
-	export const _updateChain: UpdateChain;
-}
-
 vi.mock("@/lib/crypto", () => ({
 	decryptValue: vi.fn(),
 }));
 
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import { decryptValue } from "@/lib/crypto";
 import { waitForApproval } from "@/modules/tool/invocation-state";
 
 const mockDecrypt = vi.mocked(decryptValue);
 
-function resetChains(
-	sc = dbModule._selectChain,
-	uc = dbModule._updateChain,
-) {
+function resetChains(sc = dbModule._selectChain, uc = dbModule._updateChain) {
 	sc.from.mockReset().mockReturnThis();
 	sc.where.mockReset().mockReturnThis();
 	sc.limit.mockReset().mockResolvedValue([]);
@@ -63,6 +67,8 @@ beforeEach(() => {
 	vi.useFakeTimers();
 	resetChains();
 	vi.clearAllMocks();
+	dbModule.db.select.mockReturnValue(dbModule._selectChain);
+	dbModule.db.update.mockReturnValue(dbModule._updateChain);
 	dbModule._selectChain.from.mockReturnThis();
 	dbModule._selectChain.where.mockReturnThis();
 	dbModule._selectChain.limit.mockResolvedValue([]);

@@ -39,7 +39,17 @@ type Chain = {
 
 function makeChain(): Chain {
 	const c = {} as Chain;
-	for (const k of ["select", "insert", "update", "delete", "from", "where", "orderBy", "values", "set"] as const) {
+	for (const k of [
+		"select",
+		"insert",
+		"update",
+		"delete",
+		"from",
+		"where",
+		"orderBy",
+		"values",
+		"set",
+	] as const) {
 		c[k] = vi.fn().mockReturnThis();
 	}
 	c.limit = vi.fn().mockResolvedValue([]);
@@ -47,28 +57,38 @@ function makeChain(): Chain {
 	return c;
 }
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+	insert: ReturnType<typeof vi.fn>;
+	update: ReturnType<typeof vi.fn>;
+	delete: ReturnType<typeof vi.fn>;
+	transaction: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_c: Chain;
+	_tx: Chain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const chain = makeChain();
 	const tx = makeChain();
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(chain),
-			insert: vi.fn().mockReturnValue(chain),
-			update: vi.fn().mockReturnValue(chain),
-			delete: vi.fn().mockReturnValue(chain),
-			transaction: vi.fn().mockImplementation((cb: (tx: Chain) => Promise<unknown>) => cb(tx)),
+			select: vi.fn(),
+			insert: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+			transaction: vi.fn(),
 		},
 		_c: chain,
 		_tx: tx,
 	};
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _c: Chain;
-	export const _tx: Chain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import { listRemoteMcpTools } from "@/modules/mcp/client";
 import {
 	archiveMcpServer,
@@ -86,7 +106,17 @@ import {
 
 function reset() {
 	for (const chain of [dbModule._c, dbModule._tx]) {
-		for (const k of ["select", "insert", "update", "delete", "from", "where", "orderBy", "values", "set"] as const) {
+		for (const k of [
+			"select",
+			"insert",
+			"update",
+			"delete",
+			"from",
+			"where",
+			"orderBy",
+			"values",
+			"set",
+		] as const) {
 			chain[k].mockReset().mockReturnThis();
 		}
 		chain.limit.mockReset().mockResolvedValue([]);
@@ -163,12 +193,18 @@ describe("toSafeMcpServer", () => {
 	});
 
 	it("hasHeaders is true when encryptedHeadersJson present", () => {
-		const safe = toSafeMcpServer({ ...fakeSseServer, encryptedHeadersJson: { auth: "enc" } });
+		const safe = toSafeMcpServer({
+			...fakeSseServer,
+			encryptedHeadersJson: { auth: "enc" },
+		});
 		expect(safe.hasHeaders).toBe(true);
 	});
 
 	it("hasEnv is true when encryptedEnvJson present", () => {
-		const safe = toSafeMcpServer({ ...fakeSseServer, encryptedEnvJson: { KEY: "enc" } });
+		const safe = toSafeMcpServer({
+			...fakeSseServer,
+			encryptedEnvJson: { KEY: "enc" },
+		});
 		expect(safe.hasEnv).toBe(true);
 	});
 });
@@ -312,7 +348,9 @@ describe("updateMcpServer", () => {
 
 	it("updates server fields and returns updated server", async () => {
 		dbModule._c.limit.mockResolvedValueOnce([fakeSseServer]);
-		dbModule._c.returning.mockResolvedValueOnce([{ ...fakeSseServer, name: "Updated" }]);
+		dbModule._c.returning.mockResolvedValueOnce([
+			{ ...fakeSseServer, name: "Updated" },
+		]);
 
 		const result = await updateMcpServer({
 			serverId: "srv-1",
@@ -365,7 +403,9 @@ describe("archiveMcpServer", () => {
 
 describe("listMcpTools", () => {
 	it("throws when server not found", async () => {
-		await expect(listMcpTools("srv-1", "ws-1")).rejects.toThrow("MCP server not found");
+		await expect(listMcpTools("srv-1", "ws-1")).rejects.toThrow(
+			"MCP server not found",
+		);
 	});
 
 	it("returns tools ordered by name", async () => {
@@ -382,7 +422,9 @@ describe("listMcpTools", () => {
 
 describe("syncMcpTools", () => {
 	it("throws when server not found", async () => {
-		await expect(syncMcpTools("srv-1", "ws-1", "user-1")).rejects.toThrow("MCP server not found");
+		await expect(syncMcpTools("srv-1", "ws-1", "user-1")).rejects.toThrow(
+			"MCP server not found",
+		);
 	});
 
 	it("returns manual status for stdio transport", async () => {
@@ -397,8 +439,8 @@ describe("syncMcpTools", () => {
 		// Q1 (getMcpServer): .where() chains → .limit() terminal
 		// Q2 (existing tools): .where() terminal
 		dbModule._c.where
-			.mockReturnValueOnce(dbModule._c)   // Q1: keep chain for .limit()
-			.mockResolvedValueOnce([]);           // Q2: existing tools
+			.mockReturnValueOnce(dbModule._c) // Q1: keep chain for .limit()
+			.mockResolvedValueOnce([]); // Q2: existing tools
 		dbModule._c.limit.mockResolvedValueOnce([fakeSseServer]);
 		vi.mocked(listRemoteMcpTools).mockResolvedValueOnce([
 			{ name: "search", description: "Search" },
@@ -414,7 +456,9 @@ describe("syncMcpTools", () => {
 			.mockReturnValueOnce(dbModule._c)
 			.mockResolvedValueOnce([]);
 		dbModule._c.limit.mockResolvedValueOnce([fakeSseServer]);
-		vi.mocked(listRemoteMcpTools).mockRejectedValueOnce(new Error("Connection refused"));
+		vi.mocked(listRemoteMcpTools).mockRejectedValueOnce(
+			new Error("Connection refused"),
+		);
 
 		const result = await syncMcpTools("srv-1", "ws-1", "user-1");
 		expect(result.status).toBe("unhealthy");
@@ -423,7 +467,7 @@ describe("syncMcpTools", () => {
 
 	it("preserves per-tool requireApproval from existing tools", async () => {
 		dbModule._c.where
-			.mockReturnValueOnce(dbModule._c)                                   // Q1: getMcpServer where
+			.mockReturnValueOnce(dbModule._c) // Q1: getMcpServer where
 			.mockResolvedValueOnce([{ name: "search", requireApproval: true }]); // Q2: existing tools
 		dbModule._c.limit.mockResolvedValueOnce([fakeSseServer]);
 		vi.mocked(listRemoteMcpTools).mockResolvedValueOnce([
@@ -435,8 +479,9 @@ describe("syncMcpTools", () => {
 		// Check the insert values included requireApproval=true for "search"
 		expect(dbModule._tx.values).toHaveBeenCalled();
 		const insertedTools = dbModule._tx.values.mock.calls[0][0];
-		const searchTool = (insertedTools as Array<{ name: string; requireApproval: boolean }>)
-			.find((t) => t.name === "search");
+		const searchTool = (
+			insertedTools as Array<{ name: string; requireApproval: boolean }>
+		).find((t) => t.name === "search");
 		expect(searchTool?.requireApproval).toBe(true);
 	});
 });
@@ -459,7 +504,9 @@ describe("testMcpConnection", () => {
 
 	it("returns healthy with tool count message", async () => {
 		dbModule._c.limit.mockResolvedValueOnce([fakeSseServer]);
-		vi.mocked(listRemoteMcpTools).mockResolvedValueOnce([{ name: "search" }] as never);
+		vi.mocked(listRemoteMcpTools).mockResolvedValueOnce([
+			{ name: "search" },
+		] as never);
 
 		const result = await testMcpConnection("srv-1", "ws-1", "user-1");
 		expect(result.status).toBe("healthy");
@@ -531,7 +578,9 @@ describe("updateMcpTool", () => {
 
 	it("returns updated tool", async () => {
 		dbModule._c.limit.mockResolvedValueOnce([fakeSseServer]);
-		dbModule._c.returning.mockResolvedValueOnce([{ ...fakeTool, enabled: false }]);
+		dbModule._c.returning.mockResolvedValueOnce([
+			{ ...fakeTool, enabled: false },
+		]);
 
 		const result = await updateMcpTool({
 			toolId: "tool-1",

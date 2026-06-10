@@ -29,6 +29,19 @@ type InsertChain = {
 	onConflictDoUpdate: ReturnType<typeof vi.fn>;
 };
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+	update: ReturnType<typeof vi.fn>;
+	insert: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_sc: SelectChain;
+	_uc: UpdateChain;
+	_ic: InsertChain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const sc: SelectChain = {
 		from: vi.fn().mockReturnThis(),
@@ -48,9 +61,9 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(sc),
-			update: vi.fn().mockReturnValue(uc),
-			insert: vi.fn().mockReturnValue(ic),
+			select: vi.fn(),
+			update: vi.fn(),
+			insert: vi.fn(),
 		},
 		_sc: sc,
 		_uc: uc,
@@ -58,13 +71,8 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _sc: SelectChain;
-	export const _uc: UpdateChain;
-	export const _ic: InsertChain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 
 import {
 	ensureBootstrapAdmin,
@@ -91,6 +99,9 @@ function reset() {
 beforeEach(() => {
 	vi.clearAllMocks();
 	reset();
+	dbModule.db.select.mockReturnValue(dbModule._sc);
+	dbModule.db.update.mockReturnValue(dbModule._uc);
+	dbModule.db.insert.mockReturnValue(dbModule._ic);
 });
 
 describe("isAdminRole", () => {
@@ -160,7 +171,9 @@ describe("getRegistrationSetting", () => {
 	});
 
 	it("returns disabled registration when setting says so", async () => {
-		dbModule._sc.limit.mockResolvedValueOnce([{ valueJson: { enabled: false } }]);
+		dbModule._sc.limit.mockResolvedValueOnce([
+			{ valueJson: { enabled: false } },
+		]);
 		dbModule._sc.from
 			.mockReturnValueOnce(dbModule._sc)
 			.mockResolvedValueOnce([{ value: 3 }]);
@@ -171,7 +184,9 @@ describe("getRegistrationSetting", () => {
 	});
 
 	it("canPublicSignUp is true when user count is 0 even if disabled", async () => {
-		dbModule._sc.limit.mockResolvedValueOnce([{ valueJson: { enabled: false } }]);
+		dbModule._sc.limit.mockResolvedValueOnce([
+			{ valueJson: { enabled: false } },
+		]);
 		dbModule._sc.from
 			.mockReturnValueOnce(dbModule._sc)
 			.mockResolvedValueOnce([{ value: 0 }]);
@@ -184,7 +199,9 @@ describe("getRegistrationSetting", () => {
 describe("setRegistrationEnabled", () => {
 	it("upserts the registration setting", async () => {
 		// setRegistrationEnabled calls getRegistrationSetting afterwards
-		dbModule._sc.limit.mockResolvedValueOnce([{ valueJson: { enabled: true } }]);
+		dbModule._sc.limit.mockResolvedValueOnce([
+			{ valueJson: { enabled: true } },
+		]);
 		dbModule._sc.from
 			.mockReturnValueOnce(dbModule._sc)
 			.mockResolvedValueOnce([{ value: 2 }]);
@@ -274,8 +291,8 @@ describe("updateManagedUser", () => {
 		// Q2 (getActiveAdminCount): db.select({value:count()}).from(users).where(and(...)) — .where() terminal
 		// Q1's .where() must return chain so .limit() can be called
 		dbModule._sc.where
-			.mockReturnValueOnce(dbModule._sc)  // Q1: keep chain for limit
-			.mockResolvedValueOnce([{ value: 0 }]);  // Q2: getActiveAdminCount → 0 remaining admins
+			.mockReturnValueOnce(dbModule._sc) // Q1: keep chain for limit
+			.mockResolvedValueOnce([{ value: 0 }]); // Q2: getActiveAdminCount → 0 remaining admins
 		dbModule._sc.limit.mockResolvedValueOnce([
 			{ ...targetUser, id: "user-2", role: "admin", banned: false },
 		]);

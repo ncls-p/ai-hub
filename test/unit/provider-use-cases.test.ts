@@ -16,8 +16,10 @@ vi.mock("@/lib/crypto", () => ({
 }));
 
 const mockAdapter = vi.hoisted(() => ({
-	validateConnection: vi.fn().mockResolvedValue({ status: "healthy", latencyMs: 50 }),
-	listModels: vi.fn().mockResolvedValue([{ id: "model-1", name: "GPT-4" }]),
+	validateConnection: vi
+		.fn()
+		.mockResolvedValue({ status: "healthy", latencyMs: 50 }),
+	listModels: vi.fn().mockResolvedValue([{ modelId: "model-1", displayName: "GPT-4", capabilities: { text: true } }]),
 }));
 
 vi.mock("@/server/infrastructure/providers", () => ({
@@ -38,6 +40,18 @@ type Chain = {
 	returning: ReturnType<typeof vi.fn>;
 };
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+	insert: ReturnType<typeof vi.fn>;
+	update: ReturnType<typeof vi.fn>;
+	delete: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_c: Chain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const c: Chain = {
 		select: vi.fn().mockReturnThis(),
@@ -54,20 +68,17 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(c),
-			insert: vi.fn().mockReturnValue(c),
-			update: vi.fn().mockReturnValue(c),
-			delete: vi.fn().mockReturnValue(c),
+			select: vi.fn(),
+			insert: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
 		},
 		_c: c,
 	};
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _c: Chain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import {
 	archiveProvider,
 	createModel,
@@ -107,7 +118,7 @@ beforeEach(() => {
 const fakeProvider = {
 	id: "prov-1",
 	workspaceId: "ws-1",
-	kind: "openai" as const,
+	kind: "openai-compatible" as const,
 	name: "My Provider",
 	baseUrl: null,
 	authType: "bearer" as const,
@@ -173,7 +184,7 @@ describe("createProvider", () => {
 		const result = await createProvider({
 			workspaceId: "ws-1",
 			userId: "user-1",
-			kind: "openai",
+			kind: "openai-compatible",
 			name: "Test",
 			authType: "bearer",
 		});
@@ -190,7 +201,7 @@ describe("createProvider", () => {
 		await createProvider({
 			workspaceId: "ws-1",
 			userId: "user-1",
-			kind: "openai",
+			kind: "openai-compatible",
 			name: "Test",
 			authType: "bearer",
 			apiKey: "sk-secret",
@@ -206,7 +217,7 @@ describe("createProvider", () => {
 		await createProvider({
 			workspaceId: "ws-1",
 			userId: "user-1",
-			kind: "openai",
+			kind: "openai-compatible",
 			name: "Test",
 			authType: "bearer",
 			headersJson: { "X-Custom": "secret-header" },
@@ -255,7 +266,11 @@ describe("listProviders", () => {
 describe("updateProvider", () => {
 	it("throws when provider not found", async () => {
 		await expect(
-			updateProvider({ providerId: "prov-1", workspaceId: "ws-1", userId: "user-1" }),
+			updateProvider({
+				providerId: "prov-1",
+				workspaceId: "ws-1",
+				userId: "user-1",
+			}),
 		).rejects.toThrow("Provider not found");
 	});
 
@@ -339,7 +354,9 @@ describe("testProviderConnection", () => {
 	});
 
 	it("decrypts API key before calling adapter", async () => {
-		dbModule._c.limit.mockResolvedValueOnce([{ ...fakeProvider, encryptedApiKey: "enc:key" }]);
+		dbModule._c.limit.mockResolvedValueOnce([
+			{ ...fakeProvider, encryptedApiKey: "enc:key" },
+		]);
 		const { decryptValue } = await import("@/lib/crypto");
 
 		await testProviderConnection("prov-1", "ws-1");
@@ -365,7 +382,10 @@ describe("createModel", () => {
 	it("inserts model and returns it", async () => {
 		dbModule._c.returning.mockResolvedValueOnce([fakeModel]);
 
-		const result = await createModel("prov-1", { modelId: "gpt-4" });
+		const result = await createModel("prov-1", {
+			providerId: "prov-1",
+			modelId: "gpt-4",
+		});
 
 		expect(dbModule.db.insert).toHaveBeenCalled();
 		expect(result).toEqual(fakeModel);
@@ -374,7 +394,7 @@ describe("createModel", () => {
 	it("uses modelId as displayName when not provided", async () => {
 		dbModule._c.returning.mockResolvedValueOnce([fakeModel]);
 
-		await createModel("prov-1", { modelId: "gpt-4" });
+		await createModel("prov-1", { providerId: "prov-1", modelId: "gpt-4" });
 
 		const insertValues = dbModule._c.values.mock.calls[0][0];
 		expect(insertValues.displayName).toBe("gpt-4");
@@ -383,7 +403,11 @@ describe("createModel", () => {
 	it("uses explicit displayName when provided", async () => {
 		dbModule._c.returning.mockResolvedValueOnce([fakeModel]);
 
-		await createModel("prov-1", { modelId: "gpt-4", displayName: "GPT-4 Turbo" });
+		await createModel("prov-1", {
+			providerId: "prov-1",
+			modelId: "gpt-4",
+			displayName: "GPT-4 Turbo",
+		});
 
 		const insertValues = dbModule._c.values.mock.calls[0][0];
 		expect(insertValues.displayName).toBe("GPT-4 Turbo");
@@ -427,7 +451,10 @@ describe("listModels", () => {
 
 describe("updateModel", () => {
 	it("calls db.update with provided fields", async () => {
-		await updateModel("model-1", { displayName: "GPT-4 Updated", enabled: false });
+		await updateModel("model-1", {
+			displayName: "GPT-4 Updated",
+			enabled: false,
+		});
 
 		expect(dbModule.db.update).toHaveBeenCalled();
 		expect(dbModule._c.set).toHaveBeenCalled();
@@ -454,7 +481,9 @@ describe("deleteModel", () => {
 
 describe("discoverModels", () => {
 	it("throws when provider not found", async () => {
-		await expect(discoverModels("prov-1", "ws-1")).rejects.toThrow("Provider not found");
+		await expect(discoverModels("prov-1", "ws-1")).rejects.toThrow(
+			"Provider not found",
+		);
 	});
 
 	it("returns list of discovered models", async () => {
@@ -463,12 +492,14 @@ describe("discoverModels", () => {
 		const models = await discoverModels("prov-1", "ws-1");
 
 		expect(models).toHaveLength(1);
-		expect(models[0].id).toBe("model-1");
+		expect(models[0].modelId).toBe("model-1");
 	});
 
 	it("throws when adapter does not support listModels", async () => {
 		const { getAdapter } = await import("@/server/infrastructure/providers");
-		vi.mocked(getAdapter).mockReturnValueOnce({ validateConnection: vi.fn() } as never);
+		vi.mocked(getAdapter).mockReturnValueOnce({
+			validateConnection: vi.fn(),
+		} as never);
 		dbModule._c.limit.mockResolvedValueOnce([fakeProvider]);
 
 		await expect(discoverModels("prov-1", "ws-1")).rejects.toThrow(

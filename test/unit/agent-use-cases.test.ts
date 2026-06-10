@@ -29,52 +29,78 @@ vi.mock("@/modules/tool/use-cases", () => ({
 	insertToolBindingsForVersion: vi.fn().mockResolvedValue(undefined),
 }));
 
+const CHAIN_KEYS = [
+	"select",
+	"insert",
+	"update",
+	"delete",
+	"from",
+	"where",
+	"orderBy",
+	"values",
+	"set",
+] as const;
+
+type ChainFn = ReturnType<typeof vi.fn>;
+
 type Chain = {
-	select: ReturnType<typeof vi.fn>;
-	insert: ReturnType<typeof vi.fn>;
-	update: ReturnType<typeof vi.fn>;
-	delete: ReturnType<typeof vi.fn>;
-	from: ReturnType<typeof vi.fn>;
-	where: ReturnType<typeof vi.fn>;
-	orderBy: ReturnType<typeof vi.fn>;
-	limit: ReturnType<typeof vi.fn>;
-	values: ReturnType<typeof vi.fn>;
-	set: ReturnType<typeof vi.fn>;
-	returning: ReturnType<typeof vi.fn>;
+	[K in (typeof CHAIN_KEYS)[number]]: ChainFn;
+} & {
+	limit: ChainFn;
+	returning: ChainFn;
 };
 
-function makeChain(): Chain {
-	const c = {} as Chain;
-	for (const k of ["select", "insert", "update", "delete", "from", "where", "orderBy", "values", "set"] as const) {
-		c[k] = vi.fn().mockReturnThis();
-	}
-	c.limit = vi.fn().mockResolvedValue([]);
-	c.returning = vi.fn().mockResolvedValue([]);
-	return c;
-}
+type DbMock = {
+	select: ChainFn;
+	insert: ChainFn;
+	update: ChainFn;
+	delete: ChainFn;
+	transaction: ChainFn;
+};
 
+type DbModule = {
+	db: DbMock;
+	_c: Chain;
+	_tx: Chain;
+};
+
+// vi.mock is hoisted — the factory must be self-contained (no external refs).
 vi.mock("@/server/infrastructure/db", () => {
-	const chain = makeChain();
-	const tx = makeChain();
-	return {
-		db: {
-			select: vi.fn().mockReturnValue(chain),
-			insert: vi.fn().mockReturnValue(chain),
-			update: vi.fn().mockReturnValue(chain),
-			delete: vi.fn().mockReturnValue(chain),
-			transaction: vi.fn().mockImplementation((cb: (tx: Chain) => Promise<unknown>) => cb(tx)),
-		},
-		_c: chain,
-		_tx: tx,
+	const buildChain = (): Chain => {
+		const c = {} as Record<string, ChainFn>;
+		const keys = [
+			"select",
+			"insert",
+			"update",
+			"delete",
+			"from",
+			"where",
+			"orderBy",
+			"values",
+			"set",
+		] as const;
+		for (const k of keys) {
+			c[k] = vi.fn().mockReturnThis();
+		}
+		c.limit = vi.fn().mockResolvedValue([]);
+		c.returning = vi.fn().mockResolvedValue([]);
+		return c as Chain;
 	};
+
+	const chain = buildChain();
+	const tx = buildChain();
+	const db: DbMock = {
+		select: vi.fn(),
+		insert: vi.fn(),
+		update: vi.fn(),
+		delete: vi.fn(),
+		transaction: vi.fn(),
+	};
+	return { db, _c: chain, _tx: tx };
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _c: Chain;
-	export const _tx: Chain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import {
 	archiveAgent,
 	canUseAgent,
@@ -94,7 +120,7 @@ import {
 
 function reset() {
 	for (const chain of [dbModule._c, dbModule._tx]) {
-		for (const k of ["select", "insert", "update", "delete", "from", "where", "orderBy", "values", "set"] as const) {
+		for (const k of CHAIN_KEYS) {
 			chain[k].mockReset().mockReturnThis();
 		}
 		chain.limit.mockReset().mockResolvedValue([]);
@@ -189,19 +215,28 @@ describe("canUseAgent", () => {
 	});
 
 	it("allows global agents", () => {
-		expect(canUseAgent({ ...fakeAgent, isGlobal: true } as never, "other")).toBe(true);
+		expect(
+			canUseAgent({ ...fakeAgent, isGlobal: true } as never, "other"),
+		).toBe(true);
 	});
 
 	it("allows marketplace agents", () => {
 		expect(
-			canUseAgent({ ...fakeAgent, sharingMode: "marketplace" } as never, "other"),
+			canUseAgent(
+				{ ...fakeAgent, sharingMode: "marketplace" } as never,
+				"other",
+			),
 		).toBe(true);
 	});
 
 	it("allows specific_user target", () => {
 		expect(
 			canUseAgent(
-				{ ...fakeAgent, sharingMode: "specific_user", shareTargetUserId: "user-2" } as never,
+				{
+					...fakeAgent,
+					sharingMode: "specific_user",
+					shareTargetUserId: "user-2",
+				} as never,
 				"user-2",
 			),
 		).toBe(true);
@@ -214,7 +249,11 @@ describe("canUseAgent", () => {
 	it("denies wrong specific_user target", () => {
 		expect(
 			canUseAgent(
-				{ ...fakeAgent, sharingMode: "specific_user", shareTargetUserId: "user-2" } as never,
+				{
+					...fakeAgent,
+					sharingMode: "specific_user",
+					shareTargetUserId: "user-2",
+				} as never,
 				"user-3",
 			),
 		).toBe(false);
@@ -240,13 +279,23 @@ describe("getAgentById", () => {
 
 describe("getVisibleAgentById", () => {
 	it("returns null when agent not found", async () => {
-		const result = await getVisibleAgentById("nonexistent", "ws-1", "user-1", false);
+		const result = await getVisibleAgentById(
+			"nonexistent",
+			"ws-1",
+			"user-1",
+			false,
+		);
 		expect(result).toBeNull();
 	});
 
 	it("returns agent for creator", async () => {
 		dbModule._c.limit.mockResolvedValueOnce([fakeAgent]);
-		const result = await getVisibleAgentById("agent-1", "ws-1", "user-1", false);
+		const result = await getVisibleAgentById(
+			"agent-1",
+			"ws-1",
+			"user-1",
+			false,
+		);
 		expect(result).toEqual(fakeAgent);
 	});
 
@@ -284,7 +333,7 @@ describe("listAgents", () => {
 
 describe("createAgent", () => {
 	it("throws when providerId given but provider not found", async () => {
-		dbModule._c.limit.mockResolvedValueOnce([]);  // provider lookup
+		dbModule._c.limit.mockResolvedValueOnce([]); // provider lookup
 
 		await expect(
 			createAgent({
@@ -311,8 +360,8 @@ describe("createAgent", () => {
 
 	it("throws when model not found", async () => {
 		dbModule._c.limit
-			.mockResolvedValueOnce([fakeProvider])  // provider found
-			.mockResolvedValueOnce([]);              // model not found
+			.mockResolvedValueOnce([fakeProvider]) // provider found
+			.mockResolvedValueOnce([]); // model not found
 
 		await expect(
 			createAgent({
@@ -330,7 +379,7 @@ describe("createAgent", () => {
 		const agent = { ...fakeAgent };
 		const version = { ...fakeVersion };
 		dbModule._tx.returning
-			.mockResolvedValueOnce([agent])    // insert agent
+			.mockResolvedValueOnce([agent]) // insert agent
 			.mockResolvedValueOnce([version]); // insert version
 
 		const result = await createAgent({
@@ -358,9 +407,9 @@ describe("archiveAgent", () => {
 	it("throws when non-creator tries to archive without admin", async () => {
 		dbModule._c.limit.mockResolvedValueOnce([fakeAgent]);
 
-		await expect(archiveAgent("agent-1", "ws-1", "other", false)).rejects.toThrow(
-			"Only the creator or an admin can delete this agent",
-		);
+		await expect(
+			archiveAgent("agent-1", "ws-1", "other", false),
+		).rejects.toThrow("Only the creator or an admin can delete this agent");
 	});
 
 	it("archives agent when creator", async () => {
@@ -385,7 +434,11 @@ describe("archiveAgent", () => {
 describe("updateAgent", () => {
 	it("throws when agent not found", async () => {
 		await expect(
-			updateAgent({ agentId: "nonexistent", workspaceId: "ws-1", userId: "user-1" }),
+			updateAgent({
+				agentId: "nonexistent",
+				workspaceId: "ws-1",
+				userId: "user-1",
+			}),
 		).rejects.toThrow("Agent not found");
 	});
 
@@ -401,7 +454,11 @@ describe("updateAgent", () => {
 		dbModule._c.limit.mockResolvedValueOnce([fakeAgent]);
 
 		// Use a version with null provider/model to avoid provider validation in tx
-		const versionNoProvider = { ...fakeVersion, providerId: null, modelId: null };
+		const versionNoProvider = {
+			...fakeVersion,
+			providerId: null,
+			modelId: null,
+		};
 		const newVersion = { ...fakeVersion, versionNumber: 2, id: "v2" };
 		const updatedAgent = { ...fakeAgent };
 
@@ -411,14 +468,14 @@ describe("updateAgent", () => {
 		// Q7 update activeVersionId: where → chains (result discarded)
 		// Q8 select updatedAgent: where → chains to limit
 		dbModule._tx.where
-			.mockReturnValueOnce(dbModule._tx)            // Q2 chains to limit
-			.mockResolvedValueOnce([{ maxVersion: 1 }])   // Q5 terminal
-			.mockReturnValueOnce(dbModule._tx)            // Q7 chains (update)
-			.mockReturnValueOnce(dbModule._tx);           // Q8 chains to limit
+			.mockReturnValueOnce(dbModule._tx) // Q2 chains to limit
+			.mockResolvedValueOnce([{ maxVersion: 1 }]) // Q5 terminal
+			.mockReturnValueOnce(dbModule._tx) // Q7 chains (update)
+			.mockReturnValueOnce(dbModule._tx); // Q8 chains to limit
 
 		dbModule._tx.limit
-			.mockResolvedValueOnce([versionNoProvider])   // Q2 getActiveVersionConfig
-			.mockResolvedValueOnce([updatedAgent]);        // Q8 updatedAgent
+			.mockResolvedValueOnce([versionNoProvider]) // Q2 getActiveVersionConfig
+			.mockResolvedValueOnce([updatedAgent]); // Q8 updatedAgent
 
 		dbModule._tx.returning.mockResolvedValueOnce([newVersion]);
 
@@ -486,7 +543,10 @@ describe("getActiveVersion", () => {
 
 describe("resolveProviderForVersion", () => {
 	it("returns null when version has no providerId", async () => {
-		const result = await resolveProviderForVersion({ ...fakeVersion, providerId: null } as never);
+		const result = await resolveProviderForVersion({
+			...fakeVersion,
+			providerId: null,
+		} as never);
 		expect(result).toBeNull();
 	});
 
@@ -498,8 +558,8 @@ describe("resolveProviderForVersion", () => {
 
 	it("resolves provider with decrypted API key", async () => {
 		dbModule._c.limit
-			.mockResolvedValueOnce([fakeProvider])   // provider
-			.mockResolvedValueOnce([fakeModel]);      // model
+			.mockResolvedValueOnce([fakeProvider]) // provider
+			.mockResolvedValueOnce([fakeModel]); // model
 
 		const result = await resolveProviderForVersion(fakeVersion as never);
 
@@ -561,14 +621,26 @@ describe("getConversationMessages", () => {
 
 	it("decrypts text parts", async () => {
 		const { decryptValue } = await import("@/lib/crypto");
-		const msg = { id: "msg-1", role: "user", status: "complete", createdAt: new Date() };
-		const part = { id: "part-1", messageId: "msg-1", type: "text", contentEncrypted: "enc:text", sortOrder: 0, metadataJson: null };
+		const msg = {
+			id: "msg-1",
+			role: "user",
+			status: "complete",
+			createdAt: new Date(),
+		};
+		const part = {
+			id: "part-1",
+			messageId: "msg-1",
+			type: "text",
+			contentEncrypted: "enc:text",
+			sortOrder: 0,
+			metadataJson: null,
+		};
 
 		// Q1: messages orderBy
 		// Q2: messageParts orderBy (for each message)
 		dbModule._c.orderBy
-			.mockResolvedValueOnce([msg])   // messages
-			.mockResolvedValueOnce([part]);  // parts for msg-1
+			.mockResolvedValueOnce([msg]) // messages
+			.mockResolvedValueOnce([part]); // parts for msg-1
 
 		const result = await getConversationMessages("conv-1");
 
@@ -581,8 +653,20 @@ describe("getConversationMessages", () => {
 		const { decryptValue } = await import("@/lib/crypto");
 		vi.mocked(decryptValue).mockRejectedValueOnce(new Error("Key error"));
 
-		const msg = { id: "msg-1", role: "user", status: "complete", createdAt: new Date() };
-		const part = { id: "part-1", messageId: "msg-1", type: "text", contentEncrypted: "enc:bad", sortOrder: 0, metadataJson: null };
+		const msg = {
+			id: "msg-1",
+			role: "user",
+			status: "complete",
+			createdAt: new Date(),
+		};
+		const part = {
+			id: "part-1",
+			messageId: "msg-1",
+			type: "text",
+			contentEncrypted: "enc:bad",
+			sortOrder: 0,
+			metadataJson: null,
+		};
 
 		dbModule._c.orderBy
 			.mockResolvedValueOnce([msg])
@@ -593,9 +677,21 @@ describe("getConversationMessages", () => {
 	});
 
 	it("returns metadata JSON for non-text parts", async () => {
-		const msg = { id: "msg-1", role: "assistant", status: "complete", createdAt: new Date() };
+		const msg = {
+			id: "msg-1",
+			role: "assistant",
+			status: "complete",
+			createdAt: new Date(),
+		};
 		const meta = { toolName: "calculator", input: { expression: "1+1" } };
-		const part = { id: "part-2", messageId: "msg-1", type: "tool_use", contentEncrypted: null, sortOrder: 0, metadataJson: meta };
+		const part = {
+			id: "part-2",
+			messageId: "msg-1",
+			type: "tool_use",
+			contentEncrypted: null,
+			sortOrder: 0,
+			metadataJson: meta,
+		};
 
 		dbModule._c.orderBy
 			.mockResolvedValueOnce([msg])

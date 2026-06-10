@@ -35,7 +35,7 @@ const baseTool = {
 	outputSchemaJson: null,
 	enabled: true,
 	requireApproval: false,
-	discoveredAt: null,
+	discoveredAt: new Date(),
 	createdAt: new Date(),
 	updatedAt: new Date(),
 };

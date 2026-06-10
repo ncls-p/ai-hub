@@ -28,7 +28,18 @@ type Chain = {
 
 function makeChain(): Chain {
 	const c = {} as Chain;
-	for (const k of ["select", "insert", "update", "delete", "from", "where", "orderBy", "innerJoin", "values", "set"] as const) {
+	for (const k of [
+		"select",
+		"insert",
+		"update",
+		"delete",
+		"from",
+		"where",
+		"orderBy",
+		"innerJoin",
+		"values",
+		"set",
+	] as const) {
 		c[k] = vi.fn().mockReturnThis();
 	}
 	c.limit = vi.fn().mockResolvedValue([]);
@@ -36,28 +47,38 @@ function makeChain(): Chain {
 	return c;
 }
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+	insert: ReturnType<typeof vi.fn>;
+	update: ReturnType<typeof vi.fn>;
+	delete: ReturnType<typeof vi.fn>;
+	transaction: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_c: Chain;
+	_tx: Chain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const chain = makeChain();
 	const tx = makeChain();
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(chain),
-			insert: vi.fn().mockReturnValue(chain),
-			update: vi.fn().mockReturnValue(chain),
-			delete: vi.fn().mockReturnValue(chain),
-			transaction: vi.fn().mockImplementation((cb: (tx: Chain) => Promise<unknown>) => cb(tx)),
+			select: vi.fn(),
+			insert: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn(),
+			transaction: vi.fn(),
 		},
 		_c: chain,
 		_tx: tx,
 	};
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _c: Chain;
-	export const _tx: Chain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import {
 	archiveDocument,
 	archiveKnowledgeBase,
@@ -81,7 +102,18 @@ import {
 
 function reset() {
 	for (const chain of [dbModule._c, dbModule._tx]) {
-		for (const k of ["select", "insert", "update", "delete", "from", "where", "orderBy", "innerJoin", "values", "set"] as const) {
+		for (const k of [
+			"select",
+			"insert",
+			"update",
+			"delete",
+			"from",
+			"where",
+			"orderBy",
+			"innerJoin",
+			"values",
+			"set",
+		] as const) {
 			chain[k].mockReset().mockReturnThis();
 		}
 		chain.limit.mockReset().mockResolvedValue([]);
@@ -192,7 +224,9 @@ describe("updateKnowledgeBase", () => {
 
 	it("updates and returns knowledge base", async () => {
 		dbModule._c.limit.mockResolvedValueOnce([fakeKb]);
-		dbModule._c.returning.mockResolvedValueOnce([{ ...fakeKb, name: "Updated" }]);
+		dbModule._c.returning.mockResolvedValueOnce([
+			{ ...fakeKb, name: "Updated" },
+		]);
 
 		const result = await updateKnowledgeBase({
 			knowledgeBaseId: "kb-1",
@@ -209,9 +243,9 @@ describe("updateKnowledgeBase", () => {
 
 describe("archiveKnowledgeBase", () => {
 	it("throws when knowledge base not found", async () => {
-		await expect(archiveKnowledgeBase("nonexistent", "ws-1", "user-1")).rejects.toThrow(
-			"Knowledge base not found",
-		);
+		await expect(
+			archiveKnowledgeBase("nonexistent", "ws-1", "user-1"),
+		).rejects.toThrow("Knowledge base not found");
 	});
 
 	it("archives knowledge base", async () => {
@@ -247,11 +281,10 @@ describe("ingestTextDocument", () => {
 		dbModule._tx.returning.mockResolvedValueOnce([processingDoc]);
 
 		// processDocumentIngestion: select document (limit), select chunks (where), update (where)
-		dbModule._c.limit
-			.mockResolvedValueOnce([processingDoc])  // Q2: select document in processDocumentIngestion
+		dbModule._c.limit.mockResolvedValueOnce([processingDoc]); // Q2: select document in processDocumentIngestion
 		dbModule._c.where
-			.mockReturnValueOnce(dbModule._c)        // Q1 (getKb where) → chain to limit (already consumed)
-			.mockResolvedValueOnce([{ id: "chunk-1" }]);  // Q3: select chunks
+			.mockReturnValueOnce(dbModule._c) // Q1 (getKb where) → chain to limit (already consumed)
+			.mockResolvedValueOnce([{ id: "chunk-1" }]); // Q3: select chunks
 
 		const result = await ingestTextDocument({
 			workspaceId: "ws-1",
@@ -269,7 +302,7 @@ describe("ingestTextDocument", () => {
 		dbModule._c.limit.mockResolvedValueOnce([fakeKb]);
 		const failedDoc = { ...fakeDoc, status: "failed" };
 		dbModule._tx.returning
-			.mockResolvedValueOnce([fakeDoc])   // insert document
+			.mockResolvedValueOnce([fakeDoc]) // insert document
 			.mockResolvedValueOnce([failedDoc]); // update to failed status
 
 		const result = await ingestTextDocument({
@@ -317,9 +350,7 @@ describe("archiveDocument", () => {
 	});
 
 	it("throws when document not found", async () => {
-		dbModule._c.limit
-			.mockResolvedValueOnce([fakeKb])
-			.mockResolvedValueOnce([]);  // document not found
+		dbModule._c.limit.mockResolvedValueOnce([fakeKb]).mockResolvedValueOnce([]); // document not found
 
 		await expect(
 			archiveDocument({
@@ -372,7 +403,11 @@ describe("scoreContent", () => {
 describe("searchKnowledgeBase", () => {
 	it("throws when knowledge base not found", async () => {
 		await expect(
-			searchKnowledgeBase({ workspaceId: "ws-1", knowledgeBaseId: "nonexistent", query: "test" }),
+			searchKnowledgeBase({
+				workspaceId: "ws-1",
+				knowledgeBaseId: "nonexistent",
+				query: "test",
+			}),
 		).rejects.toThrow("Knowledge base not found");
 	});
 
@@ -383,9 +418,9 @@ describe("searchKnowledgeBase", () => {
 		// knowledgeBaseHasEmbeddings: innerJoin.innerJoin.where() → where terminal
 		// searchKnowledgeBaseByKeyword: innerJoin.where() → where terminal
 		dbModule._c.where
-			.mockReturnValueOnce(dbModule._c)  // getKb .where → chains to limit
-			.mockResolvedValueOnce([{ count: 0 }])  // hasEmbeddings (where terminal)
-			.mockResolvedValueOnce([]);  // keyword search rows (where terminal)
+			.mockReturnValueOnce(dbModule._c) // getKb .where → chains to limit
+			.mockResolvedValueOnce([{ count: 0 }]) // hasEmbeddings (where terminal)
+			.mockResolvedValueOnce([]); // keyword search rows (where terminal)
 
 		const result = await searchKnowledgeBase({
 			workspaceId: "ws-1",
@@ -408,9 +443,9 @@ describe("searchKnowledgeBase", () => {
 		};
 
 		dbModule._c.where
-			.mockReturnValueOnce(dbModule._c)  // getKb where → chains to limit
-			.mockResolvedValueOnce([{ count: 0 }])  // no embeddings
-			.mockResolvedValueOnce([row]);  // keyword search results
+			.mockReturnValueOnce(dbModule._c) // getKb where → chains to limit
+			.mockResolvedValueOnce([{ count: 0 }]) // no embeddings
+			.mockResolvedValueOnce([row]); // keyword search results
 
 		const result = await searchKnowledgeBase({
 			workspaceId: "ws-1",
@@ -491,7 +526,7 @@ describe("cloneKnowledgeBindings", () => {
 
 describe("searchBoundKnowledgeBases", () => {
 	it("returns empty when no bindings", async () => {
-		dbModule._c.where.mockResolvedValueOnce([]);  // getKnowledgeBindingsForVersion
+		dbModule._c.where.mockResolvedValueOnce([]); // getKnowledgeBindingsForVersion
 
 		const result = await searchBoundKnowledgeBases({
 			agentVersionId: "v1",
@@ -529,7 +564,11 @@ describe("dequeueDocumentIngestionJob", () => {
 	});
 
 	it("returns and removes item from queue", () => {
-		enqueueDocumentIngestion({ documentId: "doc-x", workspaceId: "ws-1", knowledgeBaseId: "kb-1" });
+		enqueueDocumentIngestion({
+			documentId: "doc-x",
+			workspaceId: "ws-1",
+			knowledgeBaseId: "kb-1",
+		});
 		const result = dequeueDocumentIngestionJob();
 		expect(result?.documentId).toBe("doc-x");
 	});
@@ -566,8 +605,8 @@ describe("processDocumentIngestion", () => {
 		// Q3: update document status (where terminal on update)
 		dbModule._c.limit.mockResolvedValueOnce([fakeDoc]);
 		dbModule._c.where
-			.mockReturnValueOnce(dbModule._c)              // Q1 .where → chains to limit (already resolved)
-			.mockResolvedValueOnce([{ id: "chunk-1" }]);   // Q2 chunks
+			.mockReturnValueOnce(dbModule._c) // Q1 .where → chains to limit (already resolved)
+			.mockResolvedValueOnce([{ id: "chunk-1" }]); // Q2 chunks
 
 		await processDocumentIngestion("doc-1");
 
@@ -579,8 +618,8 @@ describe("processDocumentIngestion", () => {
 	it("marks document as failed when no chunks", async () => {
 		dbModule._c.limit.mockResolvedValueOnce([fakeDoc]);
 		dbModule._c.where
-			.mockReturnValueOnce(dbModule._c)  // chains to limit
-			.mockResolvedValueOnce([]);         // no chunks
+			.mockReturnValueOnce(dbModule._c) // chains to limit
+			.mockResolvedValueOnce([]); // no chunks
 
 		await processDocumentIngestion("doc-1");
 

@@ -22,6 +22,19 @@ type InsertChain = {
 	returning: ReturnType<typeof vi.fn>;
 };
 
+type DbMock = {
+	select: ReturnType<typeof vi.fn>;
+	update: ReturnType<typeof vi.fn>;
+	insert: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_sc: SelectChain;
+	_uc: UpdateChain;
+	_ic: InsertChain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const sc: SelectChain = {
 		from: vi.fn().mockReturnThis(),
@@ -38,9 +51,9 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 	return {
 		db: {
-			select: vi.fn().mockReturnValue(sc),
-			update: vi.fn().mockReturnValue(uc),
-			insert: vi.fn().mockReturnValue(ic),
+			select: vi.fn(),
+			update: vi.fn(),
+			insert: vi.fn(),
 		},
 		_sc: sc,
 		_uc: uc,
@@ -48,13 +61,8 @@ vi.mock("@/server/infrastructure/db", () => {
 	};
 });
 
-declare module "@/server/infrastructure/db" {
-	export const _sc: SelectChain;
-	export const _uc: UpdateChain;
-	export const _ic: InsertChain;
-}
-
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import {
 	createWorkspaceApiKey,
 	listWorkspaceApiKeys,
@@ -89,6 +97,9 @@ const fakeKey = {
 beforeEach(() => {
 	vi.clearAllMocks();
 	reset();
+	dbModule.db.select.mockReturnValue(dbModule._sc);
+	dbModule.db.update.mockReturnValue(dbModule._uc);
+	dbModule.db.insert.mockReturnValue(dbModule._ic);
 });
 
 describe("createWorkspaceApiKey", () => {

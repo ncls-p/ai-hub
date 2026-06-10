@@ -6,21 +6,26 @@ type InsertChain = {
 	values: ReturnType<typeof vi.fn>;
 };
 
+type DbMock = {
+	insert: ReturnType<typeof vi.fn>;
+};
+
+type DbModule = {
+	db: DbMock;
+	_insertChain: InsertChain;
+};
+
 vi.mock("@/server/infrastructure/db", () => {
 	const insertChain: InsertChain = {
 		values: vi.fn().mockResolvedValue(undefined),
 	};
 	return {
 		db: {
-			insert: vi.fn().mockReturnValue(insertChain),
+			insert: vi.fn(),
 		},
 		_insertChain: insertChain,
 	};
 });
-
-declare module "@/server/infrastructure/db" {
-	export const _insertChain: InsertChain;
-}
 
 vi.mock("@/lib/logger", () => ({
 	logger: {
@@ -30,12 +35,14 @@ vi.mock("@/lib/logger", () => ({
 	},
 }));
 
-import * as dbModule from "@/server/infrastructure/db";
+import * as _dbModule from "@/server/infrastructure/db";
+const dbModule = _dbModule as unknown as DbModule;
 import { logger } from "@/lib/logger";
 import { audit } from "@/server/domain/services/audit";
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	dbModule.db.insert.mockReturnValue(dbModule._insertChain);
 	dbModule._insertChain.values.mockResolvedValue(undefined);
 });
 
