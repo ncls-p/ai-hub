@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
 	ArrowRightIcon,
 	CheckCircle2Icon,
 	EyeIcon,
 	SendIcon,
 	SparklesIcon,
+	Store,
 	Trash2Icon,
 	WorkflowIcon,
 } from "lucide-react";
@@ -98,6 +100,7 @@ function userSafeText(value: string) {
 }
 
 export function CustomToolBuilder() {
+	const router = useRouter();
 	const { workspaceId } = useWorkspace();
 	const [messages, setMessages] = useState<BuilderMessage[]>([
 		{
@@ -263,6 +266,38 @@ export function CustomToolBuilder() {
 		} catch (error) {
 			toast.error(
 				error instanceof Error ? error.message : "Suppression impossible",
+			);
+		}
+	}
+
+	async function publishCustomToolToMarketplace(tool: CustomTool) {
+		if (!workspaceId) return;
+		try {
+			const res = await fetch("/api/marketplace/items", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					customToolId: tool.id,
+					workspaceId,
+					version: "1.0.0",
+					name: tool.name,
+					description: tool.description || undefined,
+					draftOnly: true,
+				}),
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				toast.error(err.error || "Failed to create marketplace draft");
+				return;
+			}
+			const data = await res.json();
+			toast.success("Marketplace draft created");
+			if (data.item?.id) {
+				router.push(`/marketplace/items/${data.item.id}`);
+			}
+		} catch (err) {
+			toast.error(
+				err instanceof Error ? err.message : "Failed to create marketplace draft",
 			);
 		}
 	}
@@ -559,7 +594,7 @@ export function CustomToolBuilder() {
 										<p className="truncate text-sm font-medium">{tool.name}</p>
 										<Badge variant="outline">{tool.status}</Badge>
 									</div>
-									<div className="mt-2 flex gap-2">
+									<div className="mt-2 flex flex-wrap gap-2">
 										<Button
 											type="button"
 											variant="outline"
@@ -568,6 +603,15 @@ export function CustomToolBuilder() {
 										>
 											<EyeIcon className="size-3" aria-hidden="true" />
 											Voir
+										</Button>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onClick={() => void publishCustomToolToMarketplace(tool)}
+										>
+											<Store className="size-3" aria-hidden="true" />
+											Marketplace
 										</Button>
 										<Button
 											type="button"

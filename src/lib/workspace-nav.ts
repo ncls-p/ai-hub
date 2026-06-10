@@ -33,6 +33,7 @@ export type WorkspacePermissions = {
 
 export type WorkspaceShellState = {
 	displayName?: string;
+	currentUserId?: string;
 	isAdmin?: boolean;
 	pendingToolCount: number;
 	permissions: WorkspacePermissions;

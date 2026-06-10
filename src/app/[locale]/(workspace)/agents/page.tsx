@@ -22,6 +22,7 @@ import {
 	GlobeIcon,
 	StarIcon,
 	XIcon,
+	Store,
 } from "lucide-react";
 
 import { PageLoading } from "@/components/page-loading";
@@ -557,6 +558,53 @@ export default function AgentsPage() {
 												>
 													<PencilIcon className="size-4" />
 													Configure
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													onClick={async () => {
+														try {
+															const res = await fetch(
+																"/api/marketplace/items",
+																{
+																	method: "POST",
+																	headers: {
+																		"Content-Type": "application/json",
+																	},
+																	body: JSON.stringify({
+																		agentId: agent.id,
+																		workspaceId,
+																		version: "1.0.0",
+																		name: agent.name,
+																		description: agent.description || undefined,
+																		draftOnly: true,
+																	}),
+																},
+															);
+															if (!res.ok) {
+																const err = await res.json().catch(() => ({}));
+																toast.error(
+																	err.error ||
+																		"Failed to create marketplace draft",
+																);
+																return;
+															}
+															const data = await res.json();
+															toast.success("Marketplace draft created");
+															if (data.item?.id) {
+																router.push(
+																	`/marketplace/items/${data.item.id}`,
+																);
+															}
+														} catch (err) {
+															toast.error(
+																err instanceof Error
+																	? err.message
+																	: "Failed to create marketplace draft",
+															);
+														}
+													}}
+												>
+													<Store className="size-4" />
+													Publish to marketplace
 												</DropdownMenuItem>
 												<DropdownMenuSeparator />
 												<DropdownMenuItem

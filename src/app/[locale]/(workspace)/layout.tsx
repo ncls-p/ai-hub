@@ -84,7 +84,11 @@ export default async function WorkspaceLayout({
 	return (
 		<WorkspaceProvider>
 			<OnboardingRedirect />
-			<AppShell displayName={displayName} isAdmin={isAdmin}>
+			<AppShell
+				displayName={displayName}
+				currentUserId={user.id}
+				isAdmin={isAdmin}
+			>
 				<div className="page-content h-full">{children}</div>
 			</AppShell>
 		</WorkspaceProvider>

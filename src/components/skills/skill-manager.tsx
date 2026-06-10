@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
 	BookMarkedIcon,
 	EyeIcon,
@@ -9,6 +10,7 @@ import {
 	PencilIcon,
 	PlusIcon,
 	SearchIcon,
+	Store,
 	Trash2Icon,
 	XIcon,
 } from "lucide-react";
@@ -620,6 +622,7 @@ function PreviewPanel({
 // ─── Main Skill Manager ────────────────────────────────────────────────
 
 export function SkillManager() {
+	const router = useRouter();
 	const { workspaceId } = useWorkspace();
 	const [skills, setSkills] = useState<AgentSkill[]>([]);
 	const [installCommand, setInstallCommand] = useState("");
@@ -722,6 +725,38 @@ export function SkillManager() {
 		}
 		toast.success("Skill removed");
 		await loadSkills();
+	}
+
+	async function publishSkillToMarketplace(skill: AgentSkill) {
+		if (!workspaceId) return;
+		try {
+			const res = await fetch("/api/marketplace/items", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					skillId: skill.id,
+					workspaceId,
+					version: "1.0.0",
+					name: skill.name,
+					description: skill.description || undefined,
+					draftOnly: true,
+				}),
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				toast.error(err.error || "Failed to create marketplace draft");
+				return;
+			}
+			const data = await res.json();
+			toast.success("Marketplace draft created");
+			if (data.item?.id) {
+				router.push(`/marketplace/items/${data.item.id}`);
+			}
+		} catch (err) {
+			toast.error(
+				err instanceof Error ? err.message : "Failed to create marketplace draft",
+			);
+		}
 	}
 
 	return (
@@ -847,6 +882,16 @@ export function SkillManager() {
 												</Button>
 											}
 										/>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											className="h-7 w-7"
+											aria-label={`Publish ${skill.name} to marketplace`}
+											onClick={() => void publishSkillToMarketplace(skill)}
+										>
+											<Store className="size-3.5" aria-hidden="true" />
+										</Button>
 										<Button
 											type="button"
 											variant="ghost"

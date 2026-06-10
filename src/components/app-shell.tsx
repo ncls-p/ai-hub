@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 interface AppShellProps {
 	children: React.ReactNode;
 	displayName?: string;
+	currentUserId?: string;
 	isAdmin?: boolean;
 }
 
@@ -38,7 +39,12 @@ export function useWorkspaceShell() {
 	return value;
 }
 
-export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
+export function AppShell({
+	children,
+	displayName,
+	currentUserId,
+	isAdmin,
+}: AppShellProps) {
 	const pathname = usePathname();
 	const tNav = useTranslations("nav");
 	const tShell = useTranslations("shell");
@@ -106,11 +112,12 @@ export function AppShell({ children, displayName, isAdmin }: AppShellProps) {
 	const shellValue = useMemo(
 		() => ({
 			displayName,
+			currentUserId,
 			isAdmin,
 			pendingToolCount,
 			permissions,
 		}),
-		[displayName, isAdmin, pendingToolCount, permissions],
+		[displayName, currentUserId, isAdmin, pendingToolCount, permissions],
 	);
 
 	return (
