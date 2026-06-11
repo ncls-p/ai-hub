@@ -383,11 +383,12 @@ export async function generateChatAutomationArtifacts(input: {
 	userMessage: string;
 	assistantText: string;
 	fallbackTitle: string;
+	generateSuggestions?: boolean;
 }) {
 	const config = await getChatAutomationConfig();
 	const shouldGenerateTitle = config.enabled && config.generateTitles;
 	const shouldGenerateSuggestions =
-		config.enabled && config.generateSuggestions;
+		config.enabled && config.generateSuggestions && input.generateSuggestions !== false;
 	if (!shouldGenerateTitle && !shouldGenerateSuggestions) {
 		return { title: input.fallbackTitle, suggestions: [] };
 	}

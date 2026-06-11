@@ -23,6 +23,7 @@ import {
 	registerChatStreamAbortController,
 } from "@/modules/chat/stream-bus";
 import { generateChatAutomationArtifacts } from "@/modules/chat/automation";
+import { consumeSkipNextChatSuggestions } from "@/modules/chat/suggestion-skip";
 import { searchBoundKnowledgeBases } from "@/modules/knowledge/use-cases";
 import {
 	buildSkillsRegistryPrompt,
@@ -1230,11 +1231,15 @@ export async function POST(
 					)
 					.join("\n")
 					.trim();
+				const shouldSkipSuggestions = consumeSkipNextChatSuggestions(
+					conversation.id,
+				);
 				const artifacts = assistantText
 					? await generateChatAutomationArtifacts({
 							userMessage: content,
 							assistantText,
 							fallbackTitle: conversation.title,
+							generateSuggestions: !shouldSkipSuggestions,
 						})
 					: { title: conversation.title, suggestions: [] };
 				const generatedTitle = shouldRegenerateConversationTitle

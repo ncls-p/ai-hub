@@ -618,7 +618,16 @@ export default function ChatPage() {
 		}
 	}
 
+	function skipPendingSuggestions() {
+		if (!activeConversationId) return;
+		void fetch(
+			`/api/workspace/conversations/${activeConversationId}/skip-suggestions`,
+			{ method: "POST" },
+		).catch(() => undefined);
+	}
+
 	function queueMessage(content: string) {
+		skipPendingSuggestions();
 		setQueuedMessages((current) => [...current, createQueuedMessage(content)]);
 	}
 
