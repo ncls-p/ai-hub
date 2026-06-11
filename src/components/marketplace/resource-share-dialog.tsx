@@ -27,7 +27,10 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { getVisibilityHint, getVisibilityLabel } from "./marketplace-i18n-helpers";
+import {
+	getVisibilityHint,
+	getVisibilityLabel,
+} from "./marketplace-i18n-helpers";
 import { PublishPreviewSummary } from "./publish-preview-summary";
 
 type ShareStep = "choose" | "meta" | "user";
@@ -429,19 +432,18 @@ export function ResourceShareDialog({
 			toast.success(t("toast.shared", { name }));
 			finish();
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : t("toast.shareFailed"));
+			toast.error(
+				error instanceof Error ? error.message : t("toast.shareFailed"),
+			);
 		} finally {
 			setBusy(false);
 		}
 	}, [resource, selectedUserId, createOrUpdateDraft, name, finish, t]);
 
-
 	if (!resource) return null;
 
 	const resourceSubjectKey =
-		resource.kind === "marketplace_item"
-			? "marketplace_item"
-			: resource.kind;
+		resource.kind === "marketplace_item" ? "marketplace_item" : resource.kind;
 
 	return (
 		<Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -517,12 +519,7 @@ export function ResourceShareDialog({
 									</SelectTrigger>
 									<SelectContent>
 										{(
-											[
-												"public",
-												"unlisted",
-												"private",
-												"organization",
-											] as const
+											["public", "unlisted", "private", "organization"] as const
 										).map((v) => (
 											<SelectItem key={v} value={v}>
 												{getVisibilityLabel(v, (key) =>
@@ -552,7 +549,9 @@ export function ResourceShareDialog({
 							/>
 						</div>
 						<div className="space-y-1.5">
-							<Label htmlFor="share-changelog">{t("fields.releaseNotes")}</Label>
+							<Label htmlFor="share-changelog">
+								{t("fields.releaseNotes")}
+							</Label>
 							<Textarea
 								id="share-changelog"
 								value={changelog}
@@ -568,7 +567,9 @@ export function ResourceShareDialog({
 									onCheckedChange={(v) => setIncludeSecrets(v === true)}
 								/>
 								<span className="space-y-1">
-									<span className="block font-medium">{t("secrets.include")}</span>
+									<span className="block font-medium">
+										{t("secrets.include")}
+									</span>
 									<span className="block text-xs leading-relaxed text-muted-foreground">
 										{t("secrets.warning")}
 									</span>
@@ -577,7 +578,9 @@ export function ResourceShareDialog({
 						) : null}
 						{preview?.manifestPreview ? (
 							<div className="rounded-lg border border-border/60 bg-muted/30 p-3">
-								<p className="mb-2 text-xs font-medium">{t("contentPreview")}</p>
+								<p className="mb-2 text-xs font-medium">
+									{t("contentPreview")}
+								</p>
 								<PublishPreviewSummary preview={preview.manifestPreview} />
 							</div>
 						) : null}
