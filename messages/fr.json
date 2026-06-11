@@ -312,9 +312,9 @@
       "title": "Partager « {name} »",
       "stepIndicator": "Étape {current} sur {total}",
       "steps": {
-        "meta": "Vérifiez les informations avant de partager.",
+        "meta": "Personnalisez la publication, puis elle sera directement disponible.",
         "secrets": "Cette ressource utilise des identifiants de connexion.",
-        "choose": "Choisissez comment la partager.",
+        "choose": "Choisissez la destination du partage.",
         "user": "Sélectionnez une personne."
       },
       "resourceSubject": {
@@ -339,12 +339,12 @@
       "contentPreview": "Ce qui sera partagé",
       "options": {
         "publish": {
-          "title": "Publier pour tout le monde",
-          "description": "Visible dans la marketplace — chacun peut l’installer."
+          "title": "Marketplace",
+          "description": "Personnaliser puis publier immédiatement dans la marketplace."
         },
         "user": {
-          "title": "Envoyer à une personne",
-          "description": "Partage privé avec un collègue choisi."
+          "title": "Utilisateur",
+          "description": "Partage privé avec une personne choisie."
         }
       },
       "secrets": {

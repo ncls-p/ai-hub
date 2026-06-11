@@ -312,9 +312,9 @@
       "title": "Share “{name}”",
       "stepIndicator": "Step {current} of {total}",
       "steps": {
-        "meta": "Review the details before sharing.",
+        "meta": "Customize the listing, then it goes live immediately.",
         "secrets": "This resource uses connection credentials.",
-        "choose": "Choose how to share it.",
+        "choose": "Choose where to share it.",
         "user": "Pick someone to share with."
       },
       "resourceSubject": {
@@ -339,12 +339,12 @@
       "contentPreview": "What will be shared",
       "options": {
         "publish": {
-          "title": "Publish for everyone",
-          "description": "Listed in the marketplace — anyone can install it."
+          "title": "Marketplace",
+          "description": "Customize, then publish immediately to the marketplace."
         },
         "user": {
-          "title": "Send to one person",
-          "description": "Private share with a chosen teammate."
+          "title": "User",
+          "description": "Private share with one selected teammate."
         }
       },
       "secrets": {
