@@ -303,6 +303,9 @@ jobs:
           validate_secret_length POSTGRES_PASSWORD "$POSTGRES_PASSWORD" 16
           validate_secret_length DRAGONFLY_PASSWORD "$DRAGONFLY_PASSWORD" 16
           validate_secret_length OBJECT_STORAGE_SECRET_ACCESS_KEY "$OBJECT_STORAGE_SECRET_ACCESS_KEY" 16
+          if [[ -n "${SEARXNG_SECRET:-}" ]]; then
+            validate_secret_length SEARXNG_SECRET "$SEARXNG_SECRET" 32
+          fi
 
           if [[ ! "$APP_ENCRYPTION_KEY" =~ ^[0-9A-Fa-f]{64}$ ]]; then
             echo "APP_ENCRYPTION_KEY must be a 64-character hexadecimal string." >&2
@@ -329,7 +332,13 @@ jobs:
           OBJECT_STORAGE_BUCKET="${OBJECT_STORAGE_BUCKET:-ai-hub}"
           ALLOW_PERSONAL_WORKSPACES="${ALLOW_PERSONAL_WORKSPACES:-true}"
           WORKSPACE_MONTHLY_TOKEN_LIMIT="${WORKSPACE_MONTHLY_TOKEN_LIMIT:-}"
-          SEARXNG_SECRET="${SEARXNG_SECRET:-$APP_ENCRYPTION_KEY}"
+          if [[ -z "${SEARXNG_SECRET:-}" ]]; then
+            SEARXNG_SECRET="$(
+              printf '%s:%s:%s' "${APP_ENCRYPTION_KEY}" "${COOLIFY_SERVICE_NAME}" "${AI_HUB_PUBLIC_HOST}" \
+                | sha256sum \
+                | awk '{print $1}'
+            )"
+          fi
           BETTER_AUTH_URL="${AI_HUB_PUBLIC_URL}"
           BETTER_AUTH_TRUSTED_ORIGINS="${AI_HUB_PUBLIC_URL}"
           APP_ROUTING_URL="http://${AI_HUB_PUBLIC_HOST}:3000"
