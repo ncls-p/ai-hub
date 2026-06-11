@@ -292,7 +292,11 @@ export function BuiltinToolsPanel() {
 					<div className="grid grid-cols-2 gap-2.5">
 						<StatCard label={t("stats.total")} value={stats.total} />
 						<StatCard label={t("stats.low")} value={stats.low} tone="low" />
-						<StatCard label={t("stats.medium")} value={stats.medium} tone="medium" />
+						<StatCard
+							label={t("stats.medium")}
+							value={stats.medium}
+							tone="medium"
+						/>
 						<StatCard label={t("stats.high")} value={stats.high} tone="high" />
 					</div>
 				</div>
