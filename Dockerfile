@@ -52,7 +52,7 @@ FROM deps AS migrator
 COPY . .
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
-CMD ["npm", "run", "db:migrate"]
+CMD ["node", "scripts/migrate-standalone.mjs"]
 
 FROM deps AS worker
 COPY . .
@@ -61,7 +61,7 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:3001/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
-CMD ["npm", "run", "worker"]
+CMD ["sh", "-c", "node scripts/migrate-standalone.mjs && npm run worker"]
 
 FROM deps AS dev
 COPY . .
@@ -73,7 +73,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
 CMD ["npm", "run", "dev"]
 
-FROM base AS runner
+FROM deps AS runner
 
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
@@ -86,6 +86,8 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate-standalone.mjs ./scripts/migrate-standalone.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/src/server/infrastructure/db/migrations ./src/server/infrastructure/db/migrations
 
 USER nextjs
 
@@ -93,4 +95,4 @@ EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node scripts/migrate-standalone.mjs && node server.js"]
