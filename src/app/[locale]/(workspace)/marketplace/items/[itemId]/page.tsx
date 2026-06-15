@@ -142,7 +142,7 @@ export default function MarketplaceItemPage({
 			<div className="mx-auto max-w-4xl space-y-6">
 				<Button variant="ghost" size="sm" asChild>
 					<Link href="/marketplace">
-						<ArrowLeft className="h-4 w-4 mr-1" />
+						<ArrowLeft className="size-4 mr-1" />
 						{tDetail("back")}
 					</Link>
 				</Button>
@@ -150,10 +150,10 @@ export default function MarketplaceItemPage({
 				<Card>
 					<CardHeader>
 						<div className="flex items-start gap-3">
-							<div className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted">
+							<div className="flex size-14 items-center justify-center rounded-xl bg-muted">
 								<ItemIcon
 									type={item.type}
-									className="h-7 w-7 text-muted-foreground"
+									className="size-7 text-muted-foreground"
 								/>
 							</div>
 							<div className="flex-1">
@@ -164,7 +164,7 @@ export default function MarketplaceItemPage({
 											variant="default"
 											className="bg-yellow-500 text-black"
 										>
-											<Star className="h-3 w-3 mr-1 fill-current" />{" "}
+											<Star className="size-3 mr-1 fill-current" />{" "}
 											{t("list.featured")}
 										</Badge>
 									) : null}
@@ -199,7 +199,7 @@ export default function MarketplaceItemPage({
 						{item.tagsJson && item.tagsJson.length > 0 ? (
 							<div>
 								<h3 className="mb-2 flex items-center gap-1 text-sm font-medium text-muted-foreground">
-									<Tag className="h-3 w-3" />
+									<Tag className="size-3" />
 									{tDetail("tags")}
 								</h3>
 								<div className="flex flex-wrap gap-2">
@@ -246,7 +246,7 @@ export default function MarketplaceItemPage({
 						<div className="flex flex-wrap gap-3 border-t pt-4">
 							{item.canInstall ? (
 								<Button size="lg" onClick={handleInstall}>
-									<PackagePlus className="h-4 w-4 mr-2" />
+									<PackagePlus className="size-4 mr-2" />
 									{tDetail("install")}
 								</Button>
 							) : null}
@@ -263,7 +263,7 @@ export default function MarketplaceItemPage({
 										})
 									}
 								>
-									<Share2 className="h-4 w-4 mr-2" />
+									<Share2 className="size-4 mr-2" />
 									{tDetail("share")}
 								</Button>
 							) : null}

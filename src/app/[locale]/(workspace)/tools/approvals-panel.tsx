@@ -10,7 +10,6 @@ import {
 	Loader2,
 	MessageSquare,
 	Shield,
-	ShieldAlert,
 	XCircle,
 	Zap,
 } from "lucide-react";
@@ -49,6 +48,7 @@ interface ToolInvocation {
 }
 
 type ToolAction = "approve" | "reject";
+type BusyInvocation = { id: string; action: ToolAction } | null;
 
 // ── Constants ──
 
@@ -530,65 +530,172 @@ function filterByStatus(invocations: ToolInvocation[], filterStatus: string) {
 	return invocations;
 }
 
-export function ToolApprovalsPanel() {
-	const t = useTranslations("tools.filters");
-	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
+function getInvocationStats(
+	invocations: ToolInvocation[],
+	pendingCount: number,
+) {
+	const total = invocations.length;
+	const success = invocations.filter((i) => i.status === "success").length;
+	const failed = invocations.filter(
+		(i) =>
+			i.status === "failed" ||
+			i.status === "rejected" ||
+			i.status === "denied",
+	).length;
+	const latencies = invocations
+		.map((i) => i.latencyMs)
+		.filter((v): v is number => v !== null);
+	const avgLatency =
+		latencies.length > 0
+			? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
+			: 0;
+	const successRate = total > 0 ? Math.round((success / total) * 100) : 0;
+
+	return { total, pending: pendingCount, success, failed, avgLatency, successRate };
+}
+
+async function submitInvocationAction(
+	invocationId: string,
+	action: ToolAction,
+) {
+	const res = await fetch(
+		`/api/workspace/tool-invocations/${invocationId}/${action}`,
+		{ method: "POST" },
+	);
+	if (!res.ok) {
+		const error = await res.json().catch(() => null);
+		throw new Error(error?.error || `Failed to ${action} invocation`);
+	}
+}
+
+async function fetchToolInvocations({
+	workspaceId,
+	filterStatus,
+	signal,
+}: {
+	workspaceId?: string | null;
+	filterStatus: string;
+	signal?: AbortSignal;
+}) {
+	if (!workspaceId) return [];
+
+	const searchParams = new URLSearchParams({
+		workspaceId,
+		limit: "100",
+	});
+	if (filterStatus === "pending") {
+		searchParams.set("status", "awaiting_approval");
+	}
+
+	const res = await fetch(
+		`/api/workspace/tool-invocations?${searchParams.toString()}`,
+		{ signal },
+	);
+	if (!res.ok) throw new Error("Failed to load tool invocations");
+	return (await res.json()) as ToolInvocation[];
+}
+
+function InvocationStatsRow({
+	stats,
+}: {
+	stats: ReturnType<typeof getInvocationStats>;
+}) {
+	return (
+		<div className="grid grid-cols-2 gap-3 sm:grid-cols-4 animate-in-up stagger-1">
+			<StatCard
+				label="Total"
+				value={stats.total}
+				icon={Activity}
+				color="bg-primary/10 text-primary"
+				accent="bg-primary"
+			/>
+			<StatCard
+				label="Pending"
+				value={stats.pending}
+				icon={Clock}
+				color="bg-warning/10 text-warning"
+				accent="bg-warning"
+			/>
+			<StatCard
+				label="Success Rate"
+				value={`${stats.successRate}%`}
+				icon={CheckCircle2}
+				color="bg-success/10 text-success"
+				accent="bg-success"
+			/>
+			<StatCard
+				label="Avg Latency"
+				value={`${stats.avgLatency}ms`}
+				icon={Zap}
+				color="bg-info/10 text-info"
+				accent="bg-info"
+			/>
+		</div>
+	);
+}
+
+type InvocationTabsProps = {
+	filterStatus: string;
+	invocations: ToolInvocation[];
+	busyInvocation: BusyInvocation;
+	onFilterStatusChange: (status: string) => void;
+	onApprove: (invocationId: string) => void;
+	onReject: (invocationId: string) => void;
+	t: (key: "all" | "pending" | "history") => string;
+};
+
+function InvocationTabs({
+	filterStatus,
+	invocations,
+	busyInvocation,
+	onFilterStatusChange,
+	onApprove,
+	onReject,
+	t,
+}: InvocationTabsProps) {
+	return (
+		<div className="animate-in-up stagger-2">
+			<Tabs value={filterStatus} onValueChange={onFilterStatusChange}>
+				<TabsList className="w-full overflow-x-auto sm:w-auto sm:overflow-visible">
+					<TabsTrigger value="all" className="gap-1.5">
+						<Activity className="size-3.5" aria-hidden="true" />
+						{t("all")}
+					</TabsTrigger>
+					<TabsTrigger value="pending" className="gap-1.5">
+						<Clock className="size-3.5" aria-hidden="true" />
+						{t("pending")}
+					</TabsTrigger>
+					<TabsTrigger value="history" className="gap-1.5">
+						<CheckCircle2 className="size-3.5" aria-hidden="true" />
+						{t("history")}
+					</TabsTrigger>
+				</TabsList>
+
+				<TabsContent value={filterStatus}>
+					<InvocationList
+						invocations={filterByStatus(invocations, filterStatus)}
+						filterStatus={filterStatus}
+						busyInvocation={busyInvocation}
+						onApprove={onApprove}
+						onReject={onReject}
+					/>
+				</TabsContent>
+			</Tabs>
+		</div>
+	);
+}
+
+type FetchInvocations = (signal?: AbortSignal) => Promise<ToolInvocation[]>;
+
+function useToolInvocationData(
+	workspaceId: string | null,
+	filterStatus: string,
+) {
 	const [invocations, setInvocations] = useState<ToolInvocation[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [filterStatus, setFilterStatus] = useState<string>("all");
-	const [busyInvocation, setBusyInvocation] = useState<{
-		id: string;
-		action: ToolAction;
-	} | null>(null);
-
-	const pendingInvocations = useMemo(
-		() => invocations.filter(isPendingApproval),
-		[invocations],
-	);
-
-	// Stats
-	const stats = useMemo(() => {
-		const total = invocations.length;
-		const pending = pendingInvocations.length;
-		const success = invocations.filter((i) => i.status === "success").length;
-		const failed = invocations.filter(
-			(i) =>
-				i.status === "failed" ||
-				i.status === "rejected" ||
-				i.status === "denied",
-		).length;
-		const latencies = invocations
-			.map((i) => i.latencyMs)
-			.filter((v): v is number => v !== null);
-		const avgLatency =
-			latencies.length > 0
-				? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
-				: 0;
-		const successRate =
-			total > 0 ? Math.round(((success / total) * 100) | 0) : 0;
-
-		return { total, pending, success, failed, avgLatency, successRate };
-	}, [invocations, pendingInvocations]);
-
 	const fetchInvocations = useCallback(
-		async (signal?: AbortSignal) => {
-			if (!workspaceId) return [];
-
-			const searchParams = new URLSearchParams({
-				workspaceId,
-				limit: "100",
-			});
-			if (filterStatus === "pending") {
-				searchParams.set("status", "awaiting_approval");
-			}
-
-			const res = await fetch(
-				`/api/workspace/tool-invocations?${searchParams.toString()}`,
-				{ signal },
-			);
-			if (!res.ok) throw new Error("Failed to load tool invocations");
-			return (await res.json()) as ToolInvocation[];
-		},
+		(signal?: AbortSignal) =>
+			fetchToolInvocations({ workspaceId, filterStatus, signal }),
 		[filterStatus, workspaceId],
 	);
 
@@ -639,30 +746,57 @@ export function ToolApprovalsPanel() {
 		};
 	}, [fetchInvocations, workspaceId]);
 
-	async function runInvocationAction(invocationId: string, action: ToolAction) {
-		setBusyInvocation({ id: invocationId, action });
-		try {
-			const res = await fetch(
-				`/api/workspace/tool-invocations/${invocationId}/${action}`,
-				{ method: "POST" },
-			);
-			if (!res.ok) {
-				const error = await res.json().catch(() => null);
-				throw new Error(error?.error || `Failed to ${action} invocation`);
-			}
+	return { invocations, loading, fetchInvocations, setInvocations };
+}
 
-			toast.success(
-				`Tool invocation ${action === "approve" ? "approved" : "rejected"}`,
-			);
-			setInvocations(await fetchInvocations());
-		} catch (err) {
-			toast.error(
-				err instanceof Error ? err.message : `Failed to ${action} invocation`,
-			);
-		} finally {
-			setBusyInvocation(null);
-		}
-	}
+function useInvocationActions(
+	fetchInvocations: FetchInvocations,
+	setInvocations: (invocations: ToolInvocation[]) => void,
+) {
+	const [busyInvocation, setBusyInvocation] = useState<BusyInvocation>(null);
+	const runInvocationAction = useCallback(
+		async (invocationId: string, action: ToolAction) => {
+			setBusyInvocation({ id: invocationId, action });
+			try {
+				await submitInvocationAction(invocationId, action);
+				toast.success(
+					`Tool invocation ${action === "approve" ? "approved" : "rejected"}`,
+				);
+				setInvocations(await fetchInvocations());
+			} catch (err) {
+				toast.error(
+					err instanceof Error ? err.message : `Failed to ${action} invocation`,
+				);
+			} finally {
+				setBusyInvocation(null);
+			}
+		},
+		[fetchInvocations, setInvocations],
+	);
+
+	return { busyInvocation, runInvocationAction };
+}
+
+export function ToolApprovalsPanel() {
+	const t = useTranslations("tools.filters");
+	const { workspaceId, isLoading: workspaceLoading } = useWorkspace();
+	const [filterStatus, setFilterStatus] = useState<string>("all");
+	const { invocations, loading, fetchInvocations, setInvocations } =
+		useToolInvocationData(workspaceId, filterStatus);
+	const { busyInvocation, runInvocationAction } = useInvocationActions(
+		fetchInvocations,
+		setInvocations,
+	);
+
+	const pendingInvocations = useMemo(
+		() => invocations.filter(isPendingApproval),
+		[invocations],
+	);
+
+	const stats = useMemo(
+		() => getInvocationStats(invocations, pendingInvocations.length),
+		[invocations, pendingInvocations.length],
+	);
 
 	if (workspaceLoading || !workspaceId || loading) {
 		return <PageLoading label="Loading tool invocations" />;
@@ -670,75 +804,22 @@ export function ToolApprovalsPanel() {
 
 	return (
 		<div className="flex flex-col gap-6">
-			{/* Stats Row */}
-			<div className="grid grid-cols-2 gap-3 sm:grid-cols-4 animate-in-up stagger-1">
-				<StatCard
-					label="Total"
-					value={stats.total}
-					icon={Activity}
-					color="bg-primary/10 text-primary"
-					accent="bg-primary"
-				/>
-				<StatCard
-					label="Pending"
-					value={stats.pending}
-					icon={Clock}
-					color="bg-warning/10 text-warning"
-					accent="bg-warning"
-				/>
-				<StatCard
-					label="Success Rate"
-					value={`${stats.successRate}%`}
-					icon={CheckCircle2}
-					color="bg-success/10 text-success"
-					accent="bg-success"
-				/>
-				<StatCard
-					label="Avg Latency"
-					value={`${stats.avgLatency}ms`}
-					icon={Zap}
-					color="bg-info/10 text-info"
-					accent="bg-info"
-				/>
-			</div>
-
-			{/* Pending Approvals */}
+			<InvocationStatsRow stats={stats} />
 			<PendingApprovalsPanel
 				invocations={pendingInvocations}
 				busyInvocation={busyInvocation}
 				onApprove={(id) => void runInvocationAction(id, "approve")}
 				onReject={(id) => void runInvocationAction(id, "reject")}
 			/>
-
-			{/* Filter Tabs + List */}
-			<div className="animate-in-up stagger-2">
-				<Tabs value={filterStatus} onValueChange={setFilterStatus}>
-					<TabsList className="w-full overflow-x-auto sm:w-auto sm:overflow-visible">
-						<TabsTrigger value="all" className="gap-1.5">
-							<Activity className="size-3.5" aria-hidden="true" />
-							{t("all")}
-						</TabsTrigger>
-						<TabsTrigger value="pending" className="gap-1.5">
-							<Clock className="size-3.5" aria-hidden="true" />
-							{t("pending")}
-						</TabsTrigger>
-						<TabsTrigger value="history" className="gap-1.5">
-							<CheckCircle2 className="size-3.5" aria-hidden="true" />
-							{t("history")}
-						</TabsTrigger>
-					</TabsList>
-
-					<TabsContent value={filterStatus}>
-						<InvocationList
-							invocations={filterByStatus(invocations, filterStatus)}
-							filterStatus={filterStatus}
-							busyInvocation={busyInvocation}
-							onApprove={(id) => void runInvocationAction(id, "approve")}
-							onReject={(id) => void runInvocationAction(id, "reject")}
-						/>
-					</TabsContent>
-				</Tabs>
-			</div>
+			<InvocationTabs
+				filterStatus={filterStatus}
+				invocations={invocations}
+				busyInvocation={busyInvocation}
+				onFilterStatusChange={setFilterStatus}
+				onApprove={(id) => void runInvocationAction(id, "approve")}
+				onReject={(id) => void runInvocationAction(id, "reject")}
+				t={t}
+			/>
 		</div>
 	);
 }

@@ -110,7 +110,7 @@ export function AgentHeader({
 					</Button>
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button variant="ghost" size="icon-sm" className="h-8 w-8">
+							<Button variant="ghost" size="icon-sm" className="size-8">
 								<MoreHorizontalIcon className="size-4" aria-hidden="true" />
 							</Button>
 						</DropdownMenuTrigger>

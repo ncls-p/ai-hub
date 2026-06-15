@@ -327,7 +327,7 @@ function SidebarPanel({
 					) : (
 						<DeodisLogo
 							href="/chat"
-							className="h-6 w-6 shrink-0 object-contain"
+							className="size-6 shrink-0 object-contain"
 						/>
 					)}
 					{showCollapseControl ? (

@@ -72,17 +72,20 @@ function toPositiveNumber(value: number | null | undefined) {
 	return typeof value === "number" && value > 0 ? value : undefined;
 }
 
+function hasOpenAiModelData(data: unknown): data is { data: OpenAiModel[] } {
+	if (typeof data !== "object" || data === null || !("data" in data)) {
+		return false;
+	}
+
+	return Array.isArray(data.data);
+}
+
 function parseOpenAiModels(data: unknown): ModelDescriptor[] {
-	if (
-		typeof data !== "object" ||
-		data === null ||
-		!("data" in data) ||
-		!Array.isArray(data.data)
-	) {
+	if (!hasOpenAiModelData(data)) {
 		return [];
 	}
 
-	return (data.data as OpenAiModel[])
+	return data.data
 		.filter((model) => typeof model.id === "string")
 		.map((model) => ({
 			modelId: model.id,
@@ -160,20 +163,20 @@ type DragonflyChatChunk = {
 	}>;
 };
 
+function hasOpenAiFunction(toolCall: Record<string, unknown>) {
+	return typeof toolCall.function === "object" && toolCall.function !== null;
+}
+
 function removeInvalidThinkingToolCalls(chunk: DragonflyChatChunk) {
 	for (const choice of chunk.choices ?? []) {
 		for (const container of [choice.delta, choice.message]) {
 			if (!container?.tool_calls) continue;
-			const validToolCalls = container.tool_calls.filter((toolCall) => {
-				// Dragonfly streams Anthropic content blocks as OpenAI `tool_calls`
-				// entries like `{ type: "thinking" }` or `{ type: "text" }`, without
-				// the required OpenAI `function` object. The AI SDK correctly rejects
-				// those. Reasoning/text content is already exposed via `reasoning_content`
-				// and `content`, so drop only non-function tool-call shims.
-				return (
-					typeof toolCall.function === "object" && toolCall.function !== null
-				);
-			});
+			// Dragonfly streams Anthropic content blocks as OpenAI `tool_calls`
+			// entries like `{ type: "thinking" }` or `{ type: "text" }`, without
+			// the required OpenAI `function` object. The AI SDK correctly rejects
+			// those. Reasoning/text content is already exposed via `reasoning_content`
+			// and `content`, so drop only non-function tool-call shims.
+			const validToolCalls = container.tool_calls.filter(hasOpenAiFunction);
 			if (validToolCalls.length > 0) {
 				container.tool_calls = validToolCalls;
 			} else {
@@ -228,7 +231,9 @@ function normalizeAnthropicToolLoopMessages(
 
 	return (messages as OpenAiCompatibleMessage[]).map((message) => {
 		if (message.role === "assistant" && Array.isArray(message.tool_calls)) {
-			const { reasoning_content: _reasoningContent, ...rest } = message;
+			const rest = { ...message };
+			delete rest.reasoning_content;
+
 			return {
 				...rest,
 				// Dragonfly's Anthropic bridge rejects assistant prefill when the

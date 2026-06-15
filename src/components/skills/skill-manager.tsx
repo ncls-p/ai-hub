@@ -465,7 +465,7 @@ function SkillEditorDialog({
 												<Button
 													variant="ghost"
 													size="icon"
-													className="h-8 w-8 shrink-0"
+													className="size-8 shrink-0"
 													onClick={() => removeFile(activeFile)}
 												>
 													<XIcon className="size-3.5" />
@@ -851,7 +851,7 @@ export function SkillManager() {
 													type="button"
 													variant="ghost"
 													size="icon"
-													className="h-7 w-7"
+													className="size-7"
 													aria-label={`Edit ${skill.name}`}
 												>
 													<PencilIcon className="size-3.5" aria-hidden="true" />
@@ -862,7 +862,7 @@ export function SkillManager() {
 											type="button"
 											variant="ghost"
 											size="icon"
-											className="h-7 w-7"
+											className="size-7"
 											aria-label={`${tShare("action")} ${skill.name}`}
 											onClick={() =>
 												setShareResource({
@@ -879,7 +879,7 @@ export function SkillManager() {
 											type="button"
 											variant="ghost"
 											size="icon"
-											className="h-7 w-7"
+											className="size-7"
 											onClick={() => void deleteSkill(skill.id)}
 										>
 											<Trash2Icon className="size-3.5" aria-hidden="true" />

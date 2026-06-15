@@ -876,6 +876,13 @@ const MessageContent = memo(function MessageContent({
 	const renderableParts = renderablePartsFromMessage(message).filter(
 		(part) => part.type !== "text" || part.content,
 	);
+	const lastStreamingTextPartIndex = isAnimating
+		? renderableParts.reduce(
+				(lastIndex, part, partIndex) =>
+					part.type === "text" ? partIndex : lastIndex,
+				-1,
+			)
+		: -1;
 	const approvalByPartIndex = new Map<number, PendingToolApproval>();
 	const matchedApprovalIds = new Set<string>();
 	if (message.status === "streaming") {
@@ -933,8 +940,11 @@ const MessageContent = memo(function MessageContent({
 					))
 				: null}
 			{renderableParts.length > 0 ? (
-				renderableParts.map((part, partIndex) => {
-					if (part.type === "suggestions") {
+					renderableParts.map((part, partIndex) => {
+						const shouldAnimateTextPart =
+							isAnimating && partIndex === lastStreamingTextPartIndex;
+
+						if (part.type === "suggestions") {
 						if (!showSuggestions) return null;
 						return (
 							<SuggestionsPart
@@ -968,8 +978,10 @@ const MessageContent = memo(function MessageContent({
 						<Streamdown
 							key={`${message.id}-${part.type}-${partIndex}`}
 							plugins={{ code }}
-							isAnimating={isAnimating}
-							animated={isAnimating ? STREAMING_TEXT_ANIMATION : false}
+							isAnimating={shouldAnimateTextPart}
+							animated={
+								shouldAnimateTextPart ? STREAMING_TEXT_ANIMATION : false
+							}
 							className="streaming-markdown text-sm"
 						>
 							{part.content}
@@ -1297,7 +1309,7 @@ function MessageActionBar({
 				size="icon-sm"
 				variant="ghost"
 				aria-label={copied ? "Copied" : "Copy message"}
-				className="h-6 w-6"
+				className="size-6"
 				disabled={sending}
 				onClick={handleCopy}
 			>
@@ -1313,7 +1325,7 @@ function MessageActionBar({
 					size="icon-sm"
 					variant="ghost"
 					aria-label="Edit message"
-					className="h-6 w-6"
+					className="size-6"
 					disabled={sending}
 					onClick={onEdit}
 				>
@@ -1326,7 +1338,7 @@ function MessageActionBar({
 					size="icon-sm"
 					variant="ghost"
 					aria-label="Delete message"
-					className="h-6 w-6 text-destructive/70 hover:text-destructive"
+					className="size-6 text-destructive/70 hover:text-destructive"
 					disabled={sending}
 					onClick={onDelete}
 				>

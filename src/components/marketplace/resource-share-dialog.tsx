@@ -134,7 +134,7 @@ function ShareOptionCard({
 				(disabled || loading) && "opacity-60 cursor-not-allowed",
 			)}
 		>
-			<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+			<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
 				{loading ? (
 					<Spinner className="size-4" />
 				) : (
@@ -611,7 +611,7 @@ export function ResourceShareDialog({
 											</span>
 										</span>
 										{selectedUserId === user.id ? (
-											<Star className="h-3 w-3 shrink-0 fill-primary text-primary" />
+											<Star className="size-3 shrink-0 fill-primary text-primary" />
 										) : null}
 									</button>
 								))

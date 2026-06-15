@@ -88,7 +88,7 @@ export function RichEditor({
 	if (!editor) return null;
 
 	const toolbarButtonClass =
-		"h-7 w-7 rounded-md p-0 text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 transition-transform";
+		"size-7 rounded-md p-0 text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 transition-transform";
 
 	return (
 		<div className={cn("flex min-w-72 flex-col gap-2", className)}>

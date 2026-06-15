@@ -152,10 +152,10 @@ function MarketplaceItemCard({
 		>
 			<CardHeader className="pb-2">
 				<div className="flex items-start gap-2">
-					<div className="flex items-center justify-center w-9 h-9 shrink-0 rounded-lg bg-muted">
+					<div className="flex items-center justify-center size-9 shrink-0 rounded-lg bg-muted">
 						<ItemIcon
 							type={item.type}
-							className="h-5 w-5 text-muted-foreground"
+							className="size-5 text-muted-foreground"
 						/>
 					</div>
 					<div className="min-w-0 flex-1 space-y-1">
@@ -168,7 +168,7 @@ function MarketplaceItemCard({
 									variant="default"
 									className="shrink-0 bg-yellow-500 text-black text-[10px] uppercase tracking-wide"
 								>
-									<Star className="h-3 w-3 mr-0.5 fill-current" />
+									<Star className="size-3 mr-0.5 fill-current" />
 									{t("featured")}
 								</Badge>
 							) : null}
@@ -199,7 +199,7 @@ function MarketplaceItemCard({
 				<div className="flex items-center justify-between text-xs text-muted-foreground">
 					<div className="flex items-center gap-3">
 						<span className="flex items-center gap-1">
-							<Download className="h-3 w-3" /> {item.totalDownloads}
+							<Download className="size-3" /> {item.totalDownloads}
 						</span>
 						<span>{formatMarketplaceDate(item.publishedAt, locale)}</span>
 					</div>
@@ -209,20 +209,20 @@ function MarketplaceItemCard({
 								<Button
 									size="icon"
 									variant="ghost"
-									className="h-6 w-6"
+									className="size-6"
 									aria-label={t("share")}
 									onClick={() => onShare(item)}
 								>
-									<Share2 className="h-3 w-3" />
+									<Share2 className="size-3" />
 								</Button>
 								<Button
 									size="icon"
 									variant="ghost"
-									className="h-6 w-6 text-destructive"
+									className="size-6 text-destructive"
 									aria-label={t("delete")}
 									onClick={() => onDelete(item.id)}
 								>
-									<Trash2 className="h-3 w-3" />
+									<Trash2 className="size-3" />
 								</Button>
 							</>
 						)}
@@ -230,7 +230,7 @@ function MarketplaceItemCard({
 							<Button
 								size="icon"
 								variant="ghost"
-								className="h-6 w-6"
+								className="size-6"
 								aria-label={
 									item.isFeatured ? t("toast.unfeatured") : t("toast.featured")
 								}
@@ -239,7 +239,7 @@ function MarketplaceItemCard({
 								}
 							>
 								<Star
-									className={`h-3 w-3 ${item.isFeatured ? "fill-yellow-400 text-yellow-400" : ""}`}
+									className={`size-3 ${item.isFeatured ? "fill-yellow-400 text-yellow-400" : ""}`}
 								/>
 							</Button>
 						)}
@@ -251,12 +251,12 @@ function MarketplaceItemCard({
 						className="flex-1"
 						onClick={() => onInstall(item.id)}
 					>
-						<PackagePlus className="h-3 w-3 mr-1" />
+						<PackagePlus className="size-3 mr-1" />
 						{t("install")}
 					</Button>
 					<Button size="sm" variant="outline" asChild>
 						<Link href={`/marketplace/items/${item.id}`}>
-							<ExternalLink className="h-3 w-3 mr-1" />
+							<ExternalLink className="size-3 mr-1" />
 							{t("viewDetails")}
 						</Link>
 					</Button>
@@ -484,7 +484,7 @@ export default function MarketplacePage() {
 		>
 			<div className="flex flex-col sm:flex-row gap-3 mb-6">
 				<div className="relative flex-1">
-					<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+					<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
 					<Input
 						placeholder={t("searchPlaceholder")}
 						value={search}
