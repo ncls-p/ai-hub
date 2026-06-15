@@ -940,11 +940,11 @@ const MessageContent = memo(function MessageContent({
 					))
 				: null}
 			{renderableParts.length > 0 ? (
-					renderableParts.map((part, partIndex) => {
-						const shouldAnimateTextPart =
-							isAnimating && partIndex === lastStreamingTextPartIndex;
+				renderableParts.map((part, partIndex) => {
+					const shouldAnimateTextPart =
+						isAnimating && partIndex === lastStreamingTextPartIndex;
 
-						if (part.type === "suggestions") {
+					if (part.type === "suggestions") {
 						if (!showSuggestions) return null;
 						return (
 							<SuggestionsPart

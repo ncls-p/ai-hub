@@ -52,12 +52,7 @@ type BusyInvocation = { id: string; action: ToolAction } | null;
 
 // ── Constants ──
 
-const HISTORY_STATUSES = new Set([
-	"success",
-	"failed",
-	"rejected",
-	"denied",
-]);
+const HISTORY_STATUSES = new Set(["success", "failed", "rejected", "denied"]);
 
 // ── Helpers ──
 
@@ -538,9 +533,7 @@ function getInvocationStats(
 	const success = invocations.filter((i) => i.status === "success").length;
 	const failed = invocations.filter(
 		(i) =>
-			i.status === "failed" ||
-			i.status === "rejected" ||
-			i.status === "denied",
+			i.status === "failed" || i.status === "rejected" || i.status === "denied",
 	).length;
 	const latencies = invocations
 		.map((i) => i.latencyMs)
@@ -551,7 +544,14 @@ function getInvocationStats(
 			: 0;
 	const successRate = total > 0 ? Math.round((success / total) * 100) : 0;
 
-	return { total, pending: pendingCount, success, failed, avgLatency, successRate };
+	return {
+		total,
+		pending: pendingCount,
+		success,
+		failed,
+		avgLatency,
+		successRate,
+	};
 }
 
 async function submitInvocationAction(

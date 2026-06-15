@@ -106,6 +106,13 @@
       "when": 1781272980028,
       "tag": "0014_simple_marketplace_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1781300000001,
+      "tag": "0015_repair_skipped_production_migrations",
+      "breakpoints": true
     }
   ]
 }
