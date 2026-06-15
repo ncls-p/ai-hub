@@ -1,4 +1,10 @@
-use_default_settings: true
+use_default_settings:
+  engines:
+    remove:
+      # SearXNG 2026.6.15 made EngineAbout strict while these default
+      # disabled engines still ship `about.language`, which crashes startup.
+      - woxikon.de synonyme
+      - wikimini
 
 general:
   instance_name: "AI Hub Search"
