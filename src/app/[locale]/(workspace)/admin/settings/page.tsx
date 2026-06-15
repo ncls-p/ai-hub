@@ -14,19 +14,14 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import {
-	ensureBootstrapAdmin,
-	getRegistrationSetting,
-	isAdminRole,
-} from "@/modules/admin/use-cases";
+import { isPlatformAdminSession } from "@/modules/admin/auth";
+import { getRegistrationSetting } from "@/modules/admin/use-cases";
 import { getSession } from "@/modules/auth/session";
 
 export default async function AdminSettingsPage() {
 	const t = await getTranslations("admin");
 	const session = await getSession();
-	const bootstrappedAdminId = await ensureBootstrapAdmin();
-	const isAdmin =
-		isAdminRole(session?.user.role) || bootstrappedAdminId === session?.user.id;
+	const isAdmin = await isPlatformAdminSession(session);
 
 	if (!session || !isAdmin) {
 		return (

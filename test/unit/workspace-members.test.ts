@@ -22,49 +22,34 @@ beforeAll(async () => {
 	));
 });
 
-describe("workspace member IAM", () => {
-	it("grants members.invite through workspace owner permissions", async () => {
+describe("workspace IAM", () => {
+	it("does not grant workspace member-management permissions", async () => {
+		const { SYSTEM_ROLES } = await import("@/server/domain/entities/iam");
+		for (const role of SYSTEM_ROLES.filter(
+			(item) => item.scopeType === "workspace",
+		)) {
+			expect(
+				role.permissions.some((permission) =>
+					matchesPermission(permission, "members.invite"),
+				),
+			).toBe(false);
+			expect(
+				role.permissions.some((permission) =>
+					matchesPermission(permission, "members.remove"),
+				),
+			).toBe(false);
+		}
+	});
+
+	it("keeps app-management permissions for hidden primary workspace access", async () => {
 		const { SYSTEM_ROLES } = await import("@/server/domain/entities/iam");
 		const ownerRole = SYSTEM_ROLES.find(
 			(role) => role.name === "workspace.owner",
 		);
-		expect(
-			ownerRole?.permissions.some((permission) =>
-				matchesPermission(permission, "members.invite"),
-			),
-		).toBe(true);
-		expect(
-			ownerRole?.permissions.some((permission) =>
-				matchesPermission(permission, "members.manage"),
-			),
-		).toBe(true);
-	});
-
-	it("grants usage and audit view through workspace owner permissions", async () => {
-		const { SYSTEM_ROLES } = await import("@/server/domain/entities/iam");
-		const ownerRole = SYSTEM_ROLES.find(
-			(role) => role.name === "workspace.owner",
-		);
-		expect(
-			ownerRole?.permissions.some((permission) =>
-				matchesPermission(permission, "usage.view"),
-			),
-		).toBe(true);
-		expect(
-			ownerRole?.permissions.some((permission) =>
-				matchesPermission(permission, "audit.view"),
-			),
-		).toBe(true);
-	});
-
-	it("grants admin-created workspace admins the management permissions used by APIs", async () => {
-		const { SYSTEM_ROLES } = await import("@/server/domain/entities/iam");
 		const adminRole = SYSTEM_ROLES.find(
 			(role) => role.name === "workspace.admin",
 		);
 		const requiredPermissions = [
-			"members.invite",
-			"members.remove",
 			"providers.viewMetadata",
 			"apiKeys.manage",
 			"agents.chat",
@@ -72,6 +57,11 @@ describe("workspace member IAM", () => {
 		];
 
 		for (const requiredPermission of requiredPermissions) {
+			expect(
+				ownerRole?.permissions.some((permission) =>
+					matchesPermission(permission, requiredPermission),
+				),
+			).toBe(true);
 			expect(
 				adminRole?.permissions.some((permission) =>
 					matchesPermission(permission, requiredPermission),

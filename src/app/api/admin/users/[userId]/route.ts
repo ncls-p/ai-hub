@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { logger } from "@/lib/logger";
-import {
-	ensureBootstrapAdmin,
-	isAdminRole,
-	updateManagedUser,
-} from "@/modules/admin/use-cases";
-import { getSession } from "@/modules/auth/session";
+import { requireAdminApiSession } from "@/modules/admin/auth";
+import { updateManagedUser } from "@/modules/admin/use-cases";
+import { ensurePrimaryWorkspaceForUser } from "@/modules/workspace/use-cases";
 
 const paramsSchema = z.object({ userId: z.uuid() });
 const updateUserSchema = z.object({
@@ -21,16 +18,8 @@ export async function PATCH(
 	{ params }: { params: Promise<{ userId: string }> },
 ) {
 	try {
-		const session = await getSession();
-		if (!session) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-		const bootstrappedAdminId = await ensureBootstrapAdmin();
-		const isAdmin =
-			isAdminRole(session.user.role) || bootstrappedAdminId === session.user.id;
-		if (!isAdmin) {
-			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-		}
+		const auth = await requireAdminApiSession();
+		if (!auth.ok) return auth.response;
 
 		const parsedParams = paramsSchema.safeParse(await params);
 		const parsedBody = updateUserSchema.safeParse(await req.json());
@@ -45,10 +34,18 @@ export async function PATCH(
 		}
 
 		const user = await updateManagedUser({
-			actorUserId: session.user.id,
+			actorUserId: auth.session.user.id,
 			userId: parsedParams.data.userId,
 			...parsedBody.data,
 		});
+
+		if (parsedBody.data.role) {
+			await ensurePrimaryWorkspaceForUser({
+				userId: user.id,
+				role: user.role,
+				invitedBy: auth.session.user.id,
+			});
+		}
 
 		return NextResponse.json({ user });
 	} catch (error) {

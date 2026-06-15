@@ -49,25 +49,26 @@ describe("permission matching", () => {
 		expect(matchesPermission("agents.create", "agents.delete")).toBe(false);
 	});
 
-	it("lets marketplace wildcard cover marketplace item actions", () => {
+	it("does not normalize old permission domains", () => {
 		expect(matchesPermission("marketplace.*", "marketplaceItems.install")).toBe(
+			false,
+		);
+		expect(matchesPermission("workspace.*", "apiKeys.manage")).toBe(false);
+		expect(matchesPermission("workspaces.get", "workspace.get")).toBe(false);
+		expect(matchesPermission("auditLogs.view", "audit.view")).toBe(false);
+	});
+
+	it("requires explicit domain grants instead of role marker permissions", () => {
+		expect(matchesPermission("providers.manage", "providers.delete")).toBe(
 			true,
 		);
-	});
-
-	it("normalizes legacy workspace/audit permission domains", () => {
-		expect(matchesPermission("workspace.*", "members.invite")).toBe(true);
-		expect(matchesPermission("workspace.*", "apiKeys.manage")).toBe(true);
-		expect(matchesPermission("workspaces.get", "workspace.get")).toBe(true);
-		expect(matchesPermission("auditLogs.view", "audit.view")).toBe(true);
-	});
-
-	it("treats workspace admin and owner markers as workspace-wide grants", () => {
-		expect(matchesPermission("workspace.admin", "providers.delete")).toBe(true);
-		expect(
-			matchesPermission("workspace.admin", "tools.executeRestricted"),
-		).toBe(true);
-		expect(matchesPermission("workspace.owner", "members.remove")).toBe(true);
+		expect(matchesPermission("tools.manage", "tools.executeRestricted")).toBe(
+			true,
+		);
+		expect(matchesPermission("apiKeys.*", "apiKeys.delete")).toBe(true);
+		expect(matchesPermission("workspace.admin", "providers.delete")).toBe(
+			false,
+		);
 	});
 
 	it("lets view grants satisfy read-oriented actions", () => {

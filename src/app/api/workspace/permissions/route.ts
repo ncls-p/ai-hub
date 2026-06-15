@@ -43,7 +43,6 @@ export async function GET(req: NextRequest) {
 		const [
 			canViewUsage,
 			canViewAudit,
-			canInviteMembers,
 			canViewProviders,
 			canConfigureTools,
 			canViewTools,
@@ -53,12 +52,6 @@ export async function GET(req: NextRequest) {
 		] = await Promise.all([
 			authorization.hasPermission(ctx, "usage.view", "workspace", workspaceId),
 			authorization.hasPermission(ctx, "audit.view", "workspace", workspaceId),
-			authorization.hasPermission(
-				ctx,
-				"members.invite",
-				"workspace",
-				workspaceId,
-			),
 			authorization.hasPermission(
 				ctx,
 				"providers.viewMetadata",
@@ -86,7 +79,7 @@ export async function GET(req: NextRequest) {
 			),
 			authorization.hasPermission(
 				ctx,
-				"workspace.manage",
+				"workspaces.update",
 				"workspace",
 				workspaceId,
 			),
@@ -95,12 +88,11 @@ export async function GET(req: NextRequest) {
 		return NextResponse.json({
 			canViewUsage,
 			canViewAudit,
-			canInviteMembers,
 			canViewProviders,
 			canConfigureTools,
 			canViewTools,
 			canGetMcpServers,
-			canManageApiKeys: canManageApiKeys || canManageWorkspace,
+			canManageApiKeys,
 			canManageWorkspace,
 		});
 	} catch (error) {

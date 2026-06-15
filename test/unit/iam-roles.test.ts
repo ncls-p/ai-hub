@@ -25,11 +25,12 @@ describe("SYSTEM_ROLES", () => {
 		}
 	});
 
-	it("workspace.owner has broad wildcard permissions", () => {
+	it("workspace.owner has broad explicit wildcard permissions", () => {
 		const owner = SYSTEM_ROLES.find((r) => r.name === "workspace.owner");
 		expect(owner).toBeDefined();
-		expect(owner!.permissions).toContain("workspace.*");
-		expect(owner!.permissions).toContain("members.*");
+		expect(owner!.permissions).toContain("workspaces.*");
+		expect(owner!.permissions).not.toContain("members.*");
+		expect(owner!.permissions).not.toContain("workspace.*");
 	});
 
 	it("workspace.member has restricted permissions", () => {
@@ -52,10 +53,13 @@ describe("SYSTEM_ROLES", () => {
 		expect(unique.size).toBe(names.length);
 	});
 
-	it("workspace.viewer cannot manage members", () => {
-		const viewer = SYSTEM_ROLES.find((r) => r.name === "workspace.viewer");
-		expect(viewer).toBeDefined();
-		expect(viewer!.permissions).not.toContain("members.*");
-		expect(viewer!.permissions).not.toContain("members.invite");
+	it("workspace roles do not include member-management permissions", () => {
+		for (const role of SYSTEM_ROLES.filter(
+			(item) => item.scopeType === "workspace",
+		)) {
+			expect(role.permissions).not.toContain("members.*");
+			expect(role.permissions).not.toContain("members.invite");
+			expect(role.permissions).not.toContain("members.manage");
+		}
 	});
 });

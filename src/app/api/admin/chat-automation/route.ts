@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { logger } from "@/lib/logger";
-import { ensureBootstrapAdmin, isAdminRole } from "@/modules/admin/use-cases";
-import { getSession } from "@/modules/auth/session";
+import { requireAdminApiSession } from "@/modules/admin/auth";
 import {
 	getChatAutomationAdminState,
 	setChatAutomationConfig,
@@ -35,29 +34,9 @@ const updateSchema = z
 		}
 	});
 
-async function requireAdmin() {
-	const session = await getSession();
-	if (!session) {
-		return {
-			ok: false as const,
-			response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-		};
-	}
-	const bootstrappedAdminId = await ensureBootstrapAdmin();
-	const isAdmin =
-		isAdminRole(session.user.role) || bootstrappedAdminId === session.user.id;
-	if (!isAdmin) {
-		return {
-			ok: false as const,
-			response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
-		};
-	}
-	return { ok: true as const, session };
-}
-
 export async function GET() {
 	try {
-		const auth = await requireAdmin();
+		const auth = await requireAdminApiSession();
 		if (!auth.ok) return auth.response;
 		return NextResponse.json(await getChatAutomationAdminState());
 	} catch (error) {
@@ -71,7 +50,7 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
 	try {
-		const auth = await requireAdmin();
+		const auth = await requireAdminApiSession();
 		if (!auth.ok) return auth.response;
 		const parsed = updateSchema.safeParse(await req.json());
 		if (!parsed.success) {

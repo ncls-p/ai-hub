@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
+import { isPlatformAdminSession } from "@/modules/admin/auth";
 import { getSession } from "@/modules/auth/session";
 import {
 	listMarketplaceItems,
@@ -10,7 +11,7 @@ import {
 	createCustomToolMarketplaceDraft,
 	createMcpServerMarketplaceDraft,
 	createMcpToolMarketplaceDraft,
-	getMyPublishedItems,
+	getMyMarketplaceItems,
 	getSharedWithMe,
 } from "@/modules/marketplace/use-cases";
 import { authorization } from "@/server/domain/services/authorization";
@@ -26,9 +27,7 @@ const createSchema = z
 		version: z.string().min(1).max(32).default("1.0.0"),
 		name: z.string().min(1).max(255).optional(),
 		description: z.string().max(2048).optional(),
-		visibility: z
-			.enum(["public", "private", "unlisted", "organization"])
-			.optional(),
+		visibility: z.enum(["public", "private"]).optional(),
 		tags: z.array(z.string()).optional(),
 		changelog: z.string().max(2048).optional(),
 		includeSecrets: z.boolean().optional(),
@@ -58,8 +57,8 @@ export async function GET(req: NextRequest) {
 
 		// Special endpoints
 		const path = searchParams.get("_path");
-		if (path === "my-published" && session) {
-			return NextResponse.json(await getMyPublishedItems(session.user.id));
+		if (path === "my-items" && session) {
+			return NextResponse.json(await getMyMarketplaceItems(session.user.id));
 		}
 		if (path === "shared-with-me" && session) {
 			return NextResponse.json(await getSharedWithMe(session.user.id));
@@ -78,7 +77,9 @@ export async function GET(req: NextRequest) {
 			| "rating"
 			| undefined;
 		const status = searchParams.get("status") || undefined;
-		const includeDrafts = searchParams.get("includeDrafts") === "true";
+		if (status && !(await isPlatformAdminSession(session))) {
+			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		}
 
 		return NextResponse.json(
 			await listMarketplaceItems({
@@ -88,7 +89,6 @@ export async function GET(req: NextRequest) {
 				featuredOnly,
 				sortBy,
 				status,
-				includeDrafts,
 			}),
 		);
 	} catch (error) {

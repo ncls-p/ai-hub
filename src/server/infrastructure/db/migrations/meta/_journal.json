@@ -99,6 +99,13 @@
       "when": 1781272980027,
       "tag": "0013_scheduled_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781272980028,
+      "tag": "0014_simple_marketplace_visibility",
+      "breakpoints": true
     }
   ]
 }

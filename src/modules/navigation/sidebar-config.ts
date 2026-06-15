@@ -165,7 +165,7 @@ export function collectEligibleNavItems(shell: WorkspaceShellState): NavItem[] {
 	const adminItems = adminNavItems.filter((item) => {
 		if (item.href === "/usage") return permissions.canViewUsage;
 		if (item.href === "/audit") return permissions.canViewAudit;
-		if (item.href === "/members") return permissions.canInviteMembers;
+		if (item.href === "/members") return shell.isAdmin;
 		if (item.href === "/admin/settings") return shell.isAdmin;
 		return true;
 	});
@@ -247,50 +247,9 @@ export function buildSidebarMenuGroups(
 	return groups;
 }
 
-function buildLegacyMenuGroups(shell: WorkspaceShellState): NavGroup[] {
-	const { isAdmin, pendingToolCount, permissions } = shell;
-	const canUseToolsHub =
-		permissions.canConfigureTools ||
-		permissions.canViewTools ||
-		permissions.canGetMcpServers;
-	const toolsItem: NavItem = {
-		href: "/tools",
-		labelKey: "toolsHub",
-		icon: NAV_ITEM_TEMPLATES.get("/tools")!.icon,
-		badge: pendingToolCount > 0 ? pendingToolCount : undefined,
-	};
-
-	const adminItems = adminNavItems.filter((item) => {
-		if (item.href === "/usage") return permissions.canViewUsage;
-		if (item.href === "/audit") return permissions.canViewAudit;
-		if (item.href === "/members") return permissions.canInviteMembers;
-		if (item.href === "/admin/settings") return isAdmin;
-		return true;
-	});
-
-	const capabilities = capabilitiesNavItems
-		.map((item) => (item.href === "/tools" ? toolsItem : item))
-		.filter((item) => item.href !== "/tools" || canUseToolsHub);
-	const configuration = configNavItems.filter((item) => {
-		if (item.href === "/providers") return permissions.canViewProviders;
-		if (item.href === "/api-keys") return permissions.canManageApiKeys;
-		return true;
-	});
-
-	const groups: NavGroup[] = [
-		{ labelKey: "primary", items: [...primaryNavItems, ...capabilities] },
-		{
-			labelKey: "advanced",
-			items: [...advancedCapabilityNavItems, ...configuration, ...adminItems],
-		},
-	];
-
-	return groups.filter((group) => group.items.length > 0);
-}
-
 export function buildMenuGroups(shell: WorkspaceShellState): NavGroup[] {
-	if (shell.sidebarNavConfig) {
-		return buildSidebarMenuGroups(shell, shell.sidebarNavConfig);
-	}
-	return buildLegacyMenuGroups(shell);
+	return buildSidebarMenuGroups(
+		shell,
+		shell.sidebarNavConfig ?? defaultSidebarNavConfig(),
+	);
 }

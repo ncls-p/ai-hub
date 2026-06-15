@@ -37,15 +37,7 @@ export async function GET(req: NextRequest) {
 			parsed.data.workspaceId,
 		);
 		if (!permission.granted) {
-			const fallback = await authorization.hasPermission(
-				{ principalType: "user", principalId: session.user.id },
-				"workspace.manage",
-				"workspace",
-				parsed.data.workspaceId,
-			);
-			if (!fallback) {
-				return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-			}
+			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 
 		return NextResponse.json({
@@ -82,15 +74,7 @@ export async function POST(req: NextRequest) {
 			parsed.data.workspaceId,
 		);
 		if (!permission.granted) {
-			const fallback = await authorization.hasPermission(
-				{ principalType: "user", principalId: session.user.id },
-				"workspace.manage",
-				"workspace",
-				parsed.data.workspaceId,
-			);
-			if (!fallback) {
-				return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-			}
+			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 
 		const result = await createWorkspaceApiKey({

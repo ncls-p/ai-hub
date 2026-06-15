@@ -7,6 +7,8 @@ import {
 } from "@/server/infrastructure/db/schema";
 import type { MarketplaceManifest, SourceResourceType } from "./manifest-types";
 
+type MarketplaceVisibility = "public" | "private";
+
 function slugify(value: string) {
 	return value
 		.toLowerCase()
@@ -46,7 +48,7 @@ export async function upsertMarketplaceDraft(input: {
 	changelog?: string;
 	name: string;
 	description?: string | null;
-	visibility?: "public" | "private" | "unlisted" | "organization";
+	visibility?: MarketplaceVisibility;
 	tags?: string[];
 	manifest: MarketplaceManifest;
 	metadata: Record<string, unknown>;
@@ -125,7 +127,9 @@ export async function upsertMarketplaceDraft(input: {
 				pricingModel: "free",
 				tagsJson: input.tags ?? [],
 				publishedAt:
-					input.status === "published" ? (input.publishedAt ?? new Date()) : null,
+					input.status === "published"
+						? (input.publishedAt ?? new Date())
+						: null,
 			})
 			.returning();
 

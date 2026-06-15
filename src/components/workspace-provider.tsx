@@ -7,11 +7,7 @@ import {
 	type WorkspaceContextValue,
 	type WorkspaceSummary,
 } from "@/hooks/use-workspace";
-import {
-	fetchWorkspaces,
-	getStoredWorkspaceId,
-	setStoredWorkspaceId,
-} from "@/lib/api-client";
+import { fetchWorkspaces } from "@/lib/api-client";
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 	const [workspaceId, setWorkspaceIdState] = useState<string | null>(null);
@@ -20,7 +16,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 	const [error, setError] = useState<string | null>(null);
 
 	const setWorkspaceId = useCallback((nextWorkspaceId: string) => {
-		setStoredWorkspaceId(nextWorkspaceId);
 		setWorkspaceIdState(nextWorkspaceId);
 	}, []);
 
@@ -30,13 +25,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 		try {
 			const rows = await fetchWorkspaces();
 			setWorkspaces(rows);
-			const stored = getStoredWorkspaceId();
-			const active =
-				(stored && rows.some((row) => row.id === stored) ? stored : null) ??
-				rows[0]?.id ??
-				null;
+			const active = rows[0]?.id ?? null;
 			if (active) {
-				setStoredWorkspaceId(active);
 				setWorkspaceIdState(active);
 			} else {
 				setWorkspaceIdState(null);

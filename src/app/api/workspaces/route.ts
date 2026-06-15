@@ -1,33 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 import { getSession } from "@/modules/auth/session";
 import {
-	createWorkspace,
+	ensurePrimaryWorkspaceForUser,
 	getWorkspacesByUserId,
 } from "@/modules/workspace/use-cases";
-import { logger } from "@/lib/logger";
-
-const slugSchema = z
-	.string()
-	.min(1)
-	.max(128)
-	.regex(/^[a-z0-9-]+$/);
-
-const createWorkspaceSchema = z.object({
-	organizationName: z.string().min(1).max(255),
-	organizationSlug: slugSchema,
-	workspaceName: z.string().min(1).max(255),
-	workspaceSlug: slugSchema,
-});
-
-function isUniqueConstraintError(error: unknown) {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		"code" in error &&
-		error.code === "23505"
-	);
-}
 
 export async function GET() {
 	try {
@@ -47,37 +24,21 @@ export async function GET() {
 	}
 }
 
-export async function POST(req: NextRequest) {
+export async function POST() {
 	try {
 		const session = await getSession();
 		if (!session) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		const body = await req.json();
-		const parsed = createWorkspaceSchema.safeParse(body);
-		if (!parsed.success) {
-			return NextResponse.json(
-				{ error: "Invalid input", details: parsed.error.issues },
-				{ status: 400 },
-			);
-		}
-
-		const workspace = await createWorkspace({
+		const workspace = await ensurePrimaryWorkspaceForUser({
 			userId: session.user.id,
-			...parsed.data,
+			role: session.user.role,
 		});
 
-		return NextResponse.json(workspace, { status: 201 });
+		return NextResponse.json(workspace);
 	} catch (error) {
-		if (isUniqueConstraintError(error)) {
-			return NextResponse.json(
-				{ error: "Organization or workspace slug already exists" },
-				{ status: 409 },
-			);
-		}
-
-		logger.error("Failed to create workspace", {}, error as Error);
+		logger.error("Failed to resolve primary workspace", {}, error as Error);
 		return NextResponse.json(
 			{ error: "Internal server error" },
 			{ status: 500 },

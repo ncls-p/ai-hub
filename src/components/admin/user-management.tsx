@@ -13,7 +13,6 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Field,
 	FieldContent,
@@ -29,7 +28,6 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { useWorkspace } from "@/hooks/use-workspace";
 import { cn } from "@/lib/utils";
 
 type ManagedUser = {
@@ -47,7 +45,6 @@ const emptyForm = {
 	email: "",
 	password: "",
 	role: "user" as "user" | "admin",
-	addToWorkspace: true,
 };
 
 function initialsFromName(name: string) {
@@ -112,7 +109,6 @@ export function UserManagement({
 	currentUserId: string;
 }) {
 	const t = useTranslations("admin.platform");
-	const { workspaceId } = useWorkspace();
 	const [users, setUsers] = useState(initialUsers);
 	const [form, setForm] = useState(emptyForm);
 	const [creating, setCreating] = useState(false);
@@ -140,10 +136,7 @@ export function UserManagement({
 			const res = await fetch("/api/admin/users", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					...form,
-					workspaceId: form.addToWorkspace ? workspaceId : undefined,
-				}),
+				body: JSON.stringify(form),
 			});
 			if (!res.ok) {
 				throw new Error(
@@ -298,26 +291,6 @@ export function UserManagement({
 											</SelectContent>
 										</Select>
 									</FieldContent>
-								</Field>
-								<Field>
-									<div className="flex items-center gap-2">
-										<Checkbox
-											id="new-user-workspace"
-											checked={form.addToWorkspace}
-											onCheckedChange={(checked) =>
-												setForm({
-													...form,
-													addToWorkspace: checked === true,
-												})
-											}
-										/>
-										<label
-											htmlFor="new-user-workspace"
-											className="text-sm leading-none"
-										>
-											{t("addToTeam")}
-										</label>
-									</div>
 								</Field>
 								<Button type="submit" disabled={creating} className="w-full">
 									{creating ? (

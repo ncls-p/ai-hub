@@ -36,14 +36,6 @@ const SYSTEM_ROLE_PERMISSIONS = new Map(
 	SYSTEM_ROLES.map((role) => [role.name, role.permissions]),
 );
 
-const DOMAIN_ALIASES: Record<string, string> = {
-	auditLogs: "audit",
-	marketplaceItems: "marketplace",
-	workspace: "workspaces",
-};
-
-const WORKSPACE_ADMIN_GRANTS = new Set(["owner", "admin"]);
-
 const VIEW_ACTIONS = new Set([
 	"get",
 	"list",
@@ -57,10 +49,7 @@ const VIEW_ACTIONS = new Set([
 
 function parsePermission(perm: string): { domain: string; action: string } {
 	const [domain, action = "*"] = perm.split(".");
-	return {
-		domain: DOMAIN_ALIASES[domain] ?? domain,
-		action,
-	};
+	return { domain, action };
 }
 
 export function matchesPermission(
@@ -71,13 +60,6 @@ export function matchesPermission(
 		parsePermission(grantedPermission);
 	const { domain: requiredDomain, action: requiredAction } =
 		parsePermission(requiredPermission);
-
-	if (
-		grantedDomain === "workspaces" &&
-		(grantedAction === "*" || WORKSPACE_ADMIN_GRANTS.has(grantedAction))
-	) {
-		return true;
-	}
 
 	if (grantedDomain !== requiredDomain) return false;
 	if (grantedAction === "*" || grantedAction === "manage") return true;
@@ -158,16 +140,6 @@ async function resolvePermissions(
 	const permissions: Permission[] = [];
 	for (const binding of bindings) {
 		addRolePermissions(permissions, binding.roles);
-	}
-
-	if (
-		permissions.length === 0 &&
-		resourceType === "workspace" &&
-		ctx.principalType === "user"
-	) {
-		permissions.push(
-			...(SYSTEM_ROLE_PERMISSIONS.get("workspace.member") ?? []),
-		);
 	}
 
 	const resolvedPermissions = uniquePermissions(permissions);

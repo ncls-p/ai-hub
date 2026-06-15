@@ -1045,7 +1045,7 @@ export const marketplaceItemStatusEnum = pgEnum("marketplace_item_status", [
 
 export const marketplaceItemVisibilityEnum = pgEnum(
 	"marketplace_item_visibility",
-	["public", "private", "unlisted", "organization"],
+	["public", "private"],
 );
 
 export const marketplacePricingModelEnum = pgEnum("marketplace_pricing_model", [

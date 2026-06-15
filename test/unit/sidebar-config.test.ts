@@ -84,7 +84,6 @@ describe("buildSidebarMenuGroups", () => {
 					...DEFAULT_WORKSPACE_PERMISSIONS,
 					canViewUsage: true,
 					canViewAudit: true,
-					canInviteMembers: true,
 					canViewProviders: true,
 					canManageApiKeys: true,
 				},
@@ -117,7 +116,6 @@ describe("buildSidebarMenuGroups", () => {
 					...DEFAULT_WORKSPACE_PERMISSIONS,
 					canViewUsage: true,
 					canViewAudit: true,
-					canInviteMembers: true,
 					canViewProviders: true,
 					canManageApiKeys: true,
 				},
@@ -139,7 +137,7 @@ describe("buildSidebarMenuGroups", () => {
 });
 
 describe("getDefaultSectionForNavId", () => {
-	it("maps legacy defaults", () => {
+	it("maps default sections", () => {
 		expect(getDefaultSectionForNavId("/chat")).toBe("primary");
 		expect(getDefaultSectionForNavId("/marketplace")).toBe("advanced");
 	});

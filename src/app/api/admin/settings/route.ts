@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { logger } from "@/lib/logger";
+import { requireAdminApiSession } from "@/modules/admin/auth";
 import {
-	ensureBootstrapAdmin,
 	getRegistrationSetting,
-	isAdminRole,
 	setRegistrationEnabled,
 } from "@/modules/admin/use-cases";
-import { getSession } from "@/modules/auth/session";
 
 const updateSettingsSchema = z.object({
 	registrationEnabled: z.boolean(),
@@ -28,16 +26,8 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
 	try {
-		const session = await getSession();
-		if (!session) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
-		const bootstrappedAdminId = await ensureBootstrapAdmin();
-		const isAdmin =
-			isAdminRole(session.user.role) || bootstrappedAdminId === session.user.id;
-		if (!isAdmin) {
-			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-		}
+		const auth = await requireAdminApiSession();
+		if (!auth.ok) return auth.response;
 
 		const parsed = updateSettingsSchema.safeParse(await req.json());
 		if (!parsed.success) {
@@ -49,7 +39,7 @@ export async function PATCH(req: NextRequest) {
 
 		const setting = await setRegistrationEnabled(
 			parsed.data.registrationEnabled,
-			session.user.id,
+			auth.session.user.id,
 		);
 		return NextResponse.json(setting);
 	} catch (error) {

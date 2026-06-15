@@ -8,7 +8,6 @@ import {
 	organizations,
 	roleBindings,
 	roles,
-	users,
 	workspaceMembers,
 	workspaces,
 } from "@/server/infrastructure/db/schema";
@@ -20,6 +19,16 @@ export interface CreateWorkspaceInput {
 	workspaceName: string;
 	workspaceSlug: string;
 }
+
+type WorkspaceRoleName =
+	| "workspace.member"
+	| "workspace.owner"
+	| "workspace.admin";
+
+const PRIMARY_ORGANIZATION_NAME = "Deodis";
+const PRIMARY_ORGANIZATION_SLUG = "deodis";
+const PRIMARY_WORKSPACE_NAME = "AI Hub";
+const PRIMARY_WORKSPACE_SLUG = "main";
 
 async function seedSystemRoles(
 	tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
@@ -181,6 +190,114 @@ export async function countWorkspaces() {
 	return value;
 }
 
+async function getPrimaryWorkspace() {
+	const [workspace] = await db
+		.select()
+		.from(workspaces)
+		.where(
+			and(
+				eq(workspaces.slug, PRIMARY_WORKSPACE_SLUG),
+				isNull(workspaces.archivedAt),
+			),
+		)
+		.limit(1);
+
+	return workspace ?? null;
+}
+
+function workspaceRoleForPlatformRole(role?: string | null): WorkspaceRoleName {
+	return role === "admin" ? "workspace.admin" : "workspace.member";
+}
+
+async function getActiveWorkspaceMember(workspaceId: string, userId: string) {
+	const [member] = await db
+		.select()
+		.from(workspaceMembers)
+		.where(
+			and(
+				eq(workspaceMembers.workspaceId, workspaceId),
+				eq(workspaceMembers.userId, userId),
+				eq(workspaceMembers.status, "active"),
+			),
+		)
+		.limit(1);
+
+	return member ?? null;
+}
+
+async function getWorkspaceRoleName(workspaceId: string, userId: string) {
+	const [binding] = await db
+		.select({ roleName: roles.name })
+		.from(roleBindings)
+		.innerJoin(roles, eq(roleBindings.roleId, roles.id))
+		.where(
+			and(
+				eq(roleBindings.principalType, "user"),
+				eq(roleBindings.principalId, userId),
+				eq(roleBindings.resourceType, "workspace"),
+				eq(roleBindings.resourceId, workspaceId),
+			),
+		)
+		.limit(1);
+
+	return binding?.roleName ?? null;
+}
+
+export async function ensurePrimaryWorkspaceForUser(input: {
+	userId: string;
+	role?: string | null;
+	invitedBy?: string;
+}) {
+	let workspace = await getPrimaryWorkspace();
+	if (!workspace) {
+		try {
+			return await createWorkspace({
+				userId: input.userId,
+				organizationName: PRIMARY_ORGANIZATION_NAME,
+				organizationSlug: PRIMARY_ORGANIZATION_SLUG,
+				workspaceName: PRIMARY_WORKSPACE_NAME,
+				workspaceSlug: PRIMARY_WORKSPACE_SLUG,
+			});
+		} catch (error) {
+			workspace = await getPrimaryWorkspace();
+			if (!workspace) throw error;
+		}
+	}
+
+	const desiredRole = workspaceRoleForPlatformRole(input.role);
+	const existingMember = await getActiveWorkspaceMember(
+		workspace.id,
+		input.userId,
+	);
+
+	if (!existingMember) {
+		await addWorkspaceMember({
+			workspaceId: workspace.id,
+			userId: input.userId,
+			roleName: desiredRole,
+			invitedBy: input.invitedBy ?? input.userId,
+		});
+		return workspace;
+	}
+
+	const currentRole = await getWorkspaceRoleName(workspace.id, input.userId);
+	const roleIsCurrent =
+		desiredRole === "workspace.admin"
+			? currentRole === "workspace.owner" || currentRole === "workspace.admin"
+			: currentRole === desiredRole;
+
+	if (!roleIsCurrent) {
+		await updateWorkspaceMemberRole({
+			workspaceId: workspace.id,
+			userId: input.userId,
+			roleName: desiredRole,
+			updatedBy: input.invitedBy ?? input.userId,
+		});
+	}
+
+	return workspace;
+}
+
 async function getSystemWorkspaceRole(roleName: string) {
 	const [role] = await db
 		.select()
@@ -195,64 +312,6 @@ async function getSystemWorkspaceRole(roleName: string) {
 		.limit(1);
 
 	return role ?? null;
-}
-
-export async function findUserByEmail(email: string) {
-	const [user] = await db
-		.select({
-			id: users.id,
-			name: users.name,
-			email: users.email,
-		})
-		.from(users)
-		.where(eq(users.email, email.toLowerCase().trim()))
-		.limit(1);
-
-	return user ?? null;
-}
-
-export async function listWorkspaceMembers(workspaceId: string) {
-	const members = await db
-		.select({
-			id: workspaceMembers.id,
-			userId: workspaceMembers.userId,
-			status: workspaceMembers.status,
-			createdAt: workspaceMembers.createdAt,
-			name: users.name,
-			email: users.email,
-		})
-		.from(workspaceMembers)
-		.innerJoin(users, eq(workspaceMembers.userId, users.id))
-		.where(
-			and(
-				eq(workspaceMembers.workspaceId, workspaceId),
-				eq(workspaceMembers.status, "active"),
-			),
-		);
-
-	const bindings = await db
-		.select({
-			principalId: roleBindings.principalId,
-			roleName: roles.name,
-		})
-		.from(roleBindings)
-		.innerJoin(roles, eq(roleBindings.roleId, roles.id))
-		.where(
-			and(
-				eq(roleBindings.resourceType, "workspace"),
-				eq(roleBindings.resourceId, workspaceId),
-				eq(roleBindings.principalType, "user"),
-			),
-		);
-
-	const roleByUserId = new Map(
-		bindings.map((binding) => [binding.principalId, binding.roleName]),
-	);
-
-	return members.map((member) => ({
-		...member,
-		roleName: roleByUserId.get(member.userId) ?? "workspace.member",
-	}));
 }
 
 export async function addWorkspaceMember(input: {
@@ -359,69 +418,10 @@ export async function addWorkspaceMember(input: {
 	logger.info("Workspace member added", { workspaceId, userId, invitedBy });
 }
 
-export async function removeWorkspaceMember(input: {
-	workspaceId: string;
-	userId: string;
-	removedBy: string;
-}) {
-	const { workspaceId, userId, removedBy } = input;
-
-	const [workspace] = await db
-		.select()
-		.from(workspaces)
-		.where(eq(workspaces.id, workspaceId))
-		.limit(1);
-
-	if (!workspace) {
-		throw new Error("Workspace not found");
-	}
-
-	const [member] = await db
-		.select()
-		.from(workspaceMembers)
-		.where(
-			and(
-				eq(workspaceMembers.workspaceId, workspaceId),
-				eq(workspaceMembers.userId, userId),
-				eq(workspaceMembers.status, "active"),
-			),
-		)
-		.limit(1);
-
-	if (!member) {
-		throw new Error("Member not found");
-	}
-
-	await db
-		.update(workspaceMembers)
-		.set({ status: "removed", updatedAt: new Date() })
-		.where(eq(workspaceMembers.id, member.id));
-
-	await authorization.invalidatePermissionCache(
-		userId,
-		"workspace",
-		workspaceId,
-	);
-
-	await audit.emit({
-		organizationId: workspace.organizationId,
-		workspaceId,
-		actorPrincipalType: "user",
-		actorPrincipalId: removedBy,
-		action: "workspace.member.removed",
-		resourceType: "workspace",
-		resourceId: workspaceId,
-		outcome: "success",
-		metadata: { userId },
-	});
-
-	logger.info("Workspace member removed", { workspaceId, userId, removedBy });
-}
-
 export async function updateWorkspaceMemberRole(input: {
 	workspaceId: string;
 	userId: string;
-	roleName: "workspace.member" | "workspace.owner" | "workspace.admin";
+	roleName: WorkspaceRoleName;
 	updatedBy: string;
 }) {
 	const { workspaceId, userId, roleName, updatedBy } = input;

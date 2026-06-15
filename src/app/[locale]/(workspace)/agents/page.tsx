@@ -869,7 +869,7 @@ export default function AgentsPage() {
 				resource={shareResource}
 				workspaceId={workspaceId}
 				open={shareResource !== null}
-				onClose={() => setShareResource(null)}
+				onCloseAction={() => setShareResource(null)}
 			/>
 		</WorkspacePage>
 	);

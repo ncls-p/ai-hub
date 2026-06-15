@@ -153,14 +153,14 @@ export function ResourceShareDialog({
 	resource,
 	workspaceId,
 	open,
-	onClose,
-	onSuccess,
+	onCloseAction,
+	onSuccessAction,
 }: {
 	resource: ShareableResource | null;
 	workspaceId: string | null;
 	open: boolean;
-	onClose: () => void;
-	onSuccess?: () => void;
+	onCloseAction: () => void;
+	onSuccessAction?: () => void;
 }) {
 	const t = useTranslations("marketplace.share");
 	const tVisibility = useTranslations("marketplace");
@@ -173,9 +173,7 @@ export function ResourceShareDialog({
 	const [version, setVersion] = useState("1.0.0");
 	const [changelog, setChangelog] = useState("");
 	const [tagsInput, setTagsInput] = useState("");
-	const [visibility, setVisibility] = useState<
-		"public" | "private" | "unlisted" | "organization"
-	>("public");
+	const [visibility, setVisibility] = useState<"public" | "private">("public");
 	const [includeSecrets, setIncludeSecrets] = useState(false);
 	const [users, setUsers] = useState<PlatformUser[]>([]);
 	const [search, setSearch] = useState("");
@@ -395,9 +393,9 @@ export function ResourceShareDialog({
 	}, [users.length, t]);
 
 	const finish = useCallback(() => {
-		onSuccess?.();
-		onClose();
-	}, [onClose, onSuccess]);
+		onSuccessAction?.();
+		onCloseAction();
+	}, [onCloseAction, onSuccessAction]);
 
 	const handlePublishToMarketplace = useCallback(async () => {
 		if (!resource) return;
@@ -446,7 +444,7 @@ export function ResourceShareDialog({
 		resource.kind === "marketplace_item" ? "marketplace_item" : resource.kind;
 
 	return (
-		<Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+		<Dialog open={open} onOpenChange={(next) => !next && onCloseAction()}>
 			<DialogContent className="sm:max-w-lg">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
@@ -492,53 +490,34 @@ export function ResourceShareDialog({
 								rows={3}
 							/>
 						</div>
-						<div className="grid gap-3 sm:grid-cols-2">
-							<div className="space-y-1.5">
-								<Label htmlFor="share-version">{t("fields.version")}</Label>
-								<Input
-									id="share-version"
-									value={version}
-									onChange={(e) => setVersion(e.target.value)}
-								/>
+						<div className="space-y-1.5">
+							<Label>{t("fields.visibility")}</Label>
+							<Select
+								value={visibility}
+								onValueChange={(v) => setVisibility(v as "public" | "private")}
+							>
+								<SelectTrigger>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{(["public", "private"] as const).map((v) => (
+										<SelectItem key={v} value={v}>
+											{getVisibilityLabel(v, (key) =>
+												tVisibility(key as "visibility.public"),
+											)}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							{getVisibilityHint(visibility, (key) =>
+								tVisibility(key as "visibility.publicHint"),
+							) ? (
 								<p className="text-xs text-muted-foreground">
-									{t("fields.versionHint")}
+									{getVisibilityHint(visibility, (key) =>
+										tVisibility(key as "visibility.publicHint"),
+									)}
 								</p>
-							</div>
-							<div className="space-y-1.5">
-								<Label>{t("fields.visibility")}</Label>
-								<Select
-									value={visibility}
-									onValueChange={(v) =>
-										setVisibility(
-											v as "public" | "private" | "unlisted" | "organization",
-										)
-									}
-								>
-									<SelectTrigger>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{(
-											["public", "unlisted", "private", "organization"] as const
-										).map((v) => (
-											<SelectItem key={v} value={v}>
-												{getVisibilityLabel(v, (key) =>
-													tVisibility(key as "visibility.public"),
-												)}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								{getVisibilityHint(visibility, (key) =>
-									tVisibility(key as "visibility.publicHint"),
-								) ? (
-									<p className="text-xs text-muted-foreground">
-										{getVisibilityHint(visibility, (key) =>
-											tVisibility(key as "visibility.publicHint"),
-										)}
-									</p>
-								) : null}
-							</div>
+							) : null}
 						</div>
 						<div className="space-y-1.5">
 							<Label htmlFor="share-tags">{t("fields.tags")}</Label>
@@ -546,18 +525,6 @@ export function ResourceShareDialog({
 								id="share-tags"
 								value={tagsInput}
 								onChange={(e) => setTagsInput(e.target.value)}
-							/>
-						</div>
-						<div className="space-y-1.5">
-							<Label htmlFor="share-changelog">
-								{t("fields.releaseNotes")}
-							</Label>
-							<Textarea
-								id="share-changelog"
-								value={changelog}
-								onChange={(e) => setChangelog(e.target.value)}
-								rows={2}
-								placeholder={t("fields.releaseNotesPlaceholder")}
 							/>
 						</div>
 						{preview?.canIncludeSecrets ? (
@@ -674,7 +641,7 @@ export function ResourceShareDialog({
 						</>
 					) : null}
 					{step === "choose" ? (
-						<Button variant="outline" onClick={onClose} disabled={busy}>
+						<Button variant="outline" onClick={onCloseAction} disabled={busy}>
 							{tCommon("cancel")}
 						</Button>
 					) : null}

@@ -1,17 +1,5 @@
 import type { WorkspacePermissions } from "@/lib/workspace-nav";
 
-const ACTIVE_WORKSPACE_KEY = "active_workspace_id";
-
-export function getStoredWorkspaceId(): string | null {
-	if (typeof window === "undefined") return null;
-	return window.sessionStorage.getItem(ACTIVE_WORKSPACE_KEY);
-}
-
-export function setStoredWorkspaceId(workspaceId: string) {
-	if (typeof window === "undefined") return;
-	window.sessionStorage.setItem(ACTIVE_WORKSPACE_KEY, workspaceId);
-}
-
 type WorkspaceRow = {
 	workspace?: {
 		id?: string;
@@ -53,20 +41,10 @@ export async function fetchWorkspaces(): Promise<WorkspaceSummary[]> {
 
 export async function fetchDefaultWorkspaceId(): Promise<string | null> {
 	const rows = await fetchWorkspaces();
-	if (rows.length === 0) return null;
-
-	const stored = getStoredWorkspaceId();
-	const workspaceId =
-		(stored && rows.some((row) => row.id === stored) ? stored : null) ??
-		rows[0]?.id ??
-		null;
-	if (workspaceId) setStoredWorkspaceId(workspaceId);
-	return workspaceId;
+	return rows[0]?.id ?? null;
 }
 
 export async function resolveWorkspaceId(): Promise<string | null> {
-	const stored = getStoredWorkspaceId();
-	if (stored) return stored;
 	return await fetchDefaultWorkspaceId();
 }
 

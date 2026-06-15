@@ -36,10 +36,11 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkspaceShell } from "@/components/app-shell";
+import { formatMarketplaceDate } from "@/components/marketplace/marketplace-i18n-helpers";
 import {
-	formatMarketplaceDate,
-} from "@/components/marketplace/marketplace-i18n-helpers";
-import { ItemIcon, getItemLabel } from "@/components/marketplace/marketplace-shared";
+	ItemIcon,
+	getItemLabel,
+} from "@/components/marketplace/marketplace-shared";
 import {
 	ResourceShareDialog,
 	type ShareableResource,
@@ -144,7 +145,9 @@ function MarketplaceItemCard({
 	return (
 		<Card
 			className={
-				item.isFeatured ? "ring-1 ring-yellow-500/30 bg-yellow-500/[0.03]" : undefined
+				item.isFeatured
+					? "ring-1 ring-yellow-500/30 bg-yellow-500/[0.03]"
+					: undefined
 			}
 		>
 			<CardHeader className="pb-2">
@@ -157,7 +160,9 @@ function MarketplaceItemCard({
 					</div>
 					<div className="min-w-0 flex-1 space-y-1">
 						<div className="flex flex-wrap items-center gap-1.5">
-							<CardTitle className="text-base leading-snug">{item.name}</CardTitle>
+							<CardTitle className="text-base leading-snug">
+								{item.name}
+							</CardTitle>
 							{item.isFeatured ? (
 								<Badge
 									variant="default"
@@ -270,7 +275,7 @@ export default function MarketplacePage() {
 	const { currentUserId, isAdmin = false } = useWorkspaceShell();
 	const [loading, setLoading] = useState(true);
 	const [publishedItems, setPublishedItems] = useState<MarketplaceItem[]>([]);
-	const [draftItems, setDraftItems] = useState<MarketplaceItem[]>([]);
+	const [ownedItems, setOwnedItems] = useState<MarketplaceItem[]>([]);
 	const [sharedItems, setSharedItems] = useState<MarketplaceItem[]>([]);
 
 	const [search, setSearch] = useState("");
@@ -295,28 +300,26 @@ export default function MarketplacePage() {
 
 	const fetchMarketplaceData = useCallback(async (): Promise<{
 		published: MarketplaceItem[];
-		drafts: MarketplaceItem[];
+		owned: MarketplaceItem[];
 		shared: MarketplaceItem[];
 	}> => {
-		const [publishedRes, draftsRes, sharedRes] = await Promise.all([
+		const [publishedRes, mineRes, sharedRes] = await Promise.all([
 			fetch("/api/marketplace/items"),
-			fetch("/api/marketplace/items?includeDrafts=true"),
+			fetch("/api/marketplace/items?_path=my-items"),
 			fetch("/api/marketplace/items?_path=shared-with-me"),
 		]);
 
-		if (!publishedRes.ok) throw new Error(t("toast.loadFailed"));
+		if (!publishedRes.ok || !mineRes.ok || !sharedRes.ok) {
+			throw new Error(t("toast.loadFailed"));
+		}
 
 		const published = (await publishedRes.json()) as MarketplaceItem[];
-		const allDrafts = (await draftsRes.json()) as MarketplaceItem[];
+		const mine = (await mineRes.json()) as MarketplaceItem[];
 		const sharedData = await sharedRes.json();
 		const shared = Array.isArray(sharedData)
 			? sharedData.map((s: { item: MarketplaceItem }) => s.item)
 			: [];
-		return {
-			published,
-			drafts: allDrafts.filter((item) => item.status === "draft"),
-			shared,
-		};
+		return { published, owned: mine, shared };
 	}, [t]);
 
 	useEffect(() => {
@@ -325,7 +328,7 @@ export default function MarketplacePage() {
 			.then((data) => {
 				if (!cancelled) {
 					setPublishedItems(data.published);
-					setDraftItems(data.drafts);
+					setOwnedItems(data.owned);
 					setSharedItems(data.shared);
 				}
 			})
@@ -349,9 +352,8 @@ export default function MarketplacePage() {
 	);
 
 	const myItems = useMemo(
-		() =>
-			draftItems.filter((item) => item.publisherUserId === currentUserId),
-		[draftItems, currentUserId],
+		() => ownedItems.filter((item) => item.publisherUserId === currentUserId),
+		[ownedItems, currentUserId],
 	);
 
 	const filteredPublished = useMemo(
@@ -394,7 +396,8 @@ export default function MarketplacePage() {
 				}
 			} else {
 				toast.error(
-					(await res.json().catch(() => ({}))).error || t("toast.installFailed"),
+					(await res.json().catch(() => ({}))).error ||
+						t("toast.installFailed"),
 				);
 			}
 		},
@@ -405,7 +408,7 @@ export default function MarketplacePage() {
 		fetchMarketplaceData()
 			.then((data) => {
 				setPublishedItems(data.published);
-				setDraftItems(data.drafts);
+				setOwnedItems(data.owned);
 				setSharedItems(data.shared);
 			})
 			.catch((error) => {
@@ -624,8 +627,8 @@ export default function MarketplacePage() {
 				resource={shareResource}
 				workspaceId={workspaceId}
 				open={shareResource !== null}
-				onClose={() => setShareResource(null)}
-				onSuccess={reload}
+				onCloseAction={() => setShareResource(null)}
+				onSuccessAction={reload}
 			/>
 		</WorkspacePage>
 	);

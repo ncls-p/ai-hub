@@ -26,13 +26,7 @@ import {
 	buildMcpPresetManifest,
 	buildSkillManifest,
 } from "./manifest-builders";
-import type {
-	AgentMarketplaceManifest,
-	MarketplaceManifest,
-	McpPresetMarketplaceManifest,
-	SkillMarketplaceManifest,
-	ToolMarketplaceManifest,
-} from "./manifest-types";
+import type { MarketplaceManifest } from "./manifest-types";
 
 export type {
 	AgentMarketplaceManifest,
@@ -45,6 +39,8 @@ export type {
 export { getPublishPreview } from "./publish-preview";
 export type { PublishPreviewResult } from "./publish-preview";
 
+type MarketplaceVisibility = "public" | "private";
+
 // ─── List / Search ─────────────────────────────────────────────────────
 
 export function listMarketplaceItems(input: {
@@ -55,16 +51,14 @@ export function listMarketplaceItems(input: {
 	featuredOnly?: boolean;
 	sortBy?: "featured" | "newest" | "downloads" | "rating";
 	status?: string;
-	includeDrafts?: boolean;
 }) {
 	const conditions: unknown[] = [];
 
 	if (input.status) {
 		conditions.push(eq(marketplaceItems.status, input.status as never));
-	} else if (!input.includeDrafts) {
+	} else {
 		conditions.push(eq(marketplaceItems.status, "published"));
 		if (input.userId) {
-			// Also include items shared with this user
 			const sharedSubquery = db
 				.select({ itemId: marketplaceItemShares.itemId })
 				.from(marketplaceItemShares)
@@ -281,7 +275,7 @@ export async function publishAgentDraft(
 		version: string;
 		name?: string;
 		description?: string;
-		visibility?: "public" | "private" | "unlisted" | "organization";
+		visibility?: MarketplaceVisibility;
 	} & DraftInputExtras,
 ) {
 	const [agent] = await db
@@ -332,7 +326,7 @@ export async function createMarketplaceDraft(
 		version: string;
 		name?: string;
 		description?: string;
-		visibility?: "public" | "private" | "unlisted" | "organization";
+		visibility?: MarketplaceVisibility;
 	} & DraftInputExtras,
 ) {
 	const [agent] = await db
@@ -381,7 +375,7 @@ export async function createSkillMarketplaceDraft(
 		version: string;
 		name?: string;
 		description?: string;
-		visibility?: "public" | "private" | "unlisted" | "organization";
+		visibility?: MarketplaceVisibility;
 	} & DraftInputExtras,
 ) {
 	const [skill] = await db
@@ -428,7 +422,7 @@ export async function createCustomToolMarketplaceDraft(
 		version: string;
 		name?: string;
 		description?: string;
-		visibility?: "public" | "private" | "unlisted" | "organization";
+		visibility?: MarketplaceVisibility;
 	} & DraftInputExtras,
 ) {
 	const [tool] = await db
@@ -476,7 +470,7 @@ export async function createMcpServerMarketplaceDraft(
 		version: string;
 		name?: string;
 		description?: string;
-		visibility?: "public" | "private" | "unlisted" | "organization";
+		visibility?: MarketplaceVisibility;
 	} & DraftInputExtras,
 ) {
 	const [server] = await db
@@ -531,7 +525,7 @@ export async function createMcpToolMarketplaceDraft(
 		version: string;
 		name?: string;
 		description?: string;
-		visibility?: "public" | "private" | "unlisted" | "organization";
+		visibility?: MarketplaceVisibility;
 	} & DraftInputExtras,
 ) {
 	const [tool] = await db
@@ -590,7 +584,7 @@ export async function publishMarketplaceItem(
 	itemId: string,
 	userId: string,
 	input: {
-		visibility?: "public" | "private" | "unlisted" | "organization";
+		visibility?: MarketplaceVisibility;
 		tags?: string[];
 	},
 ) {
@@ -730,17 +724,12 @@ export async function getSharedWithMe(userId: string) {
 	return shares;
 }
 
-export async function getMyPublishedItems(userId: string) {
+export async function getMyMarketplaceItems(userId: string) {
 	return db
 		.select()
 		.from(marketplaceItems)
-		.where(
-			and(
-				eq(marketplaceItems.publisherUserId, userId),
-				eq(marketplaceItems.status, "published"),
-			),
-		)
-		.orderBy(desc(marketplaceItems.publishedAt));
+		.where(eq(marketplaceItems.publisherUserId, userId))
+		.orderBy(desc(marketplaceItems.updatedAt));
 }
 
 // ─── Feature / Unfeature (Admin) ───────────────────────────────────────

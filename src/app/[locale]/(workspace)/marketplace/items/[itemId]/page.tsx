@@ -281,8 +281,8 @@ export default function MarketplaceItemPage({
 				resource={shareResource}
 				workspaceId={workspaceId}
 				open={shareResource !== null}
-				onClose={() => setShareResource(null)}
-				onSuccess={() => void loadItem(item.id).then(setItem)}
+				onCloseAction={() => setShareResource(null)}
+				onSuccessAction={() => void loadItem(item.id).then(setItem)}
 			/>
 		</WorkspacePage>
 	);

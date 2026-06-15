@@ -97,11 +97,9 @@ import {
 	addWorkspaceMember,
 	countWorkspaces,
 	createWorkspace,
-	findUserByEmail,
 	getWorkspaceBySlug,
 	getWorkspacesByUserId,
-	listWorkspaceMembers,
-	removeWorkspaceMember,
+	ensurePrimaryWorkspaceForUser,
 	updateWorkspaceMemberRole,
 } from "@/modules/workspace/use-cases";
 
@@ -210,69 +208,56 @@ describe("getWorkspacesByUserId", () => {
 	});
 });
 
-describe("findUserByEmail", () => {
-	it("returns null when user not found", async () => {
-		const result = await findUserByEmail("missing@example.com");
-		expect(result).toBeNull();
-	});
+describe("ensurePrimaryWorkspaceForUser", () => {
+	it("joins the hidden primary workspace with the role derived from platform role", async () => {
+		const primaryWorkspace = { ...fakeWorkspace, slug: "main", name: "AI Hub" };
+		const adminRole = {
+			...fakeRole,
+			id: "role-admin",
+			name: "workspace.admin",
+		};
 
-	it("returns user when found (normalizes email)", async () => {
-		const user = { id: "user-1", name: "Alice", email: "alice@example.com" };
-		dbModule._chain.limit.mockResolvedValueOnce([user]);
+		dbModule._chain.limit
+			.mockResolvedValueOnce([primaryWorkspace]) // getPrimaryWorkspace
+			.mockResolvedValueOnce([]) // getActiveWorkspaceMember
+			.mockResolvedValueOnce([primaryWorkspace]) // addWorkspaceMember workspace lookup
+			.mockResolvedValueOnce([]) // existing member lookup
+			.mockResolvedValueOnce([adminRole]); // getSystemWorkspaceRole
+		dbModule._tx.limit.mockResolvedValueOnce([]); // existing role binding lookup
 
-		const result = await findUserByEmail("ALICE@EXAMPLE.COM");
-		expect(result).toEqual(user);
-	});
-});
-
-describe("listWorkspaceMembers", () => {
-	it("returns empty list when no members", async () => {
-		// Q1: .innerJoin(users).where() terminal
-		// Q2: .innerJoin(roles).where() terminal
-		dbModule._chain.where
-			.mockResolvedValueOnce([]) // Q1: members
-			.mockResolvedValueOnce([]); // Q2: bindings
-
-		const result = await listWorkspaceMembers("ws-1");
-		expect(result).toHaveLength(0);
-	});
-
-	it("returns members with role names from bindings", async () => {
-		const memberRow = {
-			id: "m1",
+		const result = await ensurePrimaryWorkspaceForUser({
 			userId: "user-2",
-			status: "active",
-			createdAt: new Date(),
-			name: "Bob",
-			email: "bob@example.com",
-		};
-		const bindingRow = { principalId: "user-2", roleName: "workspace.owner" };
+			role: "admin",
+			invitedBy: "admin-1",
+		});
 
-		dbModule._chain.where
-			.mockResolvedValueOnce([memberRow]) // Q1: members
-			.mockResolvedValueOnce([bindingRow]); // Q2: bindings
-
-		const result = await listWorkspaceMembers("ws-1");
-		expect(result).toHaveLength(1);
-		expect(result[0].roleName).toBe("workspace.owner");
+		expect(result).toEqual(primaryWorkspace);
+		expect(dbModule.db.transaction).toHaveBeenCalledOnce();
 	});
 
-	it("defaults to workspace.member when no binding found", async () => {
-		const memberRow = {
-			id: "m1",
-			userId: "user-3",
-			status: "active",
-			createdAt: new Date(),
-			name: "Carol",
-			email: "carol@example.com",
+	it("updates an active member when platform role is downgraded", async () => {
+		const primaryWorkspace = { ...fakeWorkspace, slug: "main", name: "AI Hub" };
+		const memberRole = {
+			...fakeRole,
+			id: "role-member",
+			name: "workspace.member",
 		};
 
-		dbModule._chain.where
-			.mockResolvedValueOnce([memberRow])
-			.mockResolvedValueOnce([]); // no bindings
+		dbModule._chain.limit
+			.mockResolvedValueOnce([primaryWorkspace]) // getPrimaryWorkspace
+			.mockResolvedValueOnce([fakeMember]) // getActiveWorkspaceMember
+			.mockResolvedValueOnce([{ roleName: "workspace.admin" }]) // getWorkspaceRoleName
+			.mockResolvedValueOnce([primaryWorkspace]) // updateWorkspaceMemberRole workspace lookup
+			.mockResolvedValueOnce([memberRole]) // getSystemWorkspaceRole
+			.mockResolvedValueOnce([fakeMember]); // member lookup
 
-		const result = await listWorkspaceMembers("ws-1");
-		expect(result[0].roleName).toBe("workspace.member");
+		await ensurePrimaryWorkspaceForUser({
+			userId: "user-2",
+			role: "user",
+			invitedBy: "admin-1",
+		});
+
+		expect(dbModule.db.transaction).toHaveBeenCalledOnce();
 	});
 });
 
@@ -389,46 +374,6 @@ describe("addWorkspaceMember", () => {
 		});
 
 		expect(dbModule.db.transaction).toHaveBeenCalledOnce();
-	});
-});
-
-describe("removeWorkspaceMember", () => {
-	it("throws when workspace not found", async () => {
-		await expect(
-			removeWorkspaceMember({
-				workspaceId: "ws-1",
-				userId: "user-2",
-				removedBy: "user-1",
-			}),
-		).rejects.toThrow("Workspace not found");
-	});
-
-	it("throws when member not found", async () => {
-		dbModule._chain.limit
-			.mockResolvedValueOnce([fakeWorkspace])
-			.mockResolvedValueOnce([]);
-
-		await expect(
-			removeWorkspaceMember({
-				workspaceId: "ws-1",
-				userId: "user-2",
-				removedBy: "user-1",
-			}),
-		).rejects.toThrow("Member not found");
-	});
-
-	it("marks member as removed when found", async () => {
-		dbModule._chain.limit
-			.mockResolvedValueOnce([fakeWorkspace])
-			.mockResolvedValueOnce([fakeMember]);
-
-		await removeWorkspaceMember({
-			workspaceId: "ws-1",
-			userId: "user-2",
-			removedBy: "user-1",
-		});
-
-		expect(dbModule.db.update).toHaveBeenCalled();
 	});
 });
 

@@ -29,7 +29,6 @@ export type NavGroup = {
 export type WorkspacePermissions = {
 	canViewUsage: boolean;
 	canViewAudit: boolean;
-	canInviteMembers: boolean;
 	canViewProviders: boolean;
 	canConfigureTools: boolean;
 	canViewTools: boolean;
@@ -41,7 +40,6 @@ export type WorkspacePermissions = {
 export const DEFAULT_WORKSPACE_PERMISSIONS: WorkspacePermissions = {
 	canViewUsage: false,
 	canViewAudit: false,
-	canInviteMembers: false,
 	canViewProviders: false,
 	canConfigureTools: false,
 	canViewTools: false,

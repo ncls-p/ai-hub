@@ -292,7 +292,7 @@ export function GeneralTab({
 												<SelectItem value="none">No label</SelectItem>
 												<SelectItem value="recommended">Recommended</SelectItem>
 												<SelectItem value="organization_created">
-													Organization created
+													Created by team
 												</SelectItem>
 											</SelectContent>
 										</Select>

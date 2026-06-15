@@ -414,7 +414,7 @@ export function McpServerManager() {
 				resource={shareResource}
 				workspaceId={workspaceId}
 				open={shareResource !== null}
-				onClose={() => setShareResource(null)}
+				onCloseAction={() => setShareResource(null)}
 			/>
 		</div>
 	);

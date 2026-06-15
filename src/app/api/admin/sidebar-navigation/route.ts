@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { logger } from "@/lib/logger";
-import { ensureBootstrapAdmin, isAdminRole } from "@/modules/admin/use-cases";
-import { getSession } from "@/modules/auth/session";
+import { requireAdminApiSession } from "@/modules/admin/auth";
 import {
 	defaultSidebarNavConfig,
 	getSidebarNavCatalog,
@@ -27,29 +26,9 @@ const updateSchema = z.object({
 		.min(1),
 });
 
-async function requireAdmin() {
-	const session = await getSession();
-	if (!session) {
-		return {
-			ok: false as const,
-			response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-		};
-	}
-	const bootstrappedAdminId = await ensureBootstrapAdmin();
-	const isAdmin =
-		isAdminRole(session.user.role) || bootstrappedAdminId === session.user.id;
-	if (!isAdmin) {
-		return {
-			ok: false as const,
-			response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
-		};
-	}
-	return { ok: true as const, session };
-}
-
 export async function GET() {
 	try {
-		const auth = await requireAdmin();
+		const auth = await requireAdminApiSession();
 		if (!auth.ok) return auth.response;
 
 		const saved = await getSidebarNavConfig();
@@ -59,7 +38,11 @@ export async function GET() {
 			isCustomized: saved !== null,
 		});
 	} catch (error) {
-		logger.error("Failed to read sidebar navigation config", {}, error as Error);
+		logger.error(
+			"Failed to read sidebar navigation config",
+			{},
+			error as Error,
+		);
 		return NextResponse.json(
 			{ error: "Internal server error" },
 			{ status: 500 },
@@ -69,7 +52,7 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
 	try {
-		const auth = await requireAdmin();
+		const auth = await requireAdminApiSession();
 		if (!auth.ok) return auth.response;
 
 		const parsed = updateSchema.safeParse(await req.json());
@@ -96,7 +79,11 @@ export async function PATCH(req: NextRequest) {
 			isCustomized: true,
 		});
 	} catch (error) {
-		logger.error("Failed to update sidebar navigation config", {}, error as Error);
+		logger.error(
+			"Failed to update sidebar navigation config",
+			{},
+			error as Error,
+		);
 		return NextResponse.json(
 			{ error: "Internal server error" },
 			{ status: 500 },
@@ -106,7 +93,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE() {
 	try {
-		const auth = await requireAdmin();
+		const auth = await requireAdminApiSession();
 		if (!auth.ok) return auth.response;
 
 		await deleteSidebarNavConfig();
@@ -117,7 +104,11 @@ export async function DELETE() {
 			isCustomized: false,
 		});
 	} catch (error) {
-		logger.error("Failed to reset sidebar navigation config", {}, error as Error);
+		logger.error(
+			"Failed to reset sidebar navigation config",
+			{},
+			error as Error,
+		);
 		return NextResponse.json(
 			{ error: "Internal server error" },
 			{ status: 500 },

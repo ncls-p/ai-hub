@@ -5,9 +5,7 @@ import { getSession } from "@/modules/auth/session";
 import { publishMarketplaceItem } from "@/modules/marketplace/use-cases";
 
 const publishSchema = z.object({
-	visibility: z
-		.enum(["public", "private", "unlisted", "organization"])
-		.default("public"),
+	visibility: z.enum(["public", "private"]).default("public"),
 	tags: z.array(z.string()).optional(),
 });
 

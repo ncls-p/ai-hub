@@ -149,9 +149,7 @@ export function getVisibilityLabel(
 	visibility: string,
 	t: (key: string) => string,
 ): string {
-	if (
-		["public", "private", "unlisted", "organization"].includes(visibility)
-	) {
+	if (["public", "private"].includes(visibility)) {
 		return t(`visibility.${visibility}`);
 	}
 	return visibility;
@@ -162,9 +160,7 @@ export function getVisibilityHint(
 	t: (key: string) => string,
 ): string | undefined {
 	const hintKey = `${visibility}Hint`;
-	if (
-		["public", "private", "unlisted", "organization"].includes(visibility)
-	) {
+	if (["public", "private"].includes(visibility)) {
 		return t(`visibility.${hintKey}`);
 	}
 	return undefined;
