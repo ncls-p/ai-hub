@@ -492,9 +492,12 @@ jobs:
               jq -nc \
                 --arg name "${COOLIFY_SERVICE_NAME}" \
                 --arg description "Managed by GitHub Actions for AI Hub" \
+                --arg project_uuid "${COOLIFY_PROJECT_UUID}" \
+                --arg environment_name "${COOLIFY_ENVIRONMENT_NAME}" \
+                --arg server_uuid "${COOLIFY_SERVER_UUID}" \
                 --arg docker_compose_raw "${COMPOSE_B64}" \
                 --arg app_url "${APP_ROUTING_URL}" \
-                '{name: $name, description: $description, docker_compose_raw: $docker_compose_raw, force_domain_override: true, is_container_label_escape_enabled: true, urls: [{name: "app", url: $app_url}]}'
+                '{name: $name, description: $description, project_uuid: $project_uuid, environment_name: $environment_name, server_uuid: $server_uuid, instant_deploy: false, docker_compose_raw: $docker_compose_raw, force_domain_override: true, is_container_label_escape_enabled: true, urls: [{name: "app", url: $app_url}]}'
             )"
             api PATCH "/services/${SERVICE_UUID}" "${PATCH_BODY}" >/dev/null
           fi
@@ -546,8 +549,58 @@ jobs:
           )"
           api PATCH "/services/${SERVICE_UUID}/envs/bulk" "${ENV_PAYLOAD}" >/dev/null
 
+          verify_compose_image() {
+            local service_json="$1"
+            SERVICE_JSON_FOR_VERIFY="${service_json}" python3 - "${AI_HUB_SEARXNG_IMAGE}" <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+
+          expected = sys.argv[1]
+          service = json.loads(os.environ["SERVICE_JSON_FOR_VERIFY"])
+          fields = [service.get("docker_compose") or "", service.get("docker_compose_raw") or ""]
+          expanded = []
+          for value in fields:
+              expanded.append(value)
+              try:
+                  expanded.append(base64.b64decode(value, validate=True).decode("utf-8", "replace"))
+              except Exception:
+                  pass
+          if any(expected in value for value in expanded):
+              sys.exit(0)
+          print(f"Expected SearXNG image not found in Coolify service compose: {expected}", file=sys.stderr)
+          print(
+              "Compose field lengths: "
+              f"docker_compose={len(fields[0])}, docker_compose_raw={len(fields[1])}",
+              file=sys.stderr,
+          )
+          sys.exit(1)
+          PY
+          }
+
+          SERVICE_JSON="$(api GET "/services/${SERVICE_UUID}")"
+          if ! verify_compose_image "${SERVICE_JSON}"; then
+            echo "Retrying Coolify compose update with raw docker_compose_raw payload." >&2
+            RAW_PATCH_BODY="$(
+              jq -nc \
+                --arg name "${COOLIFY_SERVICE_NAME}" \
+                --arg description "Managed by GitHub Actions for AI Hub" \
+                --arg project_uuid "${COOLIFY_PROJECT_UUID}" \
+                --arg environment_name "${COOLIFY_ENVIRONMENT_NAME}" \
+                --arg server_uuid "${COOLIFY_SERVER_UUID}" \
+                --rawfile docker_compose_raw /tmp/ai-hub.coolify.compose.yml \
+                --arg app_url "${APP_ROUTING_URL}" \
+                '{name: $name, description: $description, project_uuid: $project_uuid, environment_name: $environment_name, server_uuid: $server_uuid, instant_deploy: false, docker_compose_raw: $docker_compose_raw, force_domain_override: true, is_container_label_escape_enabled: true, urls: [{name: "app", url: $app_url}]}'
+            )"
+            api PATCH "/services/${SERVICE_UUID}" "${RAW_PATCH_BODY}" >/dev/null
+            SERVICE_JSON="$(api GET "/services/${SERVICE_UUID}")"
+            verify_compose_image "${SERVICE_JSON}"
+          fi
+
           echo "Using Coolify service UUID ${SERVICE_UUID}"
-          api GET "/deploy?uuid=${SERVICE_UUID}" >/dev/null
+          echo "Using SearXNG image ${AI_HUB_SEARXNG_IMAGE}"
+          api GET "/deploy?uuid=${SERVICE_UUID}&force=true" >/dev/null
 
           long_running='["app", "worker", "garage", "dragonflydb", "searxng"]'
           success=false
@@ -557,7 +610,8 @@ jobs:
               jq -r --argjson names "${long_running}" '
                 def ready_app:
                   .status == "running:healthy"
-                  or .status == "running";
+                  or .status == "running"
+                  or (.name == "searxng" and .status == "running:unknown");
                 def ready_database:
                   .status == "running:healthy" or .status == "running";
                 ([.applications[]? | select(.name as $name | $names | index($name)) | select((ready_app | not))] | length)
