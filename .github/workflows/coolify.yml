@@ -493,11 +493,11 @@ jobs:
           PY
           docker compose -f /tmp/ai-hub.coolify.stack.yml config --no-interpolate > /tmp/ai-hub.coolify.compose.yml
           COMPOSE_B64="$(base64 < /tmp/ai-hub.coolify.compose.yml | tr -d '\n')"
-          RAW_PATCH_BODY="$(
+          PATCH_BODY="$(
             jq -nc \
               --arg name "${COOLIFY_SERVICE_NAME}" \
               --arg description "Managed by GitHub Actions for AI Hub" \
-              --rawfile docker_compose_raw /tmp/ai-hub.coolify.compose.yml \
+              --arg docker_compose_raw "${COMPOSE_B64}" \
               '{name: $name, description: $description, instant_deploy: false, docker_compose_raw: $docker_compose_raw}'
           )"
 
@@ -515,7 +515,7 @@ jobs:
             )"
             SERVICE_UUID="$(api POST "/services" "${CREATE_BODY}" | jq -r '.uuid')"
           else
-            api PATCH "/services/${SERVICE_UUID}" "${RAW_PATCH_BODY}" >/dev/null
+            api PATCH "/services/${SERVICE_UUID}" "${PATCH_BODY}" >/dev/null
           fi
 
           ENV_PAYLOAD="$(
@@ -568,6 +568,7 @@ jobs:
           verify_compose_image() {
             local service_json="$1"
             SERVICE_JSON_FOR_VERIFY="${service_json}" python3 - "${AI_HUB_SEARXNG_IMAGE}" <<'PY'
+          import base64
           import json
           import os
           import sys
@@ -575,9 +576,15 @@ jobs:
           expected = sys.argv[1]
           service = json.loads(os.environ["SERVICE_JSON_FOR_VERIFY"])
           fields = [service.get("docker_compose") or "", service.get("docker_compose_raw") or ""]
-          if any(expected in value for value in fields):
+          expanded = list(fields)
+          for value in fields:
+              try:
+                  expanded.append(base64.b64decode(value, validate=True).decode("utf-8", "replace"))
+              except Exception:
+                  pass
+          if any(expected in value for value in expanded):
               sys.exit(0)
-          print(f"Expected SearXNG image not found in raw Coolify service compose: {expected}", file=sys.stderr)
+          print(f"Expected SearXNG image not found in Coolify service compose: {expected}", file=sys.stderr)
           print(
               "Compose field lengths: "
               f"docker_compose={len(fields[0])}, docker_compose_raw={len(fields[1])}",
