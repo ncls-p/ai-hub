@@ -26,12 +26,17 @@ export async function DELETE(
 			return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 		}
 
-		const isMember = await authorization.requireWorkspaceMember(
-			session.user.id,
+		const permission = await authorization.requirePermission(
+			{ principalType: "user", principalId: session.user.id },
+			"tools.configure",
+			"workspace",
 			parsedQuery.data.workspaceId,
 		);
-		if (!isMember) {
-			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		if (!permission.granted) {
+			return NextResponse.json(
+				{ error: "Forbidden", reason: permission.reason },
+				{ status: 403 },
+			);
 		}
 
 		return NextResponse.json(

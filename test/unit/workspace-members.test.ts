@@ -25,7 +25,9 @@ beforeAll(async () => {
 describe("workspace member IAM", () => {
 	it("grants members.invite through workspace owner permissions", async () => {
 		const { SYSTEM_ROLES } = await import("@/server/domain/entities/iam");
-		const ownerRole = SYSTEM_ROLES.find((role) => role.name === "workspace.owner");
+		const ownerRole = SYSTEM_ROLES.find(
+			(role) => role.name === "workspace.owner",
+		);
 		expect(
 			ownerRole?.permissions.some((permission) =>
 				matchesPermission(permission, "members.invite"),
@@ -40,7 +42,9 @@ describe("workspace member IAM", () => {
 
 	it("grants usage and audit view through workspace owner permissions", async () => {
 		const { SYSTEM_ROLES } = await import("@/server/domain/entities/iam");
-		const ownerRole = SYSTEM_ROLES.find((role) => role.name === "workspace.owner");
+		const ownerRole = SYSTEM_ROLES.find(
+			(role) => role.name === "workspace.owner",
+		);
 		expect(
 			ownerRole?.permissions.some((permission) =>
 				matchesPermission(permission, "usage.view"),
@@ -51,5 +55,28 @@ describe("workspace member IAM", () => {
 				matchesPermission(permission, "audit.view"),
 			),
 		).toBe(true);
+	});
+
+	it("grants admin-created workspace admins the management permissions used by APIs", async () => {
+		const { SYSTEM_ROLES } = await import("@/server/domain/entities/iam");
+		const adminRole = SYSTEM_ROLES.find(
+			(role) => role.name === "workspace.admin",
+		);
+		const requiredPermissions = [
+			"members.invite",
+			"members.remove",
+			"providers.viewMetadata",
+			"apiKeys.manage",
+			"agents.chat",
+			"tools.executeRestricted",
+		];
+
+		for (const requiredPermission of requiredPermissions) {
+			expect(
+				adminRole?.permissions.some((permission) =>
+					matchesPermission(permission, requiredPermission),
+				),
+			).toBe(true);
+		}
 	});
 });

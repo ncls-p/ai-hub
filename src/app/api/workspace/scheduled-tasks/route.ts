@@ -19,13 +19,20 @@ const createSchema = z.object({
 	prompt: z.string().trim().min(1).max(8_000),
 	frequency: z.enum(["daily", "interval"]),
 	timezone: z.string().trim().min(1).max(64).optional(),
-	timeOfDay: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+	timeOfDay: z
+		.string()
+		.regex(/^\d{2}:\d{2}$/)
+		.nullable()
+		.optional(),
 	intervalMinutes: z.number().int().min(5).max(43_200).nullable().optional(),
 	enabled: z.boolean().optional(),
 });
 
 async function requireChatPermission(userId: string, workspaceId: string) {
-	const isMember = await authorization.requireWorkspaceMember(userId, workspaceId);
+	const isMember = await authorization.requireWorkspaceMember(
+		userId,
+		workspaceId,
+	);
 	if (!isMember) return false;
 	return authorization.hasPermission(
 		{ principalType: "user", principalId: userId },
@@ -58,10 +65,7 @@ export async function GET(req: NextRequest) {
 		}
 
 		return NextResponse.json({
-			tasks: await listScheduledTasks(
-				parsed.data.workspaceId,
-				session.user.id,
-			),
+			tasks: await listScheduledTasks(parsed.data.workspaceId, session.user.id),
 		});
 	} catch (error) {
 		logger.error("Failed to list scheduled tasks", {}, error as Error);
@@ -104,7 +108,9 @@ export async function POST(req: NextRequest) {
 	} catch (error) {
 		logger.error("Failed to create scheduled task", {}, error as Error);
 		return NextResponse.json(
-			{ error: error instanceof Error ? error.message : "Internal server error" },
+			{
+				error: error instanceof Error ? error.message : "Internal server error",
+			},
 			{ status: 400 },
 		);
 	}

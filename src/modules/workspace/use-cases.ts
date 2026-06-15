@@ -321,7 +321,12 @@ export async function addWorkspaceMember(input: {
 			)
 			.limit(1);
 
-		if (!existingBinding) {
+		if (existingBinding) {
+			await tx
+				.update(roleBindings)
+				.set({ roleId: role.id })
+				.where(eq(roleBindings.id, existingBinding.id));
+		} else {
 			await tx.insert(roleBindings).values({
 				principalType: "user",
 				principalId: userId,
@@ -466,7 +471,11 @@ export async function updateWorkspaceMemberRole(input: {
 		});
 	});
 
-	await authorization.invalidatePermissionCache(userId, "workspace", workspaceId);
+	await authorization.invalidatePermissionCache(
+		userId,
+		"workspace",
+		workspaceId,
+	);
 
 	await audit.emit({
 		organizationId: workspace.organizationId,

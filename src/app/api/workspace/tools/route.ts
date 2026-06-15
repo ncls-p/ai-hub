@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
 		const permission = await authorization.requirePermission(
 			{ principalType: "user", principalId: session.user.id },
-			"tools.configure",
+			"tools.view",
 			"workspace",
 			parsed.data.workspaceId,
 		);

@@ -55,6 +55,26 @@ describe("permission matching", () => {
 		);
 	});
 
+	it("normalizes legacy workspace/audit permission domains", () => {
+		expect(matchesPermission("workspace.*", "members.invite")).toBe(true);
+		expect(matchesPermission("workspace.*", "apiKeys.manage")).toBe(true);
+		expect(matchesPermission("workspaces.get", "workspace.get")).toBe(true);
+		expect(matchesPermission("auditLogs.view", "audit.view")).toBe(true);
+	});
+
+	it("treats workspace admin and owner markers as workspace-wide grants", () => {
+		expect(matchesPermission("workspace.admin", "providers.delete")).toBe(true);
+		expect(
+			matchesPermission("workspace.admin", "tools.executeRestricted"),
+		).toBe(true);
+		expect(matchesPermission("workspace.owner", "members.remove")).toBe(true);
+	});
+
+	it("lets view grants satisfy read-oriented actions", () => {
+		expect(matchesPermission("tools.view", "tools.get")).toBe(true);
+		expect(matchesPermission("tools.view", "tools.configure")).toBe(false);
+	});
+
 	it("handles granted permissions without an action as domain wildcards", () => {
 		expect(matchesPermission("agents", "agents.create")).toBe(true);
 		expect(matchesPermission("agents", "agents")).toBe(true);

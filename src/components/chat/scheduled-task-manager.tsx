@@ -145,7 +145,9 @@ export function ScheduledTaskManager({
 			setTasks((current) => [data.task, ...current]);
 			toast.success("Tâche planifiée créée");
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Unable to create task");
+			toast.error(
+				error instanceof Error ? error.message : "Unable to create task",
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -166,7 +168,9 @@ export function ScheduledTaskManager({
 				current.map((item) => (item.id === task.id ? data.task : item)),
 			);
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Unable to update task");
+			toast.error(
+				error instanceof Error ? error.message : "Unable to update task",
+			);
 		}
 	}
 
@@ -179,14 +183,21 @@ export function ScheduledTaskManager({
 			);
 			setTasks((current) => current.filter((task) => task.id !== taskId));
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Unable to delete task");
+			toast.error(
+				error instanceof Error ? error.message : "Unable to delete task",
+			);
 		}
 	}
 
 	return (
 		<Dialog open={open} onOpenChange={updateOpen}>
 			<DialogTrigger asChild>
-				<Button type="button" variant="outline" size="sm" disabled={!workspaceId}>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={!workspaceId}
+				>
 					<CalendarClockIcon className="size-4" aria-hidden="true" />
 					Planifier
 				</Button>
@@ -203,7 +214,10 @@ export function ScheduledTaskManager({
 				<div className="grid gap-4 rounded-xl border border-border/70 p-4">
 					<div className="grid gap-2">
 						<Label>Titre</Label>
-						<Input value={title} onChange={(event) => setTitle(event.target.value)} />
+						<Input
+							value={title}
+							onChange={(event) => setTitle(event.target.value)}
+						/>
 					</div>
 					<div className="grid gap-2">
 						<Label>Prompt</Label>
@@ -262,9 +276,12 @@ export function ScheduledTaskManager({
 					</div>
 					<div className="flex items-center justify-between gap-3 rounded-lg bg-muted/35 p-3">
 						<div>
-							<p className="text-sm font-medium">Utiliser la conversation active</p>
+							<p className="text-sm font-medium">
+								Utiliser la conversation active
+							</p>
 							<p className="text-xs text-muted-foreground">
-								Sinon, une nouvelle conversation sera créée au premier déclenchement.
+								Sinon, une nouvelle conversation sera créée au premier
+								déclenchement.
 							</p>
 						</div>
 						<Switch
@@ -273,14 +290,20 @@ export function ScheduledTaskManager({
 							onCheckedChange={setUseCurrentConversation}
 						/>
 					</div>
-					<Button type="button" onClick={() => void createTask()} disabled={saving}>
+					<Button
+						type="button"
+						onClick={() => void createTask()}
+						disabled={saving}
+					>
 						{saving ? <Loader2Icon className="animate-spin" /> : null}
 						Créer la tâche
 					</Button>
 				</div>
 
 				<div className="grid gap-2">
-					{loading ? <p className="text-sm text-muted-foreground">Chargement…</p> : null}
+					{loading ? (
+						<p className="text-sm text-muted-foreground">Chargement…</p>
+					) : null}
 					{tasks.map((task) => (
 						<div
 							key={task.id}
@@ -292,7 +315,9 @@ export function ScheduledTaskManager({
 									Prochain lancement : {formatNextRun(task.nextRunAt)}
 								</p>
 								{task.lastError ? (
-									<p className="mt-1 text-xs text-destructive">{task.lastError}</p>
+									<p className="mt-1 text-xs text-destructive">
+										{task.lastError}
+									</p>
 								) : null}
 							</div>
 							<div className="flex shrink-0 items-center gap-2">

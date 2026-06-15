@@ -190,7 +190,9 @@ function ChatContextBar({
 			{showQuota ? (
 				<CollapsibleContent>
 					<div className="flex flex-col gap-0">
-						{quota ? <QuotaBanner used={quota.used} limit={quota.limit} /> : null}
+						{quota ? (
+							<QuotaBanner used={quota.used} limit={quota.limit} />
+						) : null}
 					</div>
 				</CollapsibleContent>
 			) : null}

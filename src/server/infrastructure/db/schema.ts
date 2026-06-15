@@ -650,7 +650,9 @@ export const scheduledTasks = pgTable(
 		enabled: boolean("enabled").notNull().default(true),
 		nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
 		lastRunAt: timestamp("last_run_at", { withTimezone: true }),
-		lastStatus: scheduledTaskStatusEnum("last_status").notNull().default("idle"),
+		lastStatus: scheduledTaskStatusEnum("last_status")
+			.notNull()
+			.default("idle"),
 		lastError: text("last_error"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()

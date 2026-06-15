@@ -1,12 +1,13 @@
+import { logger } from "@/lib/logger";
+import { SYSTEM_ROLES } from "@/server/domain/entities/iam";
+import { cache } from "@/server/infrastructure/cache";
 import { db } from "@/server/infrastructure/db";
 import {
 	roles,
 	roleBindings,
 	workspaceMembers,
 } from "@/server/infrastructure/db/schema";
-import { eq, and, or, isNull, gte } from "drizzle-orm";
-import { cache } from "@/server/infrastructure/cache";
-import { logger } from "@/lib/logger";
+import { and, eq, gte, isNull, or } from "drizzle-orm";
 
 const PERMISSION_CACHE_TTL = 60; // 60 seconds
 
@@ -31,9 +32,35 @@ export interface PermissionCheckResult {
 	reason?: string;
 }
 
+const SYSTEM_ROLE_PERMISSIONS = new Map(
+	SYSTEM_ROLES.map((role) => [role.name, role.permissions]),
+);
+
+const DOMAIN_ALIASES: Record<string, string> = {
+	auditLogs: "audit",
+	marketplaceItems: "marketplace",
+	workspace: "workspaces",
+};
+
+const WORKSPACE_ADMIN_GRANTS = new Set(["owner", "admin"]);
+
+const VIEW_ACTIONS = new Set([
+	"get",
+	"list",
+	"view",
+	"viewAllowed",
+	"viewLimited",
+	"viewMetadata",
+	"viewOwn",
+	"viewShared",
+]);
+
 function parsePermission(perm: string): { domain: string; action: string } {
 	const [domain, action = "*"] = perm.split(".");
-	return { domain, action };
+	return {
+		domain: DOMAIN_ALIASES[domain] ?? domain,
+		action,
+	};
 }
 
 export function matchesPermission(
@@ -45,14 +72,52 @@ export function matchesPermission(
 	const { domain: requiredDomain, action: requiredAction } =
 		parsePermission(requiredPermission);
 
-	const domainMatches =
-		grantedDomain === requiredDomain ||
-		(grantedDomain === "marketplace" &&
-			requiredDomain.startsWith("marketplace"));
+	if (
+		grantedDomain === "workspaces" &&
+		(grantedAction === "*" || WORKSPACE_ADMIN_GRANTS.has(grantedAction))
+	) {
+		return true;
+	}
 
-	if (!domainMatches) return false;
+	if (grantedDomain !== requiredDomain) return false;
 	if (grantedAction === "*" || grantedAction === "manage") return true;
+	if (grantedAction === "view" && VIEW_ACTIONS.has(requiredAction)) return true;
 	return grantedAction === requiredAction;
+}
+
+async function isActiveWorkspaceMember(userId: string, workspaceId: string) {
+	const [member] = await db
+		.select({ id: workspaceMembers.id })
+		.from(workspaceMembers)
+		.where(
+			and(
+				eq(workspaceMembers.userId, userId),
+				eq(workspaceMembers.workspaceId, workspaceId),
+				eq(workspaceMembers.status, "active"),
+			),
+		)
+		.limit(1);
+
+	return Boolean(member);
+}
+
+function addRolePermissions(
+	permissions: Permission[],
+	role: { name: string; permissionsJson: unknown },
+) {
+	const dbPermissions = Array.isArray(role.permissionsJson)
+		? (role.permissionsJson as Permission[])
+		: [];
+	permissions.push(...dbPermissions);
+
+	const currentSystemPermissions = SYSTEM_ROLE_PERMISSIONS.get(role.name);
+	if (currentSystemPermissions) {
+		permissions.push(...currentSystemPermissions);
+	}
+}
+
+function uniquePermissions(permissions: Permission[]) {
+	return [...new Set(permissions)];
 }
 
 async function resolvePermissions(
@@ -63,6 +128,15 @@ async function resolvePermissions(
 	const cacheKey = `perm:${ctx.principalType}:${ctx.principalId}:${resourceType}:${resourceId}`;
 	const cached = await cache.get<Permission[]>(cacheKey);
 	if (cached) return cached;
+
+	if (
+		resourceType === "workspace" &&
+		ctx.principalType === "user" &&
+		!(await isActiveWorkspaceMember(ctx.principalId, resourceId))
+	) {
+		await cache.set(cacheKey, [], PERMISSION_CACHE_TTL);
+		return [];
+	}
 
 	const bindings = await db
 		.select()
@@ -83,12 +157,22 @@ async function resolvePermissions(
 
 	const permissions: Permission[] = [];
 	for (const binding of bindings) {
-		const perms = binding.roles.permissionsJson as Permission[];
-		permissions.push(...perms);
+		addRolePermissions(permissions, binding.roles);
 	}
 
-	await cache.set(cacheKey, permissions, PERMISSION_CACHE_TTL);
-	return permissions;
+	if (
+		permissions.length === 0 &&
+		resourceType === "workspace" &&
+		ctx.principalType === "user"
+	) {
+		permissions.push(
+			...(SYSTEM_ROLE_PERMISSIONS.get("workspace.member") ?? []),
+		);
+	}
+
+	const resolvedPermissions = uniquePermissions(permissions);
+	await cache.set(cacheKey, resolvedPermissions, PERMISSION_CACHE_TTL);
+	return resolvedPermissions;
 }
 
 export const authorization = {
@@ -151,18 +235,7 @@ export const authorization = {
 		userId: string,
 		workspaceId: string,
 	): Promise<boolean> {
-		const members = await db
-			.select()
-			.from(workspaceMembers)
-			.where(
-				and(
-					eq(workspaceMembers.userId, userId),
-					eq(workspaceMembers.workspaceId, workspaceId),
-					eq(workspaceMembers.status, "active"),
-				),
-			);
-
-		return members.length > 0;
+		return isActiveWorkspaceMember(userId, workspaceId);
 	},
 
 	async invalidatePermissionCache(

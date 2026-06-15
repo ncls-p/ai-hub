@@ -356,7 +356,9 @@ async function buildSearchContext(prompt: string) {
 			limit: 8,
 			language: "fr",
 		});
-		const result = await (webSearch.execute as (value: unknown) => unknown)(input);
+		const result = await (webSearch.execute as (value: unknown) => unknown)(
+			input,
+		);
 		return JSON.stringify(result, null, 2).slice(0, 12_000);
 	} catch (error) {
 		logger.warn("Scheduled task web search failed", {
@@ -399,13 +401,16 @@ async function insertMessage(input: {
 	return message;
 }
 
-export async function runScheduledTask(task: typeof scheduledTasks.$inferSelect) {
+export async function runScheduledTask(
+	task: typeof scheduledTasks.$inferSelect,
+) {
 	const startedAt = Date.now();
 	const agent = await assertAgentInWorkspace(task.agentId, task.workspaceId);
 	const version = await getActiveVersion(task.agentId);
 	if (!version) throw new Error("Agent has no active version");
 	const providerConfig = await resolveProviderForVersion(version);
-	if (!providerConfig?.modelId) throw new Error("Agent model is not configured");
+	if (!providerConfig?.modelId)
+		throw new Error("Agent model is not configured");
 
 	const conversationId = await ensureConversationForTask(task, version.id);
 	const prompt = `Tâche planifiée « ${task.title} »\n\n${task.prompt}`;
@@ -437,7 +442,8 @@ export async function runScheduledTask(task: typeof scheduledTasks.$inferSelect)
 		maxOutputTokens: Math.min(version.maxOutputTokens ?? 4_000, 4_000),
 	});
 
-	const assistantText = result.text.trim() || "La tâche planifiée n'a produit aucun contenu.";
+	const assistantText =
+		result.text.trim() || "La tâche planifiée n'a produit aucun contenu.";
 	await insertMessage({
 		conversationId,
 		role: "assistant",
@@ -477,10 +483,7 @@ export async function processDueScheduledTasks(now = new Date()) {
 		.select()
 		.from(scheduledTasks)
 		.where(
-			and(
-				eq(scheduledTasks.enabled, true),
-				lte(scheduledTasks.nextRunAt, now),
-			),
+			and(eq(scheduledTasks.enabled, true), lte(scheduledTasks.nextRunAt, now)),
 		)
 		.orderBy(asc(scheduledTasks.nextRunAt))
 		.limit(MAX_DUE_TASKS_PER_TICK);
