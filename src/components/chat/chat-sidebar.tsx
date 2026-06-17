@@ -4,11 +4,14 @@ import { Link, usePathname } from "@/i18n/navigation";
 import {
 	ChevronDownIcon,
 	CheckIcon,
+	FolderIcon,
+	FolderPlusIcon,
 	MoreHorizontalIcon,
 	MessageSquareIcon,
 	PanelLeftCloseIcon,
 	PanelLeftOpenIcon,
 	PencilIcon,
+	PinIcon,
 	PlusIcon,
 	Trash2Icon,
 	XIcon,
@@ -16,7 +19,11 @@ import {
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
-import type { ChatAgent, ChatConversation } from "@/components/chat/chat-types";
+import type {
+	ChatAgent,
+	ChatConversation,
+	ChatConversationFolder,
+} from "@/components/chat/chat-types";
 import { ThemeToggleButton } from "@/components/theme-toggle-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,12 +65,22 @@ import { cn } from "@/lib/utils";
 interface ChatSidebarProps {
 	agents: ChatAgent[];
 	conversations: ChatConversation[];
+	conversationFolders: ChatConversationFolder[];
 	activeConversationId: string | null;
 	loading?: boolean;
 	onSelectConversation: (conversationId: string) => void;
 	onNewConversation: () => void;
 	onRenameConversation?: (conversationId: string, title: string) => void;
 	onDeleteConversation?: (conversationId: string) => void;
+	onCreateConversationFolder?: (name: string) => void;
+	onRenameConversationFolder?: (folderId: string, name: string) => void;
+	onDeleteConversationFolder?: (folderId: string) => void;
+	onToggleConversationPin?: (conversationId: string, pinned: boolean) => void;
+	onReorderConversations?: (input: {
+		conversationIds: string[];
+		folderId: string | null;
+		pinned?: boolean;
+	}) => void;
 	hasMoreConversations?: boolean;
 	loadingMoreConversations?: boolean;
 	onLoadMoreConversations?: () => void;
@@ -187,6 +204,11 @@ function ConversationItem({
 	onEditStart,
 	onEditChange,
 	onEditCancel,
+	onTogglePin,
+	onDragStart,
+	onDragEnd,
+	onDropBefore,
+	isDragging,
 }: {
 	conversation: ChatConversation;
 	isActive: boolean;
@@ -199,14 +221,27 @@ function ConversationItem({
 	onEditStart: () => void;
 	onEditChange: (title: string) => void;
 	onEditCancel: () => void;
+	onTogglePin: () => void;
+	onDragStart: (event: React.DragEvent<HTMLDivElement>) => void;
+	onDragEnd: () => void;
+	onDropBefore: (event: React.DragEvent<HTMLDivElement>) => void;
+	isDragging: boolean;
 }) {
+	const pinned = Boolean(conversation.pinnedAt);
+
 	return (
 		<div
+			draggable={!isEditing}
+			onDragStart={onDragStart}
+			onDragEnd={onDragEnd}
+			onDragOver={(event) => event.preventDefault()}
+			onDrop={onDropBefore}
 			className={cn(
 				"group/conversation relative overflow-hidden rounded-lg border transition-colors",
 				isActive
 					? "border-input bg-muted"
 					: "border-transparent hover:border-border hover:bg-muted/70",
+				isDragging && "opacity-45",
 			)}
 		>
 			{/* Active indicator bar */}
@@ -281,6 +316,9 @@ function ConversationItem({
 							</span>
 						</span>
 					</button>
+					{pinned ? (
+						<PinIcon className="size-3 shrink-0 text-primary" aria-hidden="true" />
+					) : null}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<Button
@@ -298,6 +336,10 @@ function ConversationItem({
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
 							<DropdownMenuGroup>
+								<DropdownMenuItem onSelect={onTogglePin} className="gap-2">
+									<PinIcon className="size-3.5" aria-hidden="true" />
+									{pinned ? "Unpin" : "Pin to top"}
+								</DropdownMenuItem>
 								<DropdownMenuItem onSelect={onEditStart} className="gap-2">
 									<PencilIcon className="size-3.5" aria-hidden="true" />
 									Rename
@@ -322,12 +364,18 @@ function ConversationItem({
 export function ChatSidebar({
 	agents,
 	conversations,
+	conversationFolders,
 	activeConversationId,
 	loading,
 	onSelectConversation,
 	onNewConversation,
 	onRenameConversation,
 	onDeleteConversation,
+	onCreateConversationFolder,
+	onRenameConversationFolder,
+	onDeleteConversationFolder,
+	onToggleConversationPin,
+	onReorderConversations,
 	hasMoreConversations,
 	loadingMoreConversations,
 	onLoadMoreConversations,
@@ -341,6 +389,16 @@ export function ChatSidebar({
 		string | null
 	>(null);
 	const [editingTitle, setEditingTitle] = useState("");
+	const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+	const [editingFolderName, setEditingFolderName] = useState("");
+	const [creatingFolder, setCreatingFolder] = useState(false);
+	const [newFolderName, setNewFolderName] = useState("");
+	const [closedFolderIds, setClosedFolderIds] = useState<Set<string>>(
+		() => new Set(),
+	);
+	const [draggingConversationId, setDraggingConversationId] = useState<
+		string | null
+	>(null);
 	const agentNameById = useMemo(
 		() => new Map(agents.map((agent) => [agent.id, agent.name])),
 		[agents],
@@ -349,6 +407,159 @@ export function ChatSidebar({
 		() => (shell ? buildMenuGroups(shell) : []),
 		[shell],
 	);
+	const sortedConversations = useMemo(() => {
+		return [...conversations].sort((a, b) => {
+			const aPinned = a.pinnedAt ? 0 : 1;
+			const bPinned = b.pinnedAt ? 0 : 1;
+			if (aPinned !== bPinned) return aPinned - bPinned;
+			const aOrder = a.sidebarOrder ?? Number.MAX_SAFE_INTEGER;
+			const bOrder = b.sidebarOrder ?? Number.MAX_SAFE_INTEGER;
+			if (aOrder !== bOrder) return aOrder - bOrder;
+			return (
+				new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+			);
+		});
+	}, [conversations]);
+	const pinnedConversations = useMemo(
+		() => sortedConversations.filter((conversation) => conversation.pinnedAt),
+		[sortedConversations],
+	);
+	const unpinnedConversations = useMemo(
+		() => sortedConversations.filter((conversation) => !conversation.pinnedAt),
+		[sortedConversations],
+	);
+	const topLevelConversations = useMemo(
+		() => unpinnedConversations.filter((conversation) => !conversation.folderId),
+		[unpinnedConversations],
+	);
+	const folderSections = useMemo(() => {
+		return conversationFolders.map((folder) => ({
+			folder,
+			conversations: unpinnedConversations.filter(
+				(conversation) => conversation.folderId === folder.id,
+			),
+		}));
+	}, [conversationFolders, unpinnedConversations]);
+
+	function orderedIdsWithInsertion(
+		items: ChatConversation[],
+		draggedId: string,
+		beforeId?: string,
+	) {
+		const ids = items
+			.map((conversation) => conversation.id)
+			.filter((id) => id !== draggedId);
+		const insertionIndex = beforeId ? ids.indexOf(beforeId) : -1;
+		ids.splice(insertionIndex >= 0 ? insertionIndex : ids.length, 0, draggedId);
+		return ids;
+	}
+
+	function reorderDraggedConversation({
+		folderId,
+		pinned,
+		beforeId,
+	}: {
+		folderId: string | null;
+		pinned: boolean;
+		beforeId?: string;
+	}) {
+		if (!draggingConversationId || !onReorderConversations) return;
+		if (beforeId === draggingConversationId) {
+			setDraggingConversationId(null);
+			return;
+		}
+		const destinationItems = pinned
+			? pinnedConversations
+			: folderId
+				? (folderSections.find((section) => section.folder.id === folderId)
+						?.conversations ?? [])
+				: topLevelConversations;
+		onReorderConversations({
+			conversationIds: orderedIdsWithInsertion(
+				destinationItems,
+				draggingConversationId,
+				beforeId,
+			),
+			folderId,
+			pinned,
+		});
+		setDraggingConversationId(null);
+	}
+
+	function handleConversationDrop(
+		event: React.DragEvent<HTMLDivElement>,
+		conversation: ChatConversation,
+	) {
+		event.preventDefault();
+		event.stopPropagation();
+		reorderDraggedConversation({
+			folderId: conversation.pinnedAt ? null : (conversation.folderId ?? null),
+			pinned: Boolean(conversation.pinnedAt),
+			beforeId: conversation.id,
+		});
+	}
+
+	function startFolderCreate() {
+		setCreatingFolder(true);
+		setNewFolderName("");
+	}
+
+	function saveNewFolder() {
+		const name = newFolderName.trim();
+		if (!name) return;
+		onCreateConversationFolder?.(name);
+		setCreatingFolder(false);
+		setNewFolderName("");
+	}
+
+	function toggleFolder(folderId: string) {
+		setClosedFolderIds((current) => {
+			const next = new Set(current);
+			if (next.has(folderId)) next.delete(folderId);
+			else next.add(folderId);
+			return next;
+		});
+	}
+
+	function renderConversation(conversation: ChatConversation) {
+		const isActive = activeConversationId === conversation.id;
+		const isEditing = editingConversationId === conversation.id;
+		const agentName = agentNameById.get(conversation.agentId) ?? "Assistant";
+
+		return (
+			<ConversationItem
+				key={conversation.id}
+				conversation={conversation}
+				isActive={isActive}
+				isEditing={isEditing}
+				editingTitle={isEditing ? editingTitle : ""}
+				agentName={agentName}
+				onSelect={() => onSelectConversation(conversation.id)}
+				onRename={(title) => {
+					onRenameConversation?.(conversation.id, title);
+					setEditingConversationId(null);
+				}}
+				onDelete={() => onDeleteConversation?.(conversation.id)}
+				onEditStart={() => {
+					setEditingConversationId(conversation.id);
+					setEditingTitle(conversation.title);
+				}}
+				onEditChange={setEditingTitle}
+				onEditCancel={() => setEditingConversationId(null)}
+				onTogglePin={() =>
+					onToggleConversationPin?.(conversation.id, !conversation.pinnedAt)
+				}
+				onDragStart={(event) => {
+					setDraggingConversationId(conversation.id);
+					event.dataTransfer.effectAllowed = "move";
+					event.dataTransfer.setData("text/plain", conversation.id);
+				}}
+				onDragEnd={() => setDraggingConversationId(null)}
+				onDropBefore={(event) => handleConversationDrop(event, conversation)}
+				isDragging={draggingConversationId === conversation.id}
+			/>
+		);
+	}
 
 	if (collapsed) {
 		return (
@@ -389,7 +600,7 @@ export function ChatSidebar({
 					<TooltipContent side="right">New chat</TooltipContent>
 				</Tooltip>
 				<div className="mt-1 flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto py-1">
-					{conversations.slice(0, 10).map((conversation) => (
+					{sortedConversations.slice(0, 10).map((conversation) => (
 						<Tooltip key={conversation.id}>
 							<TooltipTrigger asChild>
 								<Button
@@ -411,7 +622,9 @@ export function ChatSidebar({
 									<MessageSquareIcon className="size-4" aria-hidden="true" />
 								</Button>
 							</TooltipTrigger>
-							<TooltipContent side="right">{conversation.title}</TooltipContent>
+							<TooltipContent side="right">
+								{conversation.title}
+							</TooltipContent>
 						</Tooltip>
 					))}
 				</div>
@@ -439,7 +652,10 @@ export function ChatSidebar({
 									onClick={() => onCollapsedChange(true)}
 									className="size-7 rounded-md"
 								>
-									<PanelLeftCloseIcon className="size-3.5" aria-hidden="true" />
+									<PanelLeftCloseIcon
+										className="size-3.5"
+										aria-hidden="true"
+									/>
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent>Collapse sidebar</TooltipContent>
@@ -468,13 +684,62 @@ export function ChatSidebar({
 					<span className="text-[11px] font-medium text-muted-foreground">
 						Conversations
 					</span>
-					{conversations.length > 0 ? (
-						<span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-							{conversations.length}
-							{hasMoreConversations ? "+" : ""}
-						</span>
-					) : null}
+					<div className="flex items-center gap-1">
+						{conversations.length > 0 ? (
+							<span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+								{conversations.length}
+								{hasMoreConversations ? "+" : ""}
+							</span>
+						) : null}
+						<Button
+							type="button"
+							size="icon-sm"
+							variant="ghost"
+							aria-label="Create folder"
+							className="size-6 rounded-md text-muted-foreground"
+							onClick={startFolderCreate}
+						>
+							<FolderPlusIcon className="size-3.5" aria-hidden="true" />
+						</Button>
+					</div>
 				</div>
+
+				{creatingFolder ? (
+					<div className="flex items-center gap-1 rounded-lg border bg-background p-1">
+						<Input
+							value={newFolderName}
+							onChange={(event) => setNewFolderName(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter") saveNewFolder();
+								if (event.key === "Escape") setCreatingFolder(false);
+							}}
+							placeholder="Folder name"
+							className="h-7 min-w-0 rounded-md px-2 text-xs"
+							autoFocus
+						/>
+						<Button
+							type="button"
+							size="icon-sm"
+							variant="ghost"
+							aria-label="Create folder"
+							className="size-6 shrink-0"
+							onClick={saveNewFolder}
+						>
+							<CheckIcon className="size-3" aria-hidden="true" />
+						</Button>
+						<Button
+							type="button"
+							size="icon-sm"
+							variant="ghost"
+							aria-label="Cancel folder creation"
+							className="size-6 shrink-0"
+							onClick={() => setCreatingFolder(false)}
+						>
+							<XIcon className="size-3" aria-hidden="true" />
+						</Button>
+					</div>
+				) : null}
+
 				<div className="flex min-h-0 flex-col gap-1">
 					{loading ? (
 						<div className="flex flex-col gap-px pt-px">
@@ -482,7 +747,7 @@ export function ChatSidebar({
 							<Skeleton className="h-8 w-full rounded" />
 							<Skeleton className="h-8 w-full rounded" />
 						</div>
-					) : conversations.length === 0 ? (
+					) : conversations.length === 0 && conversationFolders.length === 0 ? (
 						<div className="pt-2">
 							<Empty className="border border-dashed py-8">
 								<EmptyHeader>
@@ -520,36 +785,163 @@ export function ChatSidebar({
 							</Empty>
 						</div>
 					) : (
-						<div className="flex flex-col gap-px">
-							{conversations.map((conversation) => {
-								const isActive = activeConversationId === conversation.id;
-								const isEditing = editingConversationId === conversation.id;
-								const agentName =
-									agentNameById.get(conversation.agentId) ?? "Assistant";
+						<div className="flex flex-col gap-2">
+							{pinnedConversations.length > 0 ? (
+								<section
+									className="flex flex-col gap-px"
+									onDragOver={(event) => event.preventDefault()}
+									onDrop={(event) => {
+										event.preventDefault();
+										reorderDraggedConversation({ folderId: null, pinned: true });
+									}}
+								>
+									<div className="flex items-center gap-1 px-2 pb-1 text-[11px] font-medium text-muted-foreground">
+										<PinIcon className="size-3" aria-hidden="true" />
+										Pinned
+									</div>
+									{pinnedConversations.map(renderConversation)}
+								</section>
+							) : null}
+
+							{folderSections.map(({ folder, conversations: folderConversations }) => {
+								const open = !closedFolderIds.has(folder.id);
+								const isEditingFolder = editingFolderId === folder.id;
 
 								return (
-									<ConversationItem
-										key={conversation.id}
-										conversation={conversation}
-										isActive={isActive}
-										isEditing={isEditing}
-										editingTitle={isEditing ? editingTitle : ""}
-										agentName={agentName}
-										onSelect={() => onSelectConversation(conversation.id)}
-										onRename={(title) => {
-											onRenameConversation?.(conversation.id, title);
-											setEditingConversationId(null);
-										}}
-										onDelete={() => onDeleteConversation?.(conversation.id)}
-										onEditStart={() => {
-											setEditingConversationId(conversation.id);
-											setEditingTitle(conversation.title);
-										}}
-										onEditChange={setEditingTitle}
-										onEditCancel={() => setEditingConversationId(null)}
-									/>
+									<section key={folder.id} className="flex flex-col gap-px">
+										<div
+											className="group/folder flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/60"
+											onDragOver={(event) => event.preventDefault()}
+											onDrop={(event) => {
+												event.preventDefault();
+												reorderDraggedConversation({
+													folderId: folder.id,
+													pinned: false,
+												});
+											}}
+										>
+											<FolderIcon className="size-3.5 shrink-0" aria-hidden="true" />
+											{isEditingFolder ? (
+												<div className="flex min-w-0 flex-1 items-center gap-1">
+													<Input
+														value={editingFolderName}
+														onChange={(event) =>
+															setEditingFolderName(event.target.value)
+														}
+														onKeyDown={(event) => {
+															if (event.key === "Enter") {
+																const name = editingFolderName.trim();
+																if (name) {
+																	onRenameConversationFolder?.(folder.id, name);
+																	setEditingFolderId(null);
+																}
+															}
+															if (event.key === "Escape") setEditingFolderId(null);
+														}}
+														className="h-6 min-w-0 rounded-md px-2 text-xs"
+														autoFocus
+													/>
+												</div>
+											) : (
+												<button
+													type="button"
+													className="flex min-w-0 flex-1 items-center gap-1 text-left"
+													onClick={() => toggleFolder(folder.id)}
+												>
+													<ChevronDownIcon
+														className={cn(
+															"size-3 shrink-0 transition-transform",
+															!open && "-rotate-90",
+														)}
+														aria-hidden="true"
+													/>
+													<span className="truncate font-medium">{folder.name}</span>
+													<span className="text-muted-foreground/50">
+														{folderConversations.length}
+													</span>
+												</button>
+											)}
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button
+														type="button"
+														size="icon-sm"
+														variant="ghost"
+														className="size-6 opacity-0 group-hover/folder:opacity-100 data-[state=open]:opacity-100"
+														aria-label="Folder actions"
+													>
+														<MoreHorizontalIcon className="size-3" aria-hidden="true" />
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<DropdownMenuItem
+														onSelect={() => {
+															setEditingFolderId(folder.id);
+															setEditingFolderName(folder.name);
+														}}
+														className="gap-2"
+													>
+														<PencilIcon className="size-3.5" aria-hidden="true" />
+														Rename
+													</DropdownMenuItem>
+													<DropdownMenuItem
+														variant="destructive"
+														onSelect={() => onDeleteConversationFolder?.(folder.id)}
+														className="gap-2"
+													>
+														<Trash2Icon className="size-3.5" aria-hidden="true" />
+														Delete folder
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										</div>
+										{open ? (
+											<div className="flex flex-col gap-px pl-3">
+												{folderConversations.length > 0 ? (
+													folderConversations.map(renderConversation)
+												) : (
+													<div
+														className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground/60"
+														onDragOver={(event) => event.preventDefault()}
+														onDrop={(event) => {
+															event.preventDefault();
+															reorderDraggedConversation({
+																folderId: folder.id,
+																pinned: false,
+															});
+														}}
+													>
+														Drop chats here
+													</div>
+												)}
+											</div>
+										) : null}
+									</section>
 								);
 							})}
+
+							<section
+								className="flex flex-col gap-px"
+								onDragOver={(event) => event.preventDefault()}
+								onDrop={(event) => {
+									event.preventDefault();
+									reorderDraggedConversation({ folderId: null, pinned: false });
+								}}
+							>
+								{topLevelConversations.length > 0 ? (
+									<>
+										<div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground">
+											Recent
+										</div>
+										{topLevelConversations.map(renderConversation)}
+									</>
+								) : folderSections.length === 0 ? (
+									<div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground/60">
+										Drop chats here
+									</div>
+								) : null}
+							</section>
+
 							{hasMoreConversations && onLoadMoreConversations ? (
 								<Button
 									type="button"

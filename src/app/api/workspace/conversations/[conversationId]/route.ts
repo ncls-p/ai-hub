@@ -6,12 +6,27 @@ import { getSession } from "@/modules/auth/session";
 import { getConversationMessages } from "@/modules/agent/use-cases";
 import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
-import { conversations } from "@/server/infrastructure/db/schema";
+import {
+	conversationFolders,
+	conversations,
+} from "@/server/infrastructure/db/schema";
 
 const paramsSchema = z.object({ conversationId: z.uuid() });
-const updateConversationSchema = z.object({
-	title: z.string().trim().min(1).max(512),
-});
+const updateConversationSchema = z
+	.object({
+		title: z.string().trim().min(1).max(512).optional(),
+		folderId: z.uuid().nullable().optional(),
+		pinned: z.boolean().optional(),
+		sidebarOrder: z.number().int().nullable().optional(),
+	})
+	.refine(
+		(value) =>
+			value.title !== undefined ||
+			value.folderId !== undefined ||
+			value.pinned !== undefined ||
+			value.sidebarOrder !== undefined,
+		{ message: "At least one field is required" },
+	);
 
 export async function GET(
 	_req: Request,
@@ -69,6 +84,9 @@ export async function GET(
 				id: conversation.id,
 				agentId: conversation.agentId,
 				title: conversation.title,
+				folderId: conversation.folderId,
+				pinnedAt: conversation.pinnedAt,
+				sidebarOrder: conversation.sidebarOrder,
 				createdAt: conversation.createdAt,
 				updatedAt: conversation.updatedAt,
 			},
@@ -133,9 +151,45 @@ export async function PATCH(
 			);
 		}
 
+		if (parsedBody.data.folderId) {
+			const [folder] = await db
+				.select({ id: conversationFolders.id })
+				.from(conversationFolders)
+				.where(
+					and(
+						eq(conversationFolders.id, parsedBody.data.folderId),
+						eq(conversationFolders.workspaceId, conversation.workspaceId),
+						eq(conversationFolders.userId, session.user.id),
+						isNull(conversationFolders.archivedAt),
+					),
+				)
+				.limit(1);
+			if (!folder) {
+				return NextResponse.json(
+					{ error: "Folder not found" },
+					{ status: 404 },
+				);
+			}
+		}
+
+		const patch: Partial<typeof conversations.$inferInsert> = {};
+		if (parsedBody.data.title !== undefined) {
+			patch.title = parsedBody.data.title;
+			patch.updatedAt = new Date();
+		}
+		if (parsedBody.data.folderId !== undefined) {
+			patch.folderId = parsedBody.data.folderId;
+		}
+		if (parsedBody.data.pinned !== undefined) {
+			patch.pinnedAt = parsedBody.data.pinned ? new Date() : null;
+		}
+		if (parsedBody.data.sidebarOrder !== undefined) {
+			patch.sidebarOrder = parsedBody.data.sidebarOrder;
+		}
+
 		const [updated] = await db
 			.update(conversations)
-			.set({ title: parsedBody.data.title, updatedAt: new Date() })
+			.set(patch)
 			.where(eq(conversations.id, conversationId))
 			.returning();
 

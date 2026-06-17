@@ -9,6 +9,17 @@ export interface ChatConversation {
 	id: string;
 	title: string;
 	agentId: string;
+	folderId?: string | null;
+	pinnedAt?: string | null;
+	sidebarOrder?: number | null;
+	updatedAt: string;
+}
+
+export interface ChatConversationFolder {
+	id: string;
+	name: string;
+	sortOrder: number;
+	createdAt: string;
 	updatedAt: string;
 }
 

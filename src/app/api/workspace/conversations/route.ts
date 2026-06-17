@@ -1,11 +1,15 @@
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getSession } from "@/modules/auth/session";
 import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
-import { agents, conversations } from "@/server/infrastructure/db/schema";
+import {
+	agents,
+	conversationFolders,
+	conversations,
+} from "@/server/infrastructure/db/schema";
 
 const DEFAULT_CONVERSATION_LIMIT = 50;
 const MAX_CONVERSATION_LIMIT = 100;
@@ -128,19 +132,51 @@ export async function GET(req: Request) {
 				title: conversations.title,
 				agentId: conversations.agentId,
 				agentVersionId: conversations.agentVersionId,
+				folderId: conversations.folderId,
+				pinnedAt: conversations.pinnedAt,
+				sidebarOrder: conversations.sidebarOrder,
 				createdAt: conversations.createdAt,
 				updatedAt: conversations.updatedAt,
 			})
 			.from(conversations)
 			.where(and(...conditions))
-			.orderBy(desc(conversations.updatedAt), desc(conversations.id))
+			.orderBy(
+				sql`${conversations.pinnedAt} IS NULL`,
+				sql`${conversations.sidebarOrder} IS NULL`,
+				asc(conversations.sidebarOrder),
+				desc(conversations.updatedAt),
+				desc(conversations.id),
+			)
 			.limit(limit + 1);
 		const hasMore = rows.length > limit;
 		const list = hasMore ? rows.slice(0, limit) : rows;
 
 		if (includeMeta === "true") {
+			const folders = await db
+				.select({
+					id: conversationFolders.id,
+					name: conversationFolders.name,
+					sortOrder: conversationFolders.sortOrder,
+					createdAt: conversationFolders.createdAt,
+					updatedAt: conversationFolders.updatedAt,
+				})
+				.from(conversationFolders)
+				.where(
+					and(
+						eq(conversationFolders.workspaceId, workspaceId),
+						eq(conversationFolders.userId, session.user.id),
+						isNull(conversationFolders.archivedAt),
+					),
+				)
+				.orderBy(
+					asc(conversationFolders.sortOrder),
+					asc(conversationFolders.createdAt),
+					asc(conversationFolders.id),
+				);
+
 			return NextResponse.json({
 				conversations: list,
+				folders,
 				hasMore,
 				nextCursor: hasMore ? createConversationCursor(list.at(-1)) : null,
 			});

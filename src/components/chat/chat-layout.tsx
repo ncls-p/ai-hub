@@ -12,7 +12,11 @@ import {
 import { useWorkspaceShell } from "@/components/app-shell";
 import { AppHeader } from "@/components/app-header";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
-import type { ChatAgent, ChatConversation } from "@/components/chat/chat-types";
+import type {
+	ChatAgent,
+	ChatConversation,
+	ChatConversationFolder,
+} from "@/components/chat/chat-types";
 import { SetupWizard } from "@/components/setup/setup-wizard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -108,6 +112,7 @@ type ChatSidebarCollapsedChangeHandler = NonNullable<
 interface ChatLayoutProps {
   agents: ChatAgent[];
   conversations: ChatConversation[];
+  conversationFolders: ChatConversationFolder[];
   selectedAgent: ChatAgent | null;
   selectedAgentId: string | null;
   activeConversationId: string | null;
@@ -118,6 +123,15 @@ interface ChatLayoutProps {
   onNewConversation: () => void;
   onRenameConversation?: (conversationId: string, title: string) => void;
   onDeleteConversation?: (conversationId: string) => void;
+  onCreateConversationFolder?: (name: string) => void;
+  onRenameConversationFolder?: (folderId: string, name: string) => void;
+  onDeleteConversationFolder?: (folderId: string) => void;
+  onToggleConversationPin?: (conversationId: string, pinned: boolean) => void;
+  onReorderConversations?: (input: {
+    conversationIds: string[];
+    folderId: string | null;
+    pinned?: boolean;
+  }) => void;
   hasMoreConversations?: boolean;
   loadingMoreConversations?: boolean;
   onLoadMoreConversations?: () => void;
@@ -128,6 +142,7 @@ interface ChatLayoutProps {
 export function ChatLayout({
   agents,
   conversations,
+  conversationFolders,
   selectedAgentId,
   activeConversationId,
   canChat,
@@ -137,6 +152,11 @@ export function ChatLayout({
   onNewConversation,
   onRenameConversation,
   onDeleteConversation,
+  onCreateConversationFolder,
+  onRenameConversationFolder,
+  onDeleteConversationFolder,
+  onToggleConversationPin,
+  onReorderConversations,
   hasMoreConversations,
   loadingMoreConversations,
   onLoadMoreConversations,
@@ -194,12 +214,18 @@ export function ChatLayout({
   const sidebarProps = {
     agents,
     conversations,
+    conversationFolders,
     activeConversationId,
     loading: loadingSidebar,
     onSelectConversation,
     onNewConversation,
     onRenameConversation,
     onDeleteConversation,
+    onCreateConversationFolder,
+    onRenameConversationFolder,
+    onDeleteConversationFolder,
+    onToggleConversationPin,
+    onReorderConversations,
     hasMoreConversations,
     loadingMoreConversations,
     onLoadMoreConversations,

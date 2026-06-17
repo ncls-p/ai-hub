@@ -518,6 +518,38 @@ export const conversationStatusEnum = pgEnum("conversation_status", [
 	"deleted",
 ]);
 
+export const conversationFolders = pgTable(
+	"conversation_folders",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		workspaceId: uuid("workspace_id")
+			.notNull()
+			.references(() => workspaces.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		name: varchar("name", { length: 160 }).notNull(),
+		sortOrder: integer("sort_order").notNull().default(0),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		archivedAt: timestamp("archived_at", { withTimezone: true }),
+	},
+	(t) => ({
+		userWorkspaceOrder: index("conversation_folders_user_workspace_order").on(
+			t.userId,
+			t.workspaceId,
+			t.archivedAt,
+			t.sortOrder,
+			t.createdAt,
+			t.id,
+		),
+	}),
+);
+
 export const conversations = pgTable(
 	"conversations",
 	{
@@ -534,6 +566,11 @@ export const conversations = pgTable(
 			.references(() => users.id),
 		title: varchar("title", { length: 512 }).notNull().default("New Chat"),
 		status: conversationStatusEnum("status").notNull().default("active"),
+		folderId: uuid("folder_id").references(() => conversationFolders.id, {
+			onDelete: "set null",
+		}),
+		pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+		sidebarOrder: integer("sidebar_order"),
 		parentConversationId: uuid("parent_conversation_id"),
 		branchFromMessageId: uuid("branch_from_message_id"),
 		createdAt: timestamp("created_at", { withTimezone: true })
@@ -555,6 +592,15 @@ export const conversations = pgTable(
 			t.workspaceId,
 			t.status,
 			t.archivedAt,
+			t.updatedAt,
+			t.id,
+		),
+		sidebarOrder: index("conversations_sidebar_order").on(
+			t.userId,
+			t.workspaceId,
+			t.folderId,
+			t.pinnedAt,
+			t.sidebarOrder,
 			t.updatedAt,
 			t.id,
 		),
@@ -1371,6 +1417,7 @@ export const workspaceRelations = relations(workspaces, ({ one, many }) => ({
 	}),
 	members: many(workspaceMembers),
 	agents: many(agents),
+	conversationFolders: many(conversationFolders),
 	providers: many(aiProviders),
 	mcpServers: many(mcpServers),
 	knowledgeBases: many(knowledgeBases),
@@ -1410,6 +1457,21 @@ export const agentVersionRelations = relations(
 	}),
 );
 
+export const conversationFolderRelations = relations(
+	conversationFolders,
+	({ one, many }) => ({
+		workspace: one(workspaces, {
+			fields: [conversationFolders.workspaceId],
+			references: [workspaces.id],
+		}),
+		user: one(users, {
+			fields: [conversationFolders.userId],
+			references: [users.id],
+		}),
+		conversations: many(conversations),
+	}),
+);
+
 export const conversationRelations = relations(
 	conversations,
 	({ one, many }) => ({
@@ -1428,6 +1490,10 @@ export const conversationRelations = relations(
 		user: one(users, {
 			fields: [conversations.userId],
 			references: [users.id],
+		}),
+		folder: one(conversationFolders, {
+			fields: [conversations.folderId],
+			references: [conversationFolders.id],
 		}),
 		messages: many(messages),
 	}),

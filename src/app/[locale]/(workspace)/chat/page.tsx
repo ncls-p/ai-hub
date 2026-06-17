@@ -24,6 +24,7 @@ import type {
 	AgentVersion,
 	ChatAgent,
 	ChatConversation,
+	ChatConversationFolder,
 	ChatMessage,
 	PendingToolApproval,
 } from "@/components/chat/chat-types";
@@ -60,6 +61,7 @@ const CONVERSATION_PAGE_SIZE = 50;
 
 type ConversationListPage = {
 	conversations: ChatConversation[];
+	folders: ChatConversationFolder[];
 	hasMore: boolean;
 	nextCursor: string | null;
 };
@@ -70,10 +72,16 @@ function normalizeConversationList(
 	payload: ConversationListPayload,
 ): ConversationListPage {
 	if (Array.isArray(payload)) {
-		return { conversations: payload, hasMore: false, nextCursor: null };
+		return {
+			conversations: payload,
+			folders: [],
+			hasMore: false,
+			nextCursor: null,
+		};
 	}
 	return {
 		conversations: payload.conversations ?? [],
+		folders: payload.folders ?? [],
 		hasMore: payload.hasMore,
 		nextCursor: payload.nextCursor,
 	};
@@ -185,6 +193,9 @@ export default function ChatPage() {
 	const [agents, setAgents] = useState<ChatAgent[]>([]);
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 	const [conversations, setConversations] = useState<ChatConversation[]>([]);
+	const [conversationFolders, setConversationFolders] = useState<
+		ChatConversationFolder[]
+	>([]);
 	const [hasMoreConversations, setHasMoreConversations] = useState(false);
 	const [conversationCursor, setConversationCursor] = useState<string | null>(
 		null,
@@ -230,7 +241,12 @@ export default function ChatPage() {
 			signal?: AbortSignal;
 		} = {}) => {
 			if (!workspaceId) {
-				return { conversations: [], hasMore: false, nextCursor: null };
+				return {
+					conversations: [],
+					folders: [],
+					hasMore: false,
+					nextCursor: null,
+				};
 			}
 			const params = new URLSearchParams({
 				workspaceId,
@@ -250,6 +266,7 @@ export default function ChatPage() {
 	const refreshConversations = useCallback(async () => {
 		const data = await fetchConversationPage();
 		setConversations(data.conversations);
+		setConversationFolders(data.folders);
 		setHasMoreConversations(data.hasMore);
 		setConversationCursor(data.nextCursor);
 	}, [fetchConversationPage]);
@@ -264,6 +281,7 @@ export default function ChatPage() {
 			setConversations((current) =>
 				mergeConversationPages(current, data.conversations),
 			);
+			if (data.folders.length > 0) setConversationFolders(data.folders);
 			setHasMoreConversations(data.hasMore);
 			setConversationCursor(data.nextCursor);
 		} catch (error) {
@@ -415,6 +433,7 @@ export default function ChatPage() {
 				});
 				if (cancelled) return;
 				setConversations(conversationData.conversations);
+				setConversationFolders(conversationData.folders);
 				setHasMoreConversations(conversationData.hasMore);
 				setConversationCursor(conversationData.nextCursor);
 			} catch (err) {
@@ -736,6 +755,131 @@ export default function ChatPage() {
 		}
 	}
 
+	async function createConversationFolder(name: string) {
+		if (!workspaceId) return;
+		try {
+			const data = await fetchJson<{ folder: ChatConversationFolder }>(
+				"/api/workspace/conversation-folders",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ workspaceId, name }),
+				},
+			);
+			setConversationFolders((current) => [...current, data.folder]);
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to create folder",
+			);
+		}
+	}
+
+	async function renameConversationFolder(folderId: string, name: string) {
+		try {
+			const data = await fetchJson<{ folder: ChatConversationFolder }>(
+				`/api/workspace/conversation-folders/${folderId}`,
+				{
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ name }),
+				},
+			);
+			setConversationFolders((current) =>
+				current.map((folder) =>
+					folder.id === folderId ? data.folder : folder,
+				),
+			);
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to rename folder",
+			);
+		}
+	}
+
+	async function deleteConversationFolder(folderId: string) {
+		const confirmed = window.confirm("Delete this folder? Conversations stay available.");
+		if (!confirmed) return;
+		try {
+			await fetchJson(`/api/workspace/conversation-folders/${folderId}`, {
+				method: "DELETE",
+			});
+			setConversationFolders((current) =>
+				current.filter((folder) => folder.id !== folderId),
+			);
+			setConversations((current) =>
+				current.map((conversation) =>
+					conversation.folderId === folderId
+						? { ...conversation, folderId: null }
+						: conversation,
+				),
+			);
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to delete folder",
+			);
+		}
+	}
+
+	async function toggleConversationPin(conversationId: string, pinned: boolean) {
+		try {
+			const data = await fetchJson<{ conversation: ChatConversation }>(
+				`/api/workspace/conversations/${conversationId}`,
+				{
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ pinned }),
+				},
+			);
+			setConversations((current) =>
+				current.map((conversation) =>
+					conversation.id === conversationId
+						? { ...conversation, ...data.conversation }
+						: conversation,
+				),
+			);
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to update pin",
+			);
+		}
+	}
+
+	async function reorderConversations(input: {
+		conversationIds: string[];
+		folderId: string | null;
+		pinned?: boolean;
+	}) {
+		if (!workspaceId) return;
+		const now = new Date().toISOString();
+		setConversations((current) =>
+			current.map((conversation) => {
+				const index = input.conversationIds.indexOf(conversation.id);
+				if (index === -1) return conversation;
+				return {
+					...conversation,
+					folderId: input.folderId,
+					pinnedAt:
+						input.pinned === undefined
+							? conversation.pinnedAt
+							: input.pinned
+								? (conversation.pinnedAt ?? now)
+								: null,
+					sidebarOrder: (index + 1) * 1000,
+				};
+			}),
+		);
+		try {
+			await fetchJson("/api/workspace/conversations/reorder", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ workspaceId, ...input }),
+			});
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to move chat");
+			await refreshConversations();
+		}
+	}
+
 	function skipPendingSuggestions() {
 		if (!activeConversationId) return;
 		void fetch(
@@ -905,6 +1049,7 @@ export default function ChatPage() {
 		<ChatLayout
 			agents={agents}
 			conversations={conversations}
+			conversationFolders={conversationFolders}
 			selectedAgent={selectedAgent}
 			selectedAgentId={selectedAgentId}
 			activeConversationId={activeConversationId}
@@ -922,6 +1067,19 @@ export default function ChatPage() {
 			onDeleteConversation={(conversationId) =>
 				void deleteConversation(conversationId)
 			}
+			onCreateConversationFolder={(name) =>
+				void createConversationFolder(name)
+			}
+			onRenameConversationFolder={(folderId, name) =>
+				void renameConversationFolder(folderId, name)
+			}
+			onDeleteConversationFolder={(folderId) =>
+				void deleteConversationFolder(folderId)
+			}
+			onToggleConversationPin={(conversationId, pinned) =>
+				void toggleConversationPin(conversationId, pinned)
+			}
+			onReorderConversations={(input) => void reorderConversations(input)}
 			onSetupComplete={() => void reloadAgentContext()}
 		>
 			<ChatContextBar quota={quota} />
