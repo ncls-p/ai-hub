@@ -76,6 +76,7 @@ interface Agent {
 	description: string | null;
 	logoUrl?: string | null;
 	activeVersionId: string | null;
+	modelDisplayName?: string | null;
 	sharingMode: "personal" | "marketplace" | "specific_user";
 	isGlobal: boolean;
 	isRecommended: boolean;
@@ -154,7 +155,7 @@ export default function AgentsPage() {
 		abortRef.current = new AbortController();
 		try {
 			const res = await fetch(
-				`/api/workspace/agents?workspaceId=${workspaceId}`,
+				`/api/workspace/agents?workspaceId=${workspaceId}&includeModelMeta=true`,
 				{
 					signal: abortRef.current.signal,
 				},
@@ -182,7 +183,7 @@ export default function AgentsPage() {
 		async function loadInitialAgents() {
 			try {
 				const res = await fetch(
-					`/api/workspace/agents?workspaceId=${currentWorkspaceId}`,
+					`/api/workspace/agents?workspaceId=${currentWorkspaceId}&includeModelMeta=true`,
 					{ signal: controller.signal },
 				);
 				if (!res.ok) throw new Error("Failed to load agents");
@@ -237,6 +238,7 @@ export default function AgentsPage() {
 				throw new Error(err.error || tList("toastCreateFailed"));
 			}
 
+			const data = (await res.json()) as { agent?: Agent };
 			toast.success(tList("toastCreated"));
 			setShowCreateDialog(false);
 			setForm({
@@ -249,6 +251,10 @@ export default function AgentsPage() {
 				isRecommended: false,
 				curationLabel: "none",
 			});
+			if (data.agent?.id) {
+				router.push(`/agents/${data.agent.id}`);
+				return;
+			}
 			await refreshAgents();
 		} catch (err) {
 			toast.error(
@@ -338,6 +344,10 @@ export default function AgentsPage() {
 		}
 	}
 
+	const readyAgentsCount = agents.filter((agent) =>
+		Boolean(agent.activeVersionId && agent.modelDisplayName),
+	).length;
+	const needsSetupCount = agents.length - readyAgentsCount;
 	const filteredAgents = agents.filter((agent) => {
 		if (!searchQuery.trim()) return true;
 		const q = searchQuery.toLowerCase();
@@ -365,6 +375,59 @@ export default function AgentsPage() {
 			}
 		>
 			<div className="flex flex-col gap-6">
+				<section className="rounded-2xl border bg-card p-5">
+					<div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+						<div className="max-w-2xl">
+							<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+								{tList("guideEyebrow")}
+							</p>
+							<h2 className="mt-2 text-xl font-semibold tracking-tight">
+								{tList("guideTitle")}
+							</h2>
+							<p className="mt-2 text-sm text-muted-foreground">
+								{tList("guideDescription")}
+							</p>
+						</div>
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-stretch">
+							<div className="grid grid-cols-2 gap-2 text-sm">
+								<div className="rounded-xl border bg-background px-3 py-2">
+									<p className="font-medium">{readyAgentsCount}</p>
+									<p className="text-xs text-muted-foreground">
+										{tList("readyCount", { count: readyAgentsCount })}
+									</p>
+								</div>
+								<div className="rounded-xl border bg-background px-3 py-2">
+									<p className="font-medium">{needsSetupCount}</p>
+									<p className="text-xs text-muted-foreground">
+										{tList("needsSetupCount", { count: needsSetupCount })}
+									</p>
+								</div>
+							</div>
+							<Button size="sm" onClick={() => setShowCreateDialog(true)}>
+								<PlusIcon className="size-4" aria-hidden="true" />
+								{t("create")}
+							</Button>
+						</div>
+					</div>
+					<ol className="mt-5 grid gap-2 sm:grid-cols-3">
+						{[
+							tList("guideStepCreate"),
+							tList("guideStepModel"),
+							tList("guideStepChat"),
+						].map((step, index) => (
+							<li
+								key={step}
+								className="flex items-center gap-3 rounded-xl border bg-background px-3 py-2 text-sm"
+							>
+								<span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+									{index + 1}
+								</span>
+								<span className="min-w-0 truncate">{step}</span>
+							</li>
+						))}
+					</ol>
+				</section>
+
 				{/* Agents list card */}
 				<section className="rounded-2xl border bg-card">
 					{/* Toolbar */}
@@ -428,7 +491,9 @@ export default function AgentsPage() {
 					) : (
 						<div className="flex flex-col gap-1 p-2">
 							{filteredAgents.map((agent) => {
-								const isReady = Boolean(agent.activeVersionId);
+								const isReady = Boolean(
+									agent.activeVersionId && agent.modelDisplayName,
+								);
 
 								return (
 									<div
@@ -497,7 +562,7 @@ export default function AgentsPage() {
 											className="shrink-0 text-xs"
 											onClick={() =>
 												router.push(
-													agent.activeVersionId
+													isReady
 														? `/chat?agentId=${agent.id}`
 														: `/agents/${agent.id}`,
 												)
@@ -522,7 +587,7 @@ export default function AgentsPage() {
 												<DropdownMenuItem
 													onClick={() =>
 														router.push(
-															agent.activeVersionId
+															isReady
 																? `/chat?agentId=${agent.id}`
 																: `/agents/${agent.id}`,
 														)
@@ -595,13 +660,15 @@ export default function AgentsPage() {
 				<DialogContent className="max-w-md">
 					<DialogHeader>
 						<DialogTitle>{t("createTitle")}</DialogTitle>
-						<DialogDescription>{t("description")}</DialogDescription>
+						<DialogDescription>{tList("guideDescription")}</DialogDescription>
 					</DialogHeader>
 					<div className="flex flex-col gap-4">
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="agent-name">{t("name")}</Label>
 							<Input
 								id="agent-name"
+								name="agent-name"
+								autoComplete="off"
 								placeholder={t("namePlaceholder")}
 								value={form.name}
 								onChange={(e) =>
@@ -611,13 +678,13 @@ export default function AgentsPage() {
 										slug: slugifyAgentName(e.target.value),
 									})
 								}
-								autoFocus
 							/>
 						</div>
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="agent-description">{t("descriptionLabel")}</Label>
 							<Textarea
 								id="agent-description"
+								name="agent-description"
 								placeholder={t("descriptionPlaceholder")}
 								value={form.description}
 								onChange={(e) =>
@@ -638,6 +705,8 @@ export default function AgentsPage() {
 									<Label htmlFor="agent-slug">{tList("slug")}</Label>
 									<Input
 										id="agent-slug"
+										name="agent-slug"
+										autoComplete="off"
 										placeholder={tList("slugPlaceholder")}
 										value={form.slug}
 										onChange={(e) =>
@@ -682,7 +751,10 @@ export default function AgentsPage() {
 										</Label>
 										<Input
 											id="agent-share-email"
+											name="agent-share-email"
 											type="email"
+											autoComplete="email"
+											spellCheck={false}
 											value={form.shareTargetEmail}
 											onChange={(e) =>
 												setForm({ ...form, shareTargetEmail: e.target.value })
@@ -744,6 +816,12 @@ export default function AgentsPage() {
 								) : null}
 							</div>
 						</AdvancedSection>
+						<div className="rounded-xl border bg-muted/30 p-3 text-sm">
+							<p className="font-medium">{tList("createNextTitle")}</p>
+							<p className="mt-1 text-muted-foreground">
+								{tList("createNextDescription")}
+							</p>
+						</div>
 					</div>
 					<DialogFooter>
 						<Button
@@ -768,7 +846,7 @@ export default function AgentsPage() {
 									{tList("creating")}
 								</>
 							) : (
-								tList("createAgent")
+								tList("createAndConfigure")
 							)}
 						</Button>
 					</DialogFooter>

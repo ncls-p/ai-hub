@@ -2,11 +2,13 @@
 
 import { useParams } from "next/navigation";
 import { type SyntheticEvent, useCallback, useEffect, useState } from "react";
+import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { PageLoading } from "@/components/page-loading";
 import { WorkspacePage } from "@/components/workspace-page";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkspace } from "@/hooks/use-workspace";
 
@@ -558,6 +560,28 @@ export default function AgentConfigurePage() {
 	const capabilitiesCount =
 		totalEnabledTools + selectedKnowledgeIds.length + selectedSkillIds.length;
 	const canEdit = agent?.canEdit ?? false;
+	const hasIdentity = Boolean(form.name.trim());
+	const hasModel = Boolean(form.providerId && form.modelId);
+	const setupSteps = [
+		{
+			label: t("configurePage.stepIdentity"),
+			status: hasIdentity ? t("configurePage.stepDone") : t("statusDraft"),
+			done: hasIdentity,
+		},
+		{
+			label: t("configurePage.stepModel"),
+			status: hasModel ? t("configurePage.stepDone") : t("statusMissingModel"),
+			done: hasModel,
+		},
+		{
+			label: t("configurePage.stepCapabilities"),
+			status:
+				capabilitiesCount > 0
+					? t("configurePage.stepDone")
+					: t("configurePage.stepOptional"),
+			done: capabilitiesCount > 0,
+		},
+	];
 
 	return (
 		<WorkspacePage
@@ -589,7 +613,58 @@ export default function AgentConfigurePage() {
 					onShowDeleteDialogAction={() => setShowDeleteDialog(true)}
 				/>
 
-				<div className="rounded-2xl border bg-card px-5 pb-5 pt-5 animate-in-fade stagger-2">
+				<div className="rounded-2xl border bg-card p-4 animate-in-fade stagger-2">
+					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+						<div>
+							<h3 className="text-base font-semibold">
+								{t("configurePage.setupTitle")}
+							</h3>
+							<p className="mt-1 text-sm text-muted-foreground">
+								{t("configurePage.setupDescription")}
+							</p>
+						</div>
+						{hasModel && agent?.id ? (
+							<Button asChild size="sm">
+								<Link href={`/chat?agentId=${agent.id}`}>
+									{t("configurePage.openChatCta")}
+								</Link>
+							</Button>
+						) : (
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								onClick={() => setActiveTab("essential")}
+							>
+								{t("configurePage.chooseModelCta")}
+							</Button>
+						)}
+					</div>
+					<div className="mt-4 grid gap-2 md:grid-cols-3">
+						{setupSteps.map((step, index) => (
+							<div
+								key={step.label}
+								className="flex items-center gap-3 rounded-xl border bg-background px-3 py-2"
+							>
+								<span
+									className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+										step.done
+											? "bg-success/10 text-success"
+											: "bg-muted text-muted-foreground"
+									}`}
+								>
+									{step.done ? "✓" : index + 1}
+								</span>
+								<div className="min-w-0">
+									<p className="truncate text-sm font-medium">{step.label}</p>
+									<p className="text-xs text-muted-foreground">{step.status}</p>
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+
+				<div className="rounded-2xl border bg-card px-5 pb-5 pt-5 animate-in-fade stagger-3">
 					<Tabs value={activeTab} onValueChange={setActiveTab}>
 						<TabsList className="w-full flex-wrap sm:w-auto">
 							<TabsTrigger value="essential" className="gap-2">
