@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { PageLoading } from "@/components/page-loading";
+import { ModelLogo } from "@/components/providers/model-logo";
 import { WorkspacePage } from "@/components/workspace-page";
 import {
 	AlertDialog,
@@ -73,6 +74,7 @@ interface Agent {
 	name: string;
 	slug: string;
 	description: string | null;
+	logoUrl?: string | null;
 	activeVersionId: string | null;
 	sharingMode: "personal" | "marketplace" | "specific_user";
 	isGlobal: boolean;
@@ -436,12 +438,11 @@ export default function AgentsPage() {
 											!isReady && "opacity-60",
 										)}
 									>
-										<div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
-											<MessageCircleIcon
-												className="size-4"
-												aria-hidden="true"
-											/>
-										</div>
+										<ModelLogo
+											logoUrl={agent.logoUrl}
+											label={agent.name}
+											size="md"
+										/>
 										<div className="min-w-0 flex-1">
 											<div className="flex items-center gap-2">
 												<p className="truncate text-sm font-medium">
