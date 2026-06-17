@@ -1,16 +1,16 @@
 import {
 	ActivityIcon,
 	BookOpenIcon,
-	BotIcon,
 	CalendarClockIcon,
+	CodeIcon,
 	KeyRoundIcon,
 	MessageSquareIcon,
 	PlugZapIcon,
 	ScrollTextIcon,
 	SettingsIcon,
-	SparklesIcon,
 	StoreIcon,
 	UsersIcon,
+	WorkflowIcon,
 	WrenchIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -66,7 +66,7 @@ export type WorkspaceShellState = {
 
 export const primaryNavItems: NavItem[] = [
 	{ href: "/chat", labelKey: "chat", icon: MessageSquareIcon },
-	{ href: "/agents", labelKey: "assistants", icon: BotIcon },
+	{ href: "/agents", labelKey: "assistants", icon: WorkflowIcon },
 	{ href: "/knowledge", labelKey: "knowledge", icon: BookOpenIcon },
 ];
 
@@ -83,7 +83,7 @@ export const capabilitiesNavItems: NavItem[] = [
 ];
 
 export const advancedCapabilityNavItems: NavItem[] = [
-	{ href: "/custom-tools", labelKey: "customTools", icon: SparklesIcon },
+	{ href: "/custom-tools", labelKey: "customTools", icon: CodeIcon },
 	{ href: "/marketplace", labelKey: "marketplace", icon: StoreIcon },
 ];
 

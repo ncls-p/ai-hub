@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { PlusIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { AdvancedSection } from "@/components/ui/advanced-section";
@@ -35,6 +36,7 @@ export function ProviderManager({
 	initialProviders: SafeProvider[];
 	initialModels: ProviderModel[];
 }) {
+	const t = useTranslations("providers.manager");
 	const [providers, setProviders] = useState<SafeProvider[]>(initialProviders);
 	const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
 		initialProviders[0]?.id ?? null,
@@ -95,6 +97,9 @@ export function ProviderManager({
 				(m.displayName ?? "").toLowerCase().includes(q),
 		);
 	}, [models, modelSearch]);
+	const enabledProviderCount = providers.filter(
+		(provider) => provider.enabled,
+	).length;
 
 	const loadProviders = useCallback(async () => {
 		setLoadingProviders(true);
@@ -102,7 +107,7 @@ export function ProviderManager({
 			const res = await fetch(
 				`/api/workspace/providers?workspaceId=${workspaceId}`,
 			);
-			if (!res.ok) throw new Error("Failed to load providers");
+			if (!res.ok) throw new Error(t("errorLoadProviders"));
 			const data = (await res.json()) as SafeProvider[];
 			setProviders(data);
 			setSelectedProviderId((current) => current ?? data[0]?.id ?? null);
@@ -111,7 +116,7 @@ export function ProviderManager({
 		} finally {
 			setLoadingProviders(false);
 		}
-	}, [workspaceId]);
+	}, [workspaceId, t]);
 
 	const loadModelsForProvider = useCallback(
 		async (providerId: string | null) => {
@@ -124,7 +129,7 @@ export function ProviderManager({
 				const res = await fetch(
 					`/api/workspace/providers/${providerId}/models?workspaceId=${workspaceId}`,
 				);
-				if (!res.ok) throw new Error("Failed to load models");
+				if (!res.ok) throw new Error(t("errorLoadModels"));
 				setModels((await res.json()) as ProviderModel[]);
 			} catch (error) {
 				toast.error((error as Error).message);
@@ -132,7 +137,7 @@ export function ProviderManager({
 				setLoadingModels(false);
 			}
 		},
-		[workspaceId],
+		[workspaceId, t],
 	);
 
 	function openAddDialog() {
@@ -184,17 +189,14 @@ export function ProviderManager({
 			});
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({}));
-				throw new Error(
-					data.error ||
-						"Unable to connect to the AI service. Check the URL and API key.",
-				);
+				throw new Error(data.error || t("errorConnectProvider"));
 			}
 			const provider = (await res.json()) as SafeProvider;
 			setProviders((prev) => [provider, ...prev]);
 			setSelectedProviderId(provider.id);
 			setShowAddDialog(false);
 			resetAddForm();
-			toast.success("Provider connected");
+			toast.success(t("toastProviderConnected"));
 			await loadModelsForProvider(provider.id);
 		} catch (error) {
 			toast.error((error as Error).message);
@@ -212,7 +214,7 @@ export function ProviderManager({
 				body: JSON.stringify({ workspaceId }),
 			});
 			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || "Provider test failed");
+			if (!res.ok) throw new Error(data.error || t("errorProviderTest"));
 			toast[data.status === "healthy" ? "success" : "error"](
 				data.message || `Provider is ${data.status}`,
 			);
@@ -232,7 +234,7 @@ export function ProviderManager({
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ workspaceId, enabled: !provider.enabled }),
 			});
-			if (!res.ok) throw new Error("Failed to update provider");
+			if (!res.ok) throw new Error(t("errorUpdateProvider"));
 			await loadProviders();
 		} catch (error) {
 			toast.error((error as Error).message);
@@ -258,11 +260,13 @@ export function ProviderManager({
 					}),
 				},
 			);
-			if (!res.ok) throw new Error((await res.json()).error || "Failed");
+			if (!res.ok) {
+				throw new Error((await res.json()).error || t("errorUpdateProvider"));
+			}
 			setEditingProvider(null);
 			setEditApiKey("");
 			await loadProviders();
-			toast.success("Connection updated");
+			toast.success(t("toastConnectionUpdated"));
 		} catch (error) {
 			toast.error((error as Error).message);
 		} finally {
@@ -277,14 +281,14 @@ export function ProviderManager({
 				`/api/workspace/providers/${id}?workspaceId=${workspaceId}`,
 				{ method: "DELETE" },
 			);
-			if (!res.ok) throw new Error("Failed to archive provider");
+			if (!res.ok) throw new Error(t("errorArchiveProvider"));
 			setProviders((prev) => prev.filter((p) => p.id !== id));
 			if (selectedProviderId === id) {
 				setSelectedProviderId(null);
 				setModels([]);
 			}
 			setDeleteProviderId(null);
-			toast.success("Provider archived");
+			toast.success(t("toastProviderArchived"));
 		} catch (error) {
 			toast.error((error as Error).message);
 		} finally {
@@ -326,11 +330,11 @@ export function ProviderManager({
 			);
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({}));
-				throw new Error(data.error || "Failed to create model");
+				throw new Error(data.error || t("errorCreateModel"));
 			}
 			setManualModelId("");
 			setManualModelName("");
-			toast.success("Model registered");
+			toast.success(t("toastModelRegistered"));
 			await loadModelsForProvider(selectedProviderId);
 		} catch (error) {
 			toast.error((error as Error).message);
@@ -347,9 +351,13 @@ export function ProviderManager({
 				`/api/workspace/providers/${selectedProviderId}/models?workspaceId=${workspaceId}&action=discover`,
 			);
 			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || "Failed to discover models");
+			if (!res.ok) throw new Error(data.error || t("errorDiscoverModels"));
 			setDiscoveredModels(data as DiscoveredModel[]);
-			toast.success(`Discovered ${(data as DiscoveredModel[]).length} models`);
+			toast.success(
+				t("toastDiscoveredModels", {
+					count: (data as DiscoveredModel[]).length,
+				}),
+			);
 		} catch (error) {
 			toast.error((error as Error).message);
 		} finally {
@@ -369,8 +377,10 @@ export function ProviderManager({
 					body: JSON.stringify({ workspaceId, logoUrl }),
 				},
 			);
-			if (!res.ok) throw new Error("Failed to update model logo");
-			toast.success(logoUrl ? "Logo assigned" : "Logo removed");
+			if (!res.ok) throw new Error(t("errorUpdateModelLogo"));
+			toast.success(
+				logoUrl ? t("toastLogoAssigned") : t("toastLogoRemoved"),
+			);
 			await loadModelsForProvider(selectedProviderId);
 		} catch (error) {
 			toast.error((error as Error).message);
@@ -387,9 +397,9 @@ export function ProviderManager({
 				`/api/workspace/providers/${selectedProviderId}/models/${modelId}?workspaceId=${workspaceId}`,
 				{ method: "DELETE" },
 			);
-			if (!res.ok) throw new Error("Failed to delete model");
+			if (!res.ok) throw new Error(t("errorDeleteModel"));
 			setDeleteModelId(null);
-			toast.success("Model removed");
+			toast.success(t("toastModelRemoved"));
 			await loadModelsForProvider(selectedProviderId);
 		} catch (error) {
 			toast.error((error as Error).message);
@@ -401,23 +411,59 @@ export function ProviderManager({
 	return (
 		<div className="space-y-6">
 			<div className="rounded-xl border bg-card p-5 sm:p-6">
-				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-					<div>
-						<h2 className="text-xl font-semibold tracking-tight">
-							AI Providers
+				<div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+					<div className="max-w-2xl">
+						<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+							{t("heroEyebrow")}
+						</p>
+						<h2 className="mt-2 text-xl font-semibold tracking-tight">
+							{t("heroTitle")}
 						</h2>
-						<p className="mt-1 text-sm text-muted-foreground">
-							Connect to AI services and manage available models.
+						<p className="mt-2 text-sm text-muted-foreground">
+							{t("heroDescription")}
 						</p>
 					</div>
-					<Button size="sm" onClick={openAddDialog}>
-						<PlusIcon className="size-4" aria-hidden="true" />
-						New connection
-					</Button>
+					<div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-stretch">
+						<div className="grid grid-cols-2 gap-2 text-sm">
+							<div className="rounded-xl border bg-background px-3 py-2">
+								<p className="font-medium">{enabledProviderCount}</p>
+								<p className="text-xs text-muted-foreground">
+									{t("connectionsReady", { count: enabledProviderCount })}
+								</p>
+							</div>
+							<div className="rounded-xl border bg-background px-3 py-2">
+								<p className="font-medium">{models.length}</p>
+								<p className="text-xs text-muted-foreground">
+									{t("modelsShown", { count: models.length })}
+								</p>
+							</div>
+						</div>
+						<Button size="sm" onClick={openAddDialog}>
+							<PlusIcon className="size-4" aria-hidden="true" />
+							{t("connectAi")}
+						</Button>
+					</div>
 				</div>
+				<ol className="mt-5 grid gap-2 sm:grid-cols-3">
+					{[
+						t("heroStepConnect"),
+						t("heroStepModels"),
+						t("heroStepAssistants"),
+					].map((step, index) => (
+						<li
+							key={step}
+							className="flex items-center gap-3 rounded-xl border bg-background px-3 py-2 text-sm"
+						>
+							<span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+								{index + 1}
+							</span>
+							<span className="min-w-0 truncate">{step}</span>
+						</li>
+					))}
+				</ol>
 				<AdvancedSection
-					label="System health"
-					hint="Status, model counts, and connection details"
+					label={t("systemHealth")}
+					hint={t("systemHealthHint")}
 					storageKey="advanced:providers-health"
 					className="mt-5 border-border/50 bg-muted/20"
 				>

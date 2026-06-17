@@ -5,6 +5,7 @@ import {
 	SearchIcon,
 	Trash2Icon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,20 +58,22 @@ function ProviderListHeader({
 	providerSearch,
 	onSearchChange,
 }: ProviderListProps) {
+	const t = useTranslations("providers.manager");
 	return (
 		<div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
 			<div>
-				<h3 className="text-base font-semibold">Connections</h3>
+				<h3 className="text-base font-semibold">{t("connections")}</h3>
 				<p className="text-sm text-muted-foreground">
-					{providers.length} provider{providers.length !== 1 ? "s" : ""}{" "}
-					configured
+					{t("configuredConnections", { count: providers.length })}
 				</p>
 			</div>
 			{providers.length > 2 ? (
 				<div className="relative w-56 sm:w-64">
 					<SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
-						placeholder="Filter…"
+						name="provider-search"
+						autoComplete="off"
+						placeholder={t("filterConnections")}
 						value={providerSearch}
 						onChange={(e) => onSearchChange(e.target.value)}
 						className="h-8 pl-9 text-sm"
@@ -82,6 +85,7 @@ function ProviderListHeader({
 }
 
 function ProviderListBody(props: ProviderListProps) {
+	const t = useTranslations("providers.manager");
 	const { loadingProviders, filteredProviders, providers, providerSearch } =
 		props;
 
@@ -101,7 +105,7 @@ function ProviderListBody(props: ProviderListProps) {
 	if (filteredProviders.length === 0) {
 		return (
 			<div className="px-5 py-8 text-center text-sm text-muted-foreground">
-				No provider matches &ldquo;{providerSearch}&rdquo;.
+				{t("noProviderMatch", { query: providerSearch })}
 			</div>
 		);
 	}
@@ -116,15 +120,16 @@ function ProviderListBody(props: ProviderListProps) {
 }
 
 function EmptyProviders({ onAddProvider }: { onAddProvider: () => void }) {
+	const t = useTranslations("providers.manager");
 	return (
 		<div className="px-5 py-12 text-center">
-			<p className="text-sm font-medium">No connections yet</p>
+			<p className="text-sm font-medium">{t("noConnections")}</p>
 			<p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-				Add your first provider to make models available to your assistants.
+				{t("noConnectionsHint")}
 			</p>
 			<Button size="sm" className="mt-4" onClick={onAddProvider}>
 				<PlusIcon className="size-4" aria-hidden="true" />
-				Add first provider
+				{t("addFirstProvider")}
 			</Button>
 		</div>
 	);
@@ -140,6 +145,7 @@ function ProviderRow({
 	onEditProvider,
 	onDeleteProvider,
 }: ProviderListProps & { provider: SafeProvider }) {
+	const t = useTranslations("providers.manager");
 	const colors = kindAccent(provider.kind);
 	const isSelected = selectedProviderId === provider.id;
 
@@ -157,7 +163,7 @@ function ProviderRow({
 			onClick={() => onSelectProvider(provider.id)}
 			onKeyDown={selectOnKeyboard}
 			className={cn(
-				"group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none",
+				"group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 				isSelected ? "bg-muted/50" : "",
 			)}
 		>
@@ -173,12 +179,12 @@ function ProviderRow({
 					<p className="truncate text-sm font-medium">{provider.name}</p>
 					{isSelected ? (
 						<Badge variant="secondary" className="text-xs">
-							Active
+							{t("active")}
 						</Badge>
 					) : null}
 				</div>
 				<p className="truncate font-mono text-xs text-muted-foreground">
-					{provider.baseUrl || "default endpoint"}
+					{provider.baseUrl || t("defaultEndpoint")}
 				</p>
 			</div>
 			<span className="hidden text-xs text-muted-foreground sm:inline">
@@ -193,7 +199,9 @@ function ProviderRow({
 					checked={provider.enabled}
 					onCheckedChange={() => onToggleProvider(provider)}
 					size="sm"
-					aria-label={provider.enabled ? "Disable provider" : "Enable provider"}
+					aria-label={
+						provider.enabled ? t("disableProvider") : t("enableProvider")
+					}
 				/>
 			</div>
 			<ProviderActions
@@ -217,6 +225,7 @@ function ProviderActions({
 	ProviderListProps,
 	"busy" | "onEditProvider" | "onTestProvider" | "onDeleteProvider"
 > & { provider: SafeProvider }) {
+	const t = useTranslations("providers.manager");
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
@@ -225,29 +234,29 @@ function ProviderActions({
 					variant="ghost"
 					className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
 					onClick={(e) => e.stopPropagation()}
-					aria-label="Provider actions"
+					aria-label={t("providerActions")}
 				>
-					<MoreHorizontalIcon className="size-4" />
+					<MoreHorizontalIcon className="size-4" aria-hidden="true" />
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">
 				<DropdownMenuItem onClick={() => onEditProvider(provider)}>
-					Edit connection
+					{t("editConnection")}
 				</DropdownMenuItem>
 				<DropdownMenuItem
 					disabled={busy}
 					onClick={() => onTestProvider(provider.id)}
 				>
-					<RefreshCwIcon className="size-4" />
-					Test connection
+					<RefreshCwIcon className="size-4" aria-hidden="true" />
+					{t("testConnection")}
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem
 					variant="destructive"
 					onClick={() => onDeleteProvider(provider.id)}
 				>
-					<Trash2Icon className="size-4" />
-					Archive provider
+					<Trash2Icon className="size-4" aria-hidden="true" />
+					{t("archiveProvider")}
 				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>

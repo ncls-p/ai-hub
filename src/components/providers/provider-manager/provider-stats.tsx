@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import { cn } from "@/lib/utils";
 
 import { AUTH_TYPE_LABELS, KIND_LABELS } from "./constants";
@@ -35,6 +37,7 @@ export function SystemStrip({
 	providers: SafeProvider[];
 	models: ProviderModel[];
 }) {
+	const t = useTranslations("providers.manager");
 	const healthyCount = providers.filter(
 		(p) => p.healthStatus === "healthy",
 	).length;
@@ -46,10 +49,10 @@ export function SystemStrip({
 
 	return (
 		<div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-			<MetricCell label="Connections" value={providers.length} />
-			<MetricCell label="Models" value={totalModels} />
-			<MetricCell label="Healthy" value={healthyCount} accent />
-			<MetricCell label="Enabled" value={enabledCount} />
+			<MetricCell label={t("connections")} value={providers.length} />
+			<MetricCell label={t("models")} value={totalModels} />
+			<MetricCell label={t("healthy")} value={healthyCount} accent />
+			<MetricCell label={t("enabled")} value={enabledCount} />
 		</div>
 	);
 }
@@ -61,6 +64,7 @@ export function StatsSidebar({
 	models: ProviderModel[];
 	selectedProvider: SafeProvider | null;
 }) {
+	const t = useTranslations("providers.manager");
 	const enabledModels = models.filter((m) => m.enabled).length;
 
 	return (
@@ -68,7 +72,7 @@ export function StatsSidebar({
 			<div className="rounded-xl border bg-card">
 				<div className="border-b bg-muted/30 px-5 py-3">
 					<p className="text-xs font-medium text-muted-foreground">
-						Connection details
+						{t("connectionDetails")}
 					</p>
 				</div>
 				{selectedProvider ? (
@@ -89,40 +93,40 @@ export function StatsSidebar({
 						<div className="grid grid-cols-2 divide-x">
 							<div className="px-5 py-4">
 								<p className="text-xl font-bold">{models.length}</p>
-								<p className="text-xs text-muted-foreground">models</p>
+								<p className="text-xs text-muted-foreground">{t("models")}</p>
 							</div>
 							<div className="px-5 py-4">
 								<p className="text-xl font-bold text-success">
 									{enabledModels}
 								</p>
-								<p className="text-xs text-muted-foreground">enabled</p>
+								<p className="text-xs text-muted-foreground">{t("enabled")}</p>
 							</div>
 						</div>
 						<div className="space-y-3 px-5 py-4 text-sm">
 							<div className="flex items-center justify-between">
-								<span className="text-muted-foreground">Status</span>
+								<span className="text-muted-foreground">{t("status")}</span>
 								<HealthIndicator
 									status={selectedProvider.healthStatus}
 									lastChecked={selectedProvider.lastCheckedAt}
 								/>
 							</div>
 							<div className="flex items-center justify-between">
-								<span className="text-muted-foreground">Auth</span>
+								<span className="text-muted-foreground">{t("auth")}</span>
 								<span className="font-medium">
 									{AUTH_TYPE_LABELS[selectedProvider.authType]}
 								</span>
 							</div>
 							<div>
-								<span className="text-muted-foreground">Endpoint</span>
+								<span className="text-muted-foreground">{t("endpoint")}</span>
 								<p className="mt-1 break-all font-mono text-xs text-muted-foreground">
-									{selectedProvider.baseUrl || "default endpoint"}
+									{selectedProvider.baseUrl || t("defaultEndpoint")}
 								</p>
 							</div>
 						</div>
 					</div>
 				) : (
 					<div className="px-5 py-8 text-center text-sm text-muted-foreground">
-						Select a provider to view details.
+						{t("selectProviderDetails")}
 					</div>
 				)}
 			</div>

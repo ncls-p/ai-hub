@@ -6,8 +6,10 @@ import {
 	Trash2Icon,
 	XIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { AdvancedSection } from "@/components/ui/advanced-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,11 +61,19 @@ type ModelsPanelProps = {
 };
 
 export function ModelsPanel(props: ModelsPanelProps) {
+	const t = useTranslations("providers.manager");
 	if (props.selectedProvider) {
 		return (
 			<section className="rounded-xl border bg-card">
 				<ModelsHeader {...props} />
-				<ManualModelForm {...props} />
+				<AdvancedSection
+					label={t("manualModel")}
+					hint={t("manualModelHint")}
+					storageKey="advanced:provider-manual-model"
+					className="m-4 mb-0 border-border/60 bg-muted/20"
+				>
+					<ManualModelForm {...props} />
+				</AdvancedSection>
 				<DiscoveredModelsList {...props} />
 				<RegisteredModelsList {...props} />
 			</section>
@@ -74,7 +84,7 @@ export function ModelsPanel(props: ModelsPanelProps) {
 		return (
 			<div className="rounded-xl border border-dashed bg-card p-8 text-center">
 				<p className="text-sm text-muted-foreground">
-					Select a provider to manage its models.
+					{t("selectProvider")}
 				</p>
 			</div>
 		);
@@ -88,15 +98,15 @@ function ModelsHeader({
 	busy,
 	onDiscoverModels,
 }: ModelsPanelProps) {
+	const t = useTranslations("providers.manager");
 	return (
 		<div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
 			<div>
-				<h3 className="text-base font-semibold">Models</h3>
+				<h3 className="text-base font-semibold">{t("models")}</h3>
 				<p className="text-sm text-muted-foreground">
-					Registered models for{" "}
-					<span className="font-medium text-foreground">
-						{selectedProvider?.name}
-					</span>
+					{t("modelsForProvider", {
+						provider: selectedProvider?.name ?? "—",
+					})}
 				</p>
 			</div>
 			<Button
@@ -106,7 +116,7 @@ function ModelsHeader({
 				onClick={onDiscoverModels}
 			>
 				<RefreshCwIcon className="size-4" aria-hidden="true" />
-				Discover
+				{t("discoverModels")}
 			</Button>
 		</div>
 	);
@@ -120,31 +130,34 @@ function ManualModelForm({
 	onManualModelIdChange,
 	onManualModelNameChange,
 }: ModelsPanelProps) {
+	const t = useTranslations("providers.manager");
 	return (
-		<div className="grid gap-3 border-b p-4 sm:grid-cols-[1fr_1fr_auto]">
+		<div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
 			<div className="grid gap-1.5">
 				<Label htmlFor="model-id" className="text-xs">
-					Model ID
+					{t("modelId")}
 				</Label>
 				<Input
 					id="model-id"
+					name="model-id"
 					autoComplete="off"
 					value={manualModelId}
 					onChange={(e) => onManualModelIdChange(e.target.value)}
-					placeholder="gpt-4o-mini"
+					placeholder="gpt-4o-mini…"
 					className="font-mono text-sm"
 				/>
 			</div>
 			<div className="grid gap-1.5">
 				<Label htmlFor="model-display-name" className="text-xs">
-					Display name
+					{t("displayName")}
 				</Label>
 				<Input
 					id="model-display-name"
+					name="model-display-name"
 					autoComplete="off"
 					value={manualModelName}
 					onChange={(e) => onManualModelNameChange(e.target.value)}
-					placeholder="GPT-4o mini"
+					placeholder="GPT-4o mini…"
 					className="text-sm"
 				/>
 			</div>
@@ -155,7 +168,7 @@ function ManualModelForm({
 					onClick={() => onCreateModel()}
 				>
 					<PlusIcon className="size-4" aria-hidden="true" />
-					Add
+					{t("addModel")}
 				</Button>
 			</div>
 		</div>
@@ -168,12 +181,13 @@ function DiscoveredModelsList({
 	busy,
 	onCreateModel,
 }: ModelsPanelProps) {
+	const t = useTranslations("providers.manager");
 	if (discoveredModels.length === 0) return null;
 
 	return (
 		<div className="border-b bg-muted/15 p-4">
 			<p className="mb-2 text-xs font-medium text-muted-foreground">
-				Discovered ({discoveredModels.length})
+				{t("discoveredModels", { count: discoveredModels.length })}
 			</p>
 			<div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border bg-background">
 				{discoveredModels.map((model) => {
@@ -195,7 +209,7 @@ function DiscoveredModelsList({
 								disabled={busy || alreadyRegistered}
 								onClick={() => onCreateModel(model)}
 							>
-								{alreadyRegistered ? "Added" : "Add"}
+								{alreadyRegistered ? t("alreadyAdded") : t("addModel")}
 							</Button>
 						</div>
 					);
@@ -241,13 +255,16 @@ function RegisteredModelsList({
 	onUpdateModelLogo,
 	onDeleteModel,
 }: ModelsPanelProps) {
+	const t = useTranslations("providers.manager");
 	return (
 		<div className="p-4">
 			{models.length > 3 ? (
 				<div className="relative mb-3">
 					<SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
-						placeholder="Filter models…"
+						name="model-search"
+						autoComplete="off"
+						placeholder={t("filterModels")}
 						value={modelSearch}
 						onChange={(e) => onModelSearchChange(e.target.value)}
 						className="h-8 pl-9 text-sm"
@@ -285,6 +302,7 @@ function RegisteredModelsBody({
 	| "onUpdateModelLogo"
 	| "onDeleteModel"
 >) {
+	const t = useTranslations("providers.manager");
 	if (loadingModels) {
 		return (
 			<div className="space-y-2">
@@ -297,7 +315,7 @@ function RegisteredModelsBody({
 	if (filteredModels.length === 0 && models.length === 0) {
 		return (
 			<div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-				No models registered yet.
+				{t("noModels")}
 			</div>
 		);
 	}
@@ -305,7 +323,7 @@ function RegisteredModelsBody({
 	if (filteredModels.length === 0) {
 		return (
 			<div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-				No model matches &ldquo;{modelSearch}&rdquo;.
+				{t("noModelMatch", { query: modelSearch })}
 			</div>
 		);
 	}
@@ -336,6 +354,7 @@ function RegisteredModelRow({
 	onUpdateModelLogo: (modelId: string, logoUrl: string | null) => void;
 	onDeleteModel: (modelId: string) => void;
 }) {
+	const t = useTranslations("providers.manager");
 	const modelLabel = model.displayName || model.modelId;
 
 	async function handleLogoChange(file: File | undefined) {
@@ -381,7 +400,7 @@ function RegisteredModelRow({
 				<Button size="icon-xs" variant="ghost" asChild>
 					<label
 						htmlFor={`model-logo-${model.id}`}
-						aria-label="Assign model logo"
+						aria-label={t("assignModelLogo")}
 						aria-disabled={busy}
 						className={cn(
 							"cursor-pointer",
@@ -396,7 +415,7 @@ function RegisteredModelRow({
 						size="icon-xs"
 						variant="ghost"
 						disabled={busy}
-						aria-label="Remove model logo"
+						aria-label={t("removeModelLogo")}
 						onClick={() => onUpdateModelLogo(model.id, null)}
 					>
 						<XIcon className="size-3.5" aria-hidden="true" />
@@ -405,11 +424,11 @@ function RegisteredModelRow({
 				<Button
 					size="icon-xs"
 					variant="ghost"
-					aria-label="Remove model"
+					aria-label={t("removeModel")}
 					disabled={busy}
 					onClick={() => onDeleteModel(model.id)}
 				>
-					<Trash2Icon className="size-3.5" />
+					<Trash2Icon className="size-3.5" aria-hidden="true" />
 				</Button>
 			</div>
 		</div>

@@ -1,5 +1,3 @@
-"use client";
-
 import { Loader2Icon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -64,13 +62,14 @@ type AddProviderDialogProps = {
 
 export function AddProviderDialog(props: AddProviderDialogProps) {
 	const t = useTranslations("providers");
+	const tm = useTranslations("providers.manager");
 	const tCommon = useTranslations("common");
 	return (
 		<Dialog open={props.open} onOpenChange={props.onOpenChange}>
 			<DialogContent className="sm:max-w-lg">
 				<DialogHeader>
 					<DialogTitle>{t("add")}</DialogTitle>
-					<DialogDescription>{t("description")}</DialogDescription>
+					<DialogDescription>{tm("addDialogDescription")}</DialogDescription>
 				</DialogHeader>
 				<div className="grid gap-4">
 					<AddProviderBasicFields {...props} />
@@ -85,7 +84,7 @@ export function AddProviderDialog(props: AddProviderDialogProps) {
 				</div>
 				<DialogFooter>
 					<Button variant="outline" onClick={() => props.onOpenChange(false)}>
-						Cancel
+						{tCommon("cancel")}
 					</Button>
 					<Button
 						disabled={props.busy || !props.addName.trim()}
@@ -96,7 +95,7 @@ export function AddProviderDialog(props: AddProviderDialogProps) {
 						) : (
 							<PlusIcon className="size-4" aria-hidden="true" />
 						)}
-						Connect provider
+						{tm("connectProvider")}
 					</Button>
 				</DialogFooter>
 			</DialogContent>
@@ -105,35 +104,41 @@ export function AddProviderDialog(props: AddProviderDialogProps) {
 }
 
 function AddProviderBasicFields(props: AddProviderDialogProps) {
+	const t = useTranslations("providers.manager");
 	return (
 		<>
 			<div className="grid gap-2">
-				<Label htmlFor="add-provider-name">Name</Label>
+				<Label htmlFor="add-provider-name">{t("providerName")}</Label>
 				<Input
 					id="add-provider-name"
+					name="add-provider-name"
 					autoComplete="off"
 					value={props.addName}
 					onChange={(e) => props.onNameChange(e.target.value)}
-					placeholder="Production OpenAI"
+					placeholder={t("providerNamePlaceholder")}
 				/>
 			</div>
 			<div className="grid gap-2">
-				<Label htmlFor="add-provider-url">Service URL</Label>
+				<Label htmlFor="add-provider-url">{t("serviceUrl")}</Label>
 				<Input
 					id="add-provider-url"
+					name="add-provider-url"
 					type="url"
+					inputMode="url"
 					autoComplete="off"
 					value={props.addBaseUrl}
 					onChange={(e) => props.onBaseUrlChange(e.target.value)}
-					placeholder="https://api.openai.com/v1"
+					placeholder={t("serviceUrlPlaceholder")}
 				/>
 			</div>
 			<div className="grid gap-2">
-				<Label htmlFor="add-provider-key">API key</Label>
+				<Label htmlFor="add-provider-key">{t("apiKey")}</Label>
 				<Input
 					id="add-provider-key"
+					name="add-provider-key"
 					type="password"
 					autoComplete="off"
+					spellCheck={false}
 					value={props.addApiKey}
 					onChange={(e) => props.onApiKeyChange(e.target.value)}
 					placeholder="sk-…"
@@ -144,11 +149,12 @@ function AddProviderBasicFields(props: AddProviderDialogProps) {
 }
 
 function AddProviderAdvancedFields(props: AddProviderDialogProps) {
+	const t = useTranslations("providers.manager");
 	return (
 		<div className="grid gap-4 rounded-xl border bg-muted/20 p-4">
 			<div className="grid gap-3 sm:grid-cols-2">
 				<div className="grid gap-2">
-					<Label htmlFor="add-provider-kind">Provider type</Label>
+					<Label htmlFor="add-provider-kind">{t("providerType")}</Label>
 					<Select
 						value={props.addKind}
 						onValueChange={(value) => {
@@ -170,7 +176,7 @@ function AddProviderAdvancedFields(props: AddProviderDialogProps) {
 					</Select>
 				</div>
 				<div className="grid gap-2">
-					<Label htmlFor="add-provider-auth">Authentication</Label>
+					<Label htmlFor="add-provider-auth">{t("authentication")}</Label>
 					<Select
 						value={props.addAuthType}
 						onValueChange={(value) =>
@@ -192,24 +198,26 @@ function AddProviderAdvancedFields(props: AddProviderDialogProps) {
 			</div>
 			<div className="grid gap-3 sm:grid-cols-2">
 				<div className="grid gap-2">
-					<Label htmlFor="add-headers">Custom headers</Label>
+					<Label htmlFor="add-headers">{t("customHeaders")}</Label>
 					<Textarea
 						id="add-headers"
+						name="add-headers"
 						autoComplete="off"
 						value={props.addCustomHeaders}
 						onChange={(e) => props.onCustomHeadersChange(e.target.value)}
-						placeholder="X-Team=ai-platform"
+						placeholder="X-Team=ai-platform…"
 						className="min-h-20 font-mono text-xs"
 					/>
 				</div>
 				<div className="grid gap-2">
-					<Label htmlFor="add-query">Query params</Label>
+					<Label htmlFor="add-query">{t("queryParams")}</Label>
 					<Textarea
 						id="add-query"
+						name="add-query"
 						autoComplete="off"
 						value={props.addQueryParams}
 						onChange={(e) => props.onQueryParamsChange(e.target.value)}
-						placeholder="api-version=2024-10-21"
+						placeholder="api-version=2024-10-21…"
 						className="min-h-20 font-mono text-xs"
 					/>
 				</div>
@@ -243,49 +251,63 @@ export function EditProviderDialog({
 	onApiKeyChange,
 	onSave,
 }: EditProviderDialogProps) {
+	const t = useTranslations("providers.manager");
+	const tCommon = useTranslations("common");
 	return (
 		<Dialog open={Boolean(editingProvider)} onOpenChange={onClose}>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>Edit connection</DialogTitle>
+					<DialogTitle>{t("editDialogTitle")}</DialogTitle>
 					<DialogDescription>
-						Update the details for &ldquo;{editingProvider?.name}&rdquo;.
+						{t("editDialogDescription", { name: editingProvider?.name ?? "" })}
 					</DialogDescription>
 				</DialogHeader>
 				<div className="grid gap-4">
 					<div className="grid gap-2">
-						<Label>Name</Label>
+						<Label htmlFor="edit-provider-name">{t("providerName")}</Label>
 						<Input
+							id="edit-provider-name"
+							name="edit-provider-name"
+							autoComplete="off"
 							value={editName}
 							onChange={(e) => onNameChange(e.target.value)}
 						/>
 					</div>
 					<div className="grid gap-2">
-						<Label>Service URL</Label>
+						<Label htmlFor="edit-provider-url">{t("serviceUrl")}</Label>
 						<Input
+							id="edit-provider-url"
+							name="edit-provider-url"
+							type="url"
+							inputMode="url"
+							autoComplete="off"
 							value={editBaseUrl}
 							onChange={(e) => onBaseUrlChange(e.target.value)}
 						/>
 					</div>
 					<div className="grid gap-2">
-						<Label>
-							New API key{" "}
-							<span className="text-muted-foreground">(optional)</span>
+						<Label htmlFor="edit-provider-key">
+							{t("newApiKey")}{" "}
+							<span className="text-muted-foreground">({t("optional")})</span>
 						</Label>
 						<Input
+							id="edit-provider-key"
+							name="edit-provider-key"
 							type="password"
+							autoComplete="off"
+							spellCheck={false}
 							value={editApiKey}
 							onChange={(e) => onApiKeyChange(e.target.value)}
-							placeholder="Leave blank to keep current key"
+							placeholder={t("keepCurrentKey")}
 						/>
 					</div>
 				</div>
 				<DialogFooter>
 					<Button variant="outline" onClick={onClose}>
-						Cancel
+						{tCommon("cancel")}
 					</Button>
 					<Button disabled={busy} onClick={onSave}>
-						Save changes
+						{t("saveChanges")}
 					</Button>
 				</DialogFooter>
 			</DialogContent>
@@ -304,24 +326,25 @@ export function DeleteProviderDialog({
 	onClose: () => void;
 	onDelete: (id: string) => void;
 }) {
+	const t = useTranslations("providers.manager");
+	const tCommon = useTranslations("common");
 	return (
 		<AlertDialog open={Boolean(deleteProviderId)} onOpenChange={onClose}>
 			<AlertDialogContent>
 				<AlertDialogHeader>
-					<AlertDialogTitle>Archive this connection?</AlertDialogTitle>
+					<AlertDialogTitle>{t("archiveTitle")}</AlertDialogTitle>
 					<AlertDialogDescription>
-						The provider will be archived. Existing agent versions may keep
-						references to its models.
+						{t("archiveDescription")}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>
-					<AlertDialogCancel>Cancel</AlertDialogCancel>
+					<AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
 					<AlertDialogAction
 						variant="destructive"
 						disabled={busy}
 						onClick={() => deleteProviderId && onDelete(deleteProviderId)}
 					>
-						Archive
+						{t("archive")}
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>
@@ -340,24 +363,25 @@ export function DeleteModelDialog({
 	onClose: () => void;
 	onDelete: (id: string) => void;
 }) {
+	const t = useTranslations("providers.manager");
+	const tCommon = useTranslations("common");
 	return (
 		<AlertDialog open={Boolean(deleteModelId)} onOpenChange={onClose}>
 			<AlertDialogContent>
 				<AlertDialogHeader>
-					<AlertDialogTitle>Remove this model?</AlertDialogTitle>
+					<AlertDialogTitle>{t("removeModelTitle")}</AlertDialogTitle>
 					<AlertDialogDescription>
-						The model will be removed from this provider. Assistants already
-						bound to it may need reconfiguration.
+						{t("removeModelDescription")}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>
-					<AlertDialogCancel>Cancel</AlertDialogCancel>
+					<AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
 					<AlertDialogAction
 						variant="destructive"
 						disabled={busy}
 						onClick={() => deleteModelId && onDelete(deleteModelId)}
 					>
-						Remove
+						{t("remove")}
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>

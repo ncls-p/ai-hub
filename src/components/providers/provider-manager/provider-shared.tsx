@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -6,7 +8,7 @@ import { KIND_ICONS, kindAccent } from "./constants";
 import type { ProviderKind } from "./types";
 import { formatNumber, timeAgo } from "./utils";
 
-export function CapabilityBadge({ label }: { label: string }) {
+function CapabilityBadge({ label }: { label: string }) {
 	return (
 		<span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
 			{label}
@@ -31,6 +33,7 @@ export function ModelCapabilities({
 	hostedBy?: string | null;
 	enabled?: boolean;
 }) {
+	const t = useTranslations("providers.manager");
 	const caps = capabilities ?? {};
 	const contextLabel = formatNumber(contextWindow);
 	const maxOutLabel = formatNumber(maxOutputTokens);
@@ -50,7 +53,7 @@ export function ModelCapabilities({
 		<div className="mt-1 flex flex-wrap items-center gap-1.5">
 			{enabled === false ? (
 				<Badge variant="secondary" className="text-xs">
-					Disabled
+					{t("disabled")}
 				</Badge>
 			) : null}
 			{hostedBy ? (
@@ -60,12 +63,12 @@ export function ModelCapabilities({
 			) : null}
 			{contextLabel ? (
 				<span className="text-xs text-muted-foreground">
-					Context {contextLabel}
+					{t("contextWindow", { value: contextLabel })}
 				</span>
 			) : null}
 			{maxOutLabel ? (
 				<span className="text-xs text-muted-foreground">
-					Max out {maxOutLabel}
+					{t("maxOutput", { value: maxOutLabel })}
 				</span>
 			) : null}
 			{inputTokenCost ? (
@@ -95,6 +98,7 @@ export function HealthIndicator({
 	status: string | null;
 	lastChecked: string | null;
 }) {
+	const t = useTranslations("providers.manager");
 	const dotColor =
 		status === "healthy"
 			? "bg-success"
@@ -103,10 +107,10 @@ export function HealthIndicator({
 				: "bg-muted-foreground/40";
 	const label =
 		status === "healthy"
-			? "Online"
+			? t("healthOnline")
 			: status === "unhealthy"
-				? "Failed"
-				: "Unknown";
+				? t("healthFailed")
+				: t("healthUnknown");
 
 	return (
 		<span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -142,7 +146,7 @@ export function ProviderTypeIcon({
 				className,
 			)}
 		>
-			<Icon className="size-4" />
+			<Icon className="size-4" aria-hidden="true" />
 		</div>
 	);
 }
