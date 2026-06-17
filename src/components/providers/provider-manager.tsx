@@ -357,6 +357,28 @@ export function ProviderManager({
 		}
 	}
 
+	async function updateModelLogo(modelId: string, logoUrl: string | null) {
+		if (!selectedProviderId) return;
+		setBusy(true);
+		try {
+			const res = await fetch(
+				`/api/workspace/providers/${selectedProviderId}/models/${modelId}`,
+				{
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ workspaceId, logoUrl }),
+				},
+			);
+			if (!res.ok) throw new Error("Failed to update model logo");
+			toast.success(logoUrl ? "Logo assigned" : "Logo removed");
+			await loadModelsForProvider(selectedProviderId);
+		} catch (error) {
+			toast.error((error as Error).message);
+		} finally {
+			setBusy(false);
+		}
+	}
+
 	async function deleteModel(modelId: string) {
 		if (!selectedProviderId) return;
 		setBusy(true);
@@ -433,6 +455,9 @@ export function ProviderManager({
 						loadingProviders={loadingProviders}
 						busy={busy}
 						onDiscoverModels={() => void discoverProviderModels()}
+						onUpdateModelLogo={(modelId: string, logoUrl: string | null) =>
+							void updateModelLogo(modelId, logoUrl)
+						}
 						onCreateModel={(model) => void createManualModel(model)}
 						onDeleteModel={setDeleteModelId}
 						onModelSearchChange={setModelSearch}

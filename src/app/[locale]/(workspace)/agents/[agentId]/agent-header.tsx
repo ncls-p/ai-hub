@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { ModelLogo } from "@/components/providers/model-logo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -50,14 +51,24 @@ export function AgentHeader({
 	const t = useTranslations("agents");
 	const selectedProvider = providers.find((p) => p.id === form.providerId);
 	const selectedModel = models.find((m) => m.id === form.modelId);
+	const selectedModelLabel = selectedModel?.displayName || selectedModel?.modelId;
 	const hasModel = Boolean(form.providerId && form.modelId);
 
 	return (
 		<div className="rounded-2xl border bg-card p-5 sm:p-6">
 			<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
-				<div className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-muted text-muted-foreground">
-					<MessageCircleIcon className="size-6" aria-hidden="true" />
-				</div>
+				{selectedModelLabel ? (
+					<ModelLogo
+						logoUrl={selectedModel?.logoUrl}
+						label={selectedModelLabel}
+						size="lg"
+						className="rounded-xl"
+					/>
+				) : (
+					<div className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-muted text-muted-foreground">
+						<MessageCircleIcon className="size-6" aria-hidden="true" />
+					</div>
+				)}
 
 				<div className="min-w-0 flex-1">
 					<div className="flex flex-wrap items-center gap-2">
@@ -82,10 +93,8 @@ export function AgentHeader({
 					{hasModel ? (
 						<p className="mt-1 text-sm text-muted-foreground">
 							{selectedProvider?.name}
-							{selectedModel ? (
-								<span className="ml-1 opacity-70">
-									· {selectedModel.displayName || selectedModel.modelId}
-								</span>
+							{selectedModelLabel ? (
+								<span className="ml-1 opacity-70">· {selectedModelLabel}</span>
 							) : null}
 						</p>
 					) : agent?.description ? (

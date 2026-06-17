@@ -1,4 +1,12 @@
-import { PlusIcon, RefreshCwIcon, SearchIcon, Trash2Icon } from "lucide-react";
+import {
+	ImagePlusIcon,
+	PlusIcon,
+	RefreshCwIcon,
+	SearchIcon,
+	Trash2Icon,
+	XIcon,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,8 +14,28 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
+import { ModelLogo } from "@/components/providers/model-logo";
 import { ModelCapabilities } from "./provider-shared";
 import type { DiscoveredModel, ProviderModel, SafeProvider } from "./types";
+
+const MAX_LOGO_BYTES = 256 * 1024;
+
+function readLogoFile(file: File) {
+	return new Promise<string>((resolve, reject) => {
+		if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+			reject(new Error("Use a bitmap image such as PNG, JPG, WebP, GIF, or AVIF."));
+			return;
+		}
+		if (file.size > MAX_LOGO_BYTES) {
+			reject(new Error("Logo must stay under 256 KB."));
+			return;
+		}
+		const reader = new FileReader();
+		reader.onload = () => resolve(String(reader.result));
+		reader.onerror = () => reject(new Error("Unable to read logo file."));
+		reader.readAsDataURL(file);
+	});
+}
 
 type ModelsPanelProps = {
 	selectedProvider: SafeProvider | null;
@@ -22,6 +50,7 @@ type ModelsPanelProps = {
 	loadingProviders: boolean;
 	busy: boolean;
 	onDiscoverModels: () => void;
+	onUpdateModelLogo: (modelId: string, logoUrl: string | null) => void;
 	onCreateModel: (model?: DiscoveredModel) => void;
 	onDeleteModel: (modelId: string) => void;
 	onModelSearchChange: (value: string) => void;
@@ -207,7 +236,9 @@ function RegisteredModelsList({
 	filteredModels,
 	modelSearch,
 	loadingModels,
+	busy,
 	onModelSearchChange,
+	onUpdateModelLogo,
 	onDeleteModel,
 }: ModelsPanelProps) {
 	return (
@@ -228,6 +259,8 @@ function RegisteredModelsList({
 				filteredModels={filteredModels}
 				modelSearch={modelSearch}
 				loadingModels={loadingModels}
+				busy={busy}
+				onUpdateModelLogo={onUpdateModelLogo}
 				onDeleteModel={onDeleteModel}
 			/>
 		</div>
@@ -239,6 +272,8 @@ function RegisteredModelsBody({
 	filteredModels,
 	modelSearch,
 	loadingModels,
+	busy,
+	onUpdateModelLogo,
 	onDeleteModel,
 }: Pick<
 	ModelsPanelProps,
@@ -246,6 +281,8 @@ function RegisteredModelsBody({
 	| "filteredModels"
 	| "modelSearch"
 	| "loadingModels"
+	| "busy"
+	| "onUpdateModelLogo"
 	| "onDeleteModel"
 >) {
 	if (loadingModels) {
@@ -279,6 +316,8 @@ function RegisteredModelsBody({
 				<RegisteredModelRow
 					key={model.id}
 					model={model}
+					busy={busy}
+					onUpdateModelLogo={onUpdateModelLogo}
 					onDeleteModel={onDeleteModel}
 				/>
 			))}
@@ -288,38 +327,91 @@ function RegisteredModelsBody({
 
 function RegisteredModelRow({
 	model,
+	busy,
+	onUpdateModelLogo,
 	onDeleteModel,
 }: {
 	model: ProviderModel;
+	busy: boolean;
+	onUpdateModelLogo: (modelId: string, logoUrl: string | null) => void;
 	onDeleteModel: (modelId: string) => void;
 }) {
+	const modelLabel = model.displayName || model.modelId;
+
+	async function handleLogoChange(file: File | undefined) {
+		if (!file) return;
+		try {
+			onUpdateModelLogo(model.id, await readLogoFile(file));
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Invalid image file");
+		}
+	}
+
 	return (
 		<div className="group flex items-start justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/30">
-			<div className="min-w-0">
-				<p className="truncate text-sm font-medium">
-					{model.displayName || model.modelId}
-				</p>
-				<p className="truncate font-mono text-xs text-muted-foreground">
-					{model.modelId}
-				</p>
-				<ModelCapabilities
-					capabilities={model.capabilitiesJson}
-					contextWindow={model.contextWindow}
-					maxOutputTokens={model.maxOutputTokens}
-					inputTokenCost={model.inputTokenCost}
-					outputTokenCost={model.outputTokenCost}
-					enabled={model.enabled}
-				/>
+			<div className="flex min-w-0 items-start gap-3">
+				<ModelLogo logoUrl={model.logoUrl} label={modelLabel} size="lg" />
+				<div className="min-w-0">
+					<p className="truncate text-sm font-medium">{modelLabel}</p>
+					<p className="truncate font-mono text-xs text-muted-foreground">
+						{model.modelId}
+					</p>
+					<ModelCapabilities
+						capabilities={model.capabilitiesJson}
+						contextWindow={model.contextWindow}
+						maxOutputTokens={model.maxOutputTokens}
+						inputTokenCost={model.inputTokenCost}
+						outputTokenCost={model.outputTokenCost}
+						enabled={model.enabled}
+					/>
+				</div>
 			</div>
-			<Button
-				size="icon-xs"
-				variant="ghost"
-				aria-label="Remove model"
-				className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-				onClick={() => onDeleteModel(model.id)}
-			>
-				<Trash2Icon className="size-3.5" />
-			</Button>
+			<div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+				<input
+					id={`model-logo-${model.id}`}
+					type="file"
+					accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp,image/x-icon,image/*"
+					className="sr-only"
+					disabled={busy}
+					onChange={(event) => {
+						void handleLogoChange(event.currentTarget.files?.[0]);
+						event.currentTarget.value = "";
+					}}
+				/>
+				<Button size="icon-xs" variant="ghost" asChild>
+					<label
+						htmlFor={`model-logo-${model.id}`}
+						aria-label="Assign model logo"
+						aria-disabled={busy}
+						className={cn(
+							"cursor-pointer",
+							busy && "pointer-events-none opacity-45",
+						)}
+					>
+						<ImagePlusIcon className="size-3.5" aria-hidden="true" />
+					</label>
+				</Button>
+				{model.logoUrl ? (
+					<Button
+						size="icon-xs"
+						variant="ghost"
+						disabled={busy}
+						aria-label="Remove model logo"
+						onClick={() => onUpdateModelLogo(model.id, null)}
+					>
+						<XIcon className="size-3.5" aria-hidden="true" />
+					</Button>
+				) : null}
+				<Button
+					size="icon-xs"
+					variant="ghost"
+					aria-label="Remove model"
+					disabled={busy}
+					onClick={() => onDeleteModel(model.id)}
+				>
+					<Trash2Icon className="size-3.5" />
+				</Button>
+			</div>
 		</div>
 	);
 }

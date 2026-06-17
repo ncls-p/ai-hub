@@ -120,6 +120,13 @@
       "when": 1781300000002,
       "tag": "0016_conversation_folders",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1781300000003,
+      "tag": "0017_ai_model_logos",
+      "breakpoints": true
     }
   ]
 }

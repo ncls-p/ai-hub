@@ -16,10 +16,16 @@ const paramsSchema = z.object({
 });
 
 const workspaceQuerySchema = z.object({ workspaceId: z.uuid() });
+const modelLogoUrlSchema = z
+	.string()
+	.max(350_000)
+	.regex(/^data:image\/(?!svg\+xml)[A-Za-z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$/)
+	.nullable();
 
 const updateModelSchema = z.object({
 	workspaceId: z.uuid(),
 	displayName: z.string().min(1).max(255).optional(),
+	logoUrl: modelLogoUrlSchema.optional(),
 	capabilitiesJson: z.record(z.string(), z.boolean()).optional(),
 	contextWindow: z.number().int().positive().optional(),
 	maxOutputTokens: z.number().int().positive().optional(),

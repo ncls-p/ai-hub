@@ -4,6 +4,7 @@ import { MessageSquareIcon, SaveIcon, SettingsIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { SyntheticEvent } from "react";
 
+import { ModelLogo } from "@/components/providers/model-logo";
 import { AdvancedSection } from "@/components/ui/advanced-section";
 import { Button } from "@/components/ui/button";
 import { CardFooter } from "@/components/ui/card";
@@ -162,11 +163,21 @@ export function EssentialTab({
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="__none__">—</SelectItem>
-										{filteredModels.map((model) => (
-											<SelectItem key={model.id} value={model.id}>
-												{model.displayName || model.modelId}
-											</SelectItem>
-										))}
+										{filteredModels.map((model) => {
+											const modelLabel = model.displayName || model.modelId;
+											return (
+												<SelectItem key={model.id} value={model.id}>
+													<span className="flex items-center gap-2">
+														<ModelLogo
+															logoUrl={model.logoUrl}
+															label={modelLabel}
+															size="sm"
+														/>
+														{modelLabel}
+													</span>
+												</SelectItem>
+											);
+										})}
 									</SelectContent>
 								</Select>
 							</FieldContent>

@@ -30,6 +30,7 @@ export type ProviderModel = {
 	providerId: string;
 	modelId: string;
 	displayName: string | null;
+	logoUrl: string | null;
 	capabilitiesJson: Record<string, boolean> | null;
 	contextWindow: number | null;
 	maxOutputTokens: number | null;

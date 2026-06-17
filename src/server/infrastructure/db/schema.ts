@@ -396,6 +396,7 @@ export const aiModels = pgTable(
 			.references(() => aiProviders.id, { onDelete: "cascade" }),
 		modelId: varchar("model_id", { length: 255 }).notNull(),
 		displayName: varchar("display_name", { length: 255 }),
+		logoUrl: text("logo_url"),
 		capabilitiesJson: jsonb("capabilities_json"),
 		contextWindow: integer("context_window"),
 		maxOutputTokens: integer("max_output_tokens"),

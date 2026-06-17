@@ -22,6 +22,7 @@ export type Model = {
 	providerId: string;
 	modelId: string;
 	displayName: string | null;
+	logoUrl?: string | null;
 };
 export type BuiltinTool = {
 	id: string;

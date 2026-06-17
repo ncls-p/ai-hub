@@ -328,6 +328,7 @@ export interface CreateModelInput {
     providerId: string;
     modelId: string;
     displayName?: string;
+    logoUrl?: string | null;
     capabilitiesJson?: Record<string, boolean>;
     contextWindow?: number;
     maxOutputTokens?: number;
@@ -339,6 +340,7 @@ export async function createModel(providerId: string, input: CreateModelInput) {
     const {
         modelId,
         displayName,
+        logoUrl,
         capabilitiesJson,
         contextWindow,
         maxOutputTokens,
@@ -352,6 +354,7 @@ export async function createModel(providerId: string, input: CreateModelInput) {
             providerId,
             modelId,
             displayName: displayName || modelId,
+            logoUrl: logoUrl || null,
             capabilitiesJson: capabilitiesJson || null,
             contextWindow: contextWindow || null,
             maxOutputTokens: maxOutputTokens || null,
@@ -366,6 +369,7 @@ export async function createModel(providerId: string, input: CreateModelInput) {
 
 export interface UpdateModelInput {
     displayName?: string;
+    logoUrl?: string | null;
     capabilitiesJson?: Record<string, boolean>;
     contextWindow?: number;
     maxOutputTokens?: number;
@@ -379,6 +383,7 @@ export async function updateModel(modelId: string, input: UpdateModelInput) {
 
     if (input.displayName !== undefined)
         updates.displayName = input.displayName;
+    if (input.logoUrl !== undefined) updates.logoUrl = input.logoUrl ?? null;
     if (input.capabilitiesJson !== undefined)
         updates.capabilitiesJson = input.capabilitiesJson || null;
     if (input.contextWindow !== undefined)

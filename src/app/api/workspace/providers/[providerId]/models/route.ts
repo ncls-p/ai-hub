@@ -12,11 +12,17 @@ import { authorization } from "@/server/domain/services/authorization";
 
 const paramsSchema = z.object({ providerId: z.uuid() });
 const workspaceQuerySchema = z.object({ workspaceId: z.uuid() });
+const modelLogoUrlSchema = z
+	.string()
+	.max(350_000)
+	.regex(/^data:image\/(?!svg\+xml)[A-Za-z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$/)
+	.nullable();
 
 const createModelSchema = z.object({
 	workspaceId: z.uuid(),
 	modelId: z.string().min(1).max(255),
 	displayName: z.string().min(1).max(255).optional(),
+	logoUrl: modelLogoUrlSchema.optional(),
 	capabilitiesJson: z.record(z.string(), z.boolean()).optional(),
 	contextWindow: z.number().int().positive().optional(),
 	maxOutputTokens: z.number().int().positive().optional(),
