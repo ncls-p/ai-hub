@@ -304,6 +304,7 @@ export function CapabilitiesTab({
 	selectedSkillIds,
 	setSelectedSkillIdsAction: setSelectedSkillIds,
 	saving,
+	readOnly = false,
 	onSaveAction: onSave,
 }: {
 	builtinTools: BuiltinTool[];
@@ -329,6 +330,7 @@ export function CapabilitiesTab({
 	selectedSkillIds: string[];
 	setSelectedSkillIdsAction: (fn: (prev: string[]) => string[]) => void;
 	saving: boolean;
+	readOnly?: boolean;
 	onSaveAction: () => void;
 }) {
 	const t = useTranslations("agents.configurePage");
@@ -336,7 +338,9 @@ export function CapabilitiesTab({
 	const tCommon = useTranslations("common");
 
 	return (
-		<div className="space-y-4">
+		<div
+			className={cn("space-y-4", readOnly && "pointer-events-none opacity-75")}
+		>
 			<ConfigSection
 				title={t("builtinTools")}
 				description={t("builtinToolsHint")}
@@ -596,16 +600,18 @@ export function CapabilitiesTab({
 				)}
 			</ConfigSection>
 
-			<CardFooter className="justify-end px-0 pb-0">
-				<Button type="button" disabled={saving} onClick={onSave}>
-					{saving ? (
-						<Spinner data-icon="inline-start" />
-					) : (
-						<SaveIcon data-icon="inline-start" aria-hidden="true" />
-					)}
-					{tCommon("save")}
-				</Button>
-			</CardFooter>
+			{readOnly ? null : (
+				<CardFooter className="justify-end px-0 pb-0">
+					<Button type="button" disabled={saving} onClick={onSave}>
+						{saving ? (
+							<Spinner data-icon="inline-start" />
+						) : (
+							<SaveIcon data-icon="inline-start" aria-hidden="true" />
+						)}
+						{tCommon("save")}
+					</Button>
+				</CardFooter>
+			)}
 		</div>
 	);
 }

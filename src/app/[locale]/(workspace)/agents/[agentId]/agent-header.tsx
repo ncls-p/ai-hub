@@ -5,6 +5,7 @@ import {
 	ArrowLeftIcon,
 	CheckCircle2Icon,
 	ClockIcon,
+	CopyIcon,
 	MessageCircleIcon,
 	MoreHorizontalIcon,
 	Trash2Icon,
@@ -31,6 +32,8 @@ export function AgentHeader({
 	totalEnabledTools,
 	enabledMcpCount,
 	selectedKnowledgeIds,
+	canEdit,
+	onCloneAction: onClone,
 	onShowDeleteDialogAction: onShowDeleteDialog,
 }: {
 	agent: Agent | null;
@@ -40,6 +43,8 @@ export function AgentHeader({
 	totalEnabledTools: number;
 	enabledMcpCount: number;
 	selectedKnowledgeIds: string[];
+	canEdit: boolean;
+	onCloneAction: () => void;
 	onShowDeleteDialogAction: () => void;
 }) {
 	const t = useTranslations("agents");
@@ -99,6 +104,12 @@ export function AgentHeader({
 							</Link>
 						</Button>
 					) : null}
+					{agent?.id && agent.canClone !== false ? (
+						<Button variant="outline" size="sm" onClick={onClone}>
+							<CopyIcon className="size-4" aria-hidden="true" />
+							{t("list.clone")}
+						</Button>
+					) : null}
 					<Button asChild variant="outline" size="sm">
 						<Link href="/agents">
 							<ArrowLeftIcon className="size-4" aria-hidden="true" />
@@ -107,22 +118,24 @@ export function AgentHeader({
 							</span>
 						</Link>
 					</Button>
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button variant="ghost" size="icon-sm" className="size-8">
-								<MoreHorizontalIcon className="size-4" aria-hidden="true" />
-							</Button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end">
-							<DropdownMenuItem
-								className="text-destructive focus:text-destructive"
-								onClick={onShowDeleteDialog}
-							>
-								<Trash2Icon className="size-4" aria-hidden="true" />
-								{t("configurePage.delete")}
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
+					{canEdit ? (
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="ghost" size="icon-sm" className="size-8">
+									<MoreHorizontalIcon className="size-4" aria-hidden="true" />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end">
+								<DropdownMenuItem
+									className="text-destructive focus:text-destructive"
+									onClick={onShowDeleteDialog}
+								>
+									<Trash2Icon className="size-4" aria-hidden="true" />
+									{t("configurePage.delete")}
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					) : null}
 				</div>
 			</div>
 

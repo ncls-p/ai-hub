@@ -1037,6 +1037,17 @@ export async function POST(
 					? versionToolChoice
 					: "auto"
 				: undefined;
+		const businessArtifactToolNames = [
+			"create_business_document",
+			"create_spreadsheet",
+			"create_meeting_brief",
+			"create_action_plan",
+			"create_decision_matrix",
+			"create_email_pack",
+		];
+		const hasBusinessArtifactTools = businessArtifactToolNames.some((name) =>
+			availableToolNames.includes(name),
+		);
 		const toolGuidance =
 			availableToolNames.length > 0
 				? [
@@ -1047,6 +1058,9 @@ export async function POST(
 							: null,
 						availableToolNames.includes("create_slide_deck")
 							? "When the user asks for slides, a deck, presentation, pitch deck, PDF slides, or follow-up edits to an existing deck, use create_slide_deck. It creates an interactive click-through HTML deck with print-to-PDF styling; explain briefly that PDF export is static because modern PDF viewers do not preserve JavaScript click animations."
+							: null,
+						hasBusinessArtifactTools
+							? "For common business deliverables, prefer the dedicated artifact tools instead of plain prose: create_business_document for briefs/reports/proposals/policies/SOPs, create_spreadsheet for structured tables, create_meeting_brief for agendas/minutes/action items, create_action_plan for phased execution plans, create_decision_matrix for option comparisons, and create_email_pack for professional email drafts."
 							: null,
 						availableToolNames.includes("render_html_artifact")
 							? "When the user asks for a visual design, diagram, UI mockup, chart-like schema, or interactive demo that is not specifically a slide deck, use render_html_artifact with self-contained HTML, CSS, and optional JavaScript so it appears directly in the chat. The user can view and copy the code from the artifact card, so do not duplicate the full code in your final text unless explicitly asked."

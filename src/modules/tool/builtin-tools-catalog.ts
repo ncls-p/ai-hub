@@ -62,6 +62,60 @@ export const BUILTIN_TOOL_SUMMARIES: BuiltInToolSummary[] = [
 		category: "Create",
 	},
 	{
+		id: "00000000-0000-4000-8000-000000000018",
+		name: "create_business_document",
+		displayName: "Business document",
+		description:
+			"Create printable briefs, reports, proposals, policies, SOPs, and memos.",
+		riskLevel: "medium",
+		category: "Work",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000019",
+		name: "create_spreadsheet",
+		displayName: "Spreadsheet",
+		description:
+			"Create a clean printable table with insights and CSV export text.",
+		riskLevel: "medium",
+		category: "Data",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000020",
+		name: "create_meeting_brief",
+		displayName: "Meeting brief",
+		description:
+			"Turn meeting context into an agenda, decisions, and action-item brief.",
+		riskLevel: "medium",
+		category: "Work",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000021",
+		name: "create_action_plan",
+		displayName: "Action plan",
+		description:
+			"Create a phased project plan with owners, deadlines, and risks.",
+		riskLevel: "medium",
+		category: "Work",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000022",
+		name: "create_decision_matrix",
+		displayName: "Decision matrix",
+		description:
+			"Compare options with weighted criteria and a clear recommendation.",
+		riskLevel: "medium",
+		category: "Work",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000023",
+		name: "create_email_pack",
+		displayName: "Email pack",
+		description:
+			"Draft polished business emails, follow-ups, announcements, and outreach variants.",
+		riskLevel: "medium",
+		category: "Write",
+	},
+	{
 		id: "00000000-0000-4000-8000-000000000006",
 		name: "random_number",
 		displayName: "Random number",

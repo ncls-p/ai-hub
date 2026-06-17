@@ -5,9 +5,10 @@ import { getSession } from "@/modules/auth/session";
 import { db } from "@/server/infrastructure/db";
 import { users } from "@/server/infrastructure/db/schema";
 import {
+	archiveAgent,
+	canEditAgent,
 	getVisibleAgentById,
 	updateAgent,
-	archiveAgent,
 } from "@/modules/agent/use-cases";
 import { isAdminRole } from "@/modules/admin/use-cases";
 import { authorization } from "@/server/domain/services/authorization";
@@ -143,7 +144,20 @@ export async function GET(
 			shareTargetEmail = target?.email ?? null;
 		}
 
-		return NextResponse.json({ ...agent, canAdminCurate, shareTargetEmail });
+		const createPermission = await authorization.requirePermission(
+			{ principalType: "user", principalId: session.user.id },
+			"agents.create",
+			"workspace",
+			workspaceId,
+		);
+
+		return NextResponse.json({
+			...agent,
+			canAdminCurate,
+			canEdit: canEditAgent(agent, session.user.id, canAdminCurate),
+			canClone: createPermission.granted,
+			shareTargetEmail,
+		});
 	} catch (error) {
 		logger.error("Failed to get agent", {}, error as Error);
 		return NextResponse.json(

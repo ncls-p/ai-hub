@@ -66,6 +66,15 @@ export interface CreateAgentInput {
 	canAdminCurate?: boolean;
 }
 
+export interface CloneAgentInput {
+	agentId: string;
+	workspaceId: string;
+	userId: string;
+	canAdminCurate?: boolean;
+	name?: string;
+	slug?: string;
+}
+
 export type AgentToolChoice = "auto" | "required" | "none";
 export type AgentResponseFormat = "text" | "json_object";
 
@@ -151,6 +160,41 @@ function normalizeCurationLabel(
 	if (label === "organization_created") return label;
 	if (isRecommended || label === "recommended") return "recommended";
 	return null;
+}
+
+function slugifyAgentName(value: string) {
+	return (
+		value
+			.toLowerCase()
+			.trim()
+			.normalize("NFKD")
+			.replace(/[\u0300-\u036f]/g, "")
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 96) || "assistant"
+	);
+}
+
+async function agentSlugExists(workspaceId: string, slug: string) {
+	const [existing] = await db
+		.select({ id: agents.id })
+		.from(agents)
+		.where(and(eq(agents.workspaceId, workspaceId), eq(agents.slug, slug)))
+		.limit(1);
+	return Boolean(existing);
+}
+
+async function createAvailableAgentSlug(
+	workspaceId: string,
+	preferredNameOrSlug: string,
+) {
+	const base = slugifyAgentName(preferredNameOrSlug).slice(0, 96);
+	for (let attempt = 0; attempt < 50; attempt += 1) {
+		const suffix = attempt === 0 ? "" : `-${attempt + 1}`;
+		const slug = `${base}${suffix}`.slice(0, 128);
+		if (!(await agentSlugExists(workspaceId, slug))) return slug;
+	}
+	return `${base.slice(0, 88)}-${Date.now().toString(36)}`;
 }
 
 // ─── Agent CRUD ────────────────────────────────────────────────────────
@@ -351,7 +395,11 @@ export function listAgents(
 				visibilityFilter,
 			),
 		)
-		.orderBy(sql`${agents.updatedAt} DESC`);
+		.orderBy(
+			sql`${agents.isGlobal} DESC`,
+			sql`${agents.isRecommended} DESC`,
+			sql`${agents.updatedAt} DESC`,
+		);
 }
 
 export function canUseAgent(agent: AgentRow, userId: string) {
@@ -362,6 +410,14 @@ export function canUseAgent(agent: AgentRow, userId: string) {
 		(agent.sharingMode === "specific_user" &&
 			agent.shareTargetUserId === userId)
 	);
+}
+
+export function canEditAgent(
+	agent: AgentRow,
+	userId: string,
+	canAdminCurate = false,
+) {
+	return canAdminCurate || agent.createdById === userId;
 }
 
 async function getActiveVersionConfig(
@@ -375,6 +431,98 @@ async function getActiveVersionConfig(
 		.where(eq(agentVersions.id, activeVersionId))
 		.limit(1);
 	return v || null;
+}
+
+export async function cloneAgent(input: CloneAgentInput) {
+	const source = await getVisibleAgentById(
+		input.agentId,
+		input.workspaceId,
+		input.userId,
+		Boolean(input.canAdminCurate),
+	);
+	if (!source) throw new Error("Agent not found");
+
+	const name = input.name?.trim() || `Copy of ${source.name}`;
+	const slug = input.slug?.trim()
+		? await createAvailableAgentSlug(input.workspaceId, input.slug)
+		: await createAvailableAgentSlug(input.workspaceId, name);
+
+	const { agent, version } = await db.transaction(async (tx) => {
+		const sourceVersion = await getActiveVersionConfig(
+			tx,
+			source.activeVersionId,
+		);
+		const [agent] = await tx
+			.insert(agents)
+			.values({
+				workspaceId: input.workspaceId,
+				name,
+				slug,
+				description: source.description,
+				createdById: input.userId,
+				visibility: "private",
+				sourceType: "fork",
+				sharingMode: "personal",
+				shareTargetUserId: null,
+				isGlobal: false,
+				isRecommended: false,
+				curationLabel: null,
+				forkedFromAgentId: source.id,
+			})
+			.returning();
+
+		const [version] = await tx
+			.insert(agentVersions)
+			.values({
+				agentId: agent.id,
+				versionNumber: 1,
+				name: "Initial version",
+				systemPrompt: sourceVersion?.systemPrompt ?? null,
+				providerId: sourceVersion?.providerId ?? null,
+				modelId: sourceVersion?.modelId ?? null,
+				temperature: sourceVersion?.temperature ?? null,
+				topP: sourceVersion?.topP ?? null,
+				maxOutputTokens: sourceVersion?.maxOutputTokens ?? 30_000,
+				maxToolCalls: sourceVersion?.maxToolCalls ?? 6,
+				toolChoice: sourceVersion?.toolChoice ?? null,
+				generationSettingsJson: sourceVersion?.generationSettingsJson ?? null,
+				responseFormatJson: sourceVersion?.responseFormatJson ?? null,
+				memoryPolicyJson: sourceVersion?.memoryPolicyJson ?? null,
+				guardrailsJson: sourceVersion?.guardrailsJson ?? null,
+				approvalPolicyJson: sourceVersion?.approvalPolicyJson ?? null,
+				createdById: input.userId,
+			})
+			.returning();
+
+		await tx
+			.update(agents)
+			.set({ activeVersionId: version.id })
+			.where(eq(agents.id, agent.id));
+
+		return { agent, version };
+	});
+
+	await cloneToolBindings(source.activeVersionId, version.id);
+	await cloneKnowledgeBindings(source.activeVersionId, version.id);
+	await cloneSkillBindings(source.activeVersionId, version.id);
+
+	await audit.emit({
+		workspaceId: input.workspaceId,
+		actorPrincipalType: "user",
+		actorPrincipalId: input.userId,
+		action: "agent.cloned",
+		resourceType: "agent",
+		resourceId: agent.id,
+		outcome: "success",
+		metadata: { sourceAgentId: source.id },
+	});
+
+	logger.info("Agent cloned", {
+		agentId: agent.id,
+		sourceAgentId: source.id,
+		userId: input.userId,
+	});
+	return { agent, version };
 }
 
 export async function updateAgent(input: UpdateAgentInput) {

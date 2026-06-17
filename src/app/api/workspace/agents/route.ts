@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/modules/auth/session";
-import { createAgent, listAgents } from "@/modules/agent/use-cases";
+import {
+	canEditAgent,
+	createAgent,
+	listAgents,
+} from "@/modules/agent/use-cases";
 import { isAdminRole } from "@/modules/admin/use-cases";
 import { db } from "@/server/infrastructure/db";
 import { workspaces } from "@/server/infrastructure/db/schema";
@@ -180,15 +184,23 @@ export async function GET(req: NextRequest) {
 			);
 		}
 
-		const list = await listAgents(
+		const canAdminCurate = isAdminRole(session.user.role);
+		const createPermission = await authorization.requirePermission(
+			{ principalType: "user", principalId: session.user.id },
+			"agents.create",
+			"workspace",
 			workspaceId,
-			session.user.id,
-			isAdminRole(session.user.role),
 		);
+		const list = await listAgents(workspaceId, session.user.id, canAdminCurate);
+		const agentsWithAccess = list.map((agent) => ({
+			...agent,
+			canEdit: canEditAgent(agent, session.user.id, canAdminCurate),
+			canClone: createPermission.granted,
+		}));
 
 		return NextResponse.json({
-			agents: list,
-			canAdminCurate: isAdminRole(session.user.role),
+			agents: agentsWithAccess,
+			canAdminCurate,
 		});
 	} catch (error) {
 		logger.error("Failed to list agents", {}, error as Error);

@@ -37,6 +37,7 @@ export function EssentialTab({
 	models,
 	saving,
 	canAdminCurate,
+	readOnly = false,
 	onSaveAction: onSave,
 }: {
 	form: AgentForm;
@@ -45,6 +46,7 @@ export function EssentialTab({
 	models: Model[];
 	saving: boolean;
 	canAdminCurate: boolean;
+	readOnly?: boolean;
 	onSaveAction: (e: SyntheticEvent<HTMLFormElement>) => void;
 }) {
 	const t = useTranslations("agents");
@@ -53,8 +55,12 @@ export function EssentialTab({
 	const filteredModels = models.filter((m) => m.providerId === form.providerId);
 
 	return (
-		<form onSubmit={onSave} className="flex flex-col gap-4">
-			<ConfigSection
+		<form
+			onSubmit={readOnly ? (event) => event.preventDefault() : onSave}
+			className="flex flex-col gap-4"
+		>
+			<fieldset disabled={readOnly} className="contents">
+				<ConfigSection
 				title={t("name")}
 				description={t("configurePage.identityHint")}
 				icon={SettingsIcon}
@@ -304,18 +310,21 @@ export function EssentialTab({
 						<ModelAdvancedFields form={form} setFormAction={setForm} />
 					</div>
 				</div>
-			</AdvancedSection>
+				</AdvancedSection>
+			</fieldset>
 
-			<CardFooter className="justify-end px-0 pb-0">
-				<Button type="submit" disabled={saving}>
-					{saving ? (
-						<Spinner data-icon="inline-start" />
-					) : (
-						<SaveIcon data-icon="inline-start" aria-hidden="true" />
-					)}
-					{tCommon("save")}
-				</Button>
-			</CardFooter>
+			{readOnly ? null : (
+				<CardFooter className="justify-end px-0 pb-0">
+					<Button type="submit" disabled={saving}>
+						{saving ? (
+							<Spinner data-icon="inline-start" />
+						) : (
+							<SaveIcon data-icon="inline-start" aria-hidden="true" />
+						)}
+						{tCommon("save")}
+					</Button>
+				</CardFooter>
+			)}
 		</form>
 	);
 }

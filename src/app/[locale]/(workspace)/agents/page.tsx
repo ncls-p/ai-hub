@@ -6,6 +6,7 @@ import { useRouter } from "@/i18n/navigation";
 import { AdvancedSection } from "@/components/ui/advanced-section";
 import {
 	CheckCircle2Icon,
+	CopyIcon,
 	MessageCircleIcon,
 	PlusIcon,
 	SearchIcon,
@@ -77,6 +78,8 @@ interface Agent {
 	isGlobal: boolean;
 	isRecommended: boolean;
 	curationLabel: string | null;
+	canEdit?: boolean;
+	canClone?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -282,6 +285,57 @@ export default function AgentsPage() {
 		}
 	};
 
+	async function cloneAgent(agent: Agent) {
+		if (!workspaceId) return;
+		try {
+			const res = await fetch(`/api/workspace/agents/${agent.id}/clone`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ workspaceId }),
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => null);
+				throw new Error(err?.error || tList("toastCloneFailed"));
+			}
+			const data = (await res.json()) as { agent?: Agent };
+			toast.success(tList("toastCloned"));
+			await refreshAgents();
+			if (data.agent?.id) router.push(`/agents/${data.agent.id}`);
+		} catch (err) {
+			toast.error(
+				err instanceof Error ? err.message : tList("toastCloneFailed"),
+			);
+		}
+	}
+
+	async function publishAgent(agent: Agent) {
+		if (!workspaceId) return;
+		try {
+			const res = await fetch("/api/marketplace/items", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					workspaceId,
+					agentId: agent.id,
+					version: "1.0.0",
+					name: agent.name,
+					description: agent.description || "",
+					draftOnly: true,
+				}),
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => null);
+				throw new Error(err?.error || "Publication échouée");
+			}
+			toast.success(tShare("publishedDraft"));
+			await refreshAgents();
+		} catch (err) {
+			toast.error(
+				err instanceof Error ? err.message : "Une erreur est survenue",
+			);
+		}
+	}
+
 	const filteredAgents = agents.filter((agent) => {
 		if (!searchQuery.trim()) return true;
 		const q = searchQuery.toLowerCase();
@@ -383,7 +437,10 @@ export default function AgentsPage() {
 										)}
 									>
 										<div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
-											<MessageCircleIcon className="size-4" aria-hidden="true" />
+											<MessageCircleIcon
+												className="size-4"
+												aria-hidden="true"
+											/>
 										</div>
 										<div className="min-w-0 flex-1">
 											<div className="flex items-center gap-2">
@@ -400,7 +457,10 @@ export default function AgentsPage() {
 													)}
 												>
 													{isReady ? (
-														<CheckCircle2Icon className="size-3" aria-hidden="true" />
+														<CheckCircle2Icon
+															className="size-3"
+															aria-hidden="true"
+														/>
 													) : (
 														<ClockIcon className="size-3" aria-hidden="true" />
 													)}
@@ -408,6 +468,16 @@ export default function AgentsPage() {
 														? t("statusReady")
 														: tList("statusNeedsSetup")}
 												</Badge>
+												{agent.isGlobal ? (
+													<Badge variant="secondary" className="text-xs">
+														{tList("badgeGlobal")}
+													</Badge>
+												) : null}
+												{agent.isRecommended ? (
+													<Badge variant="outline" className="text-xs">
+														{tList("badgeRecommended")}
+													</Badge>
+												) : null}
 											</div>
 											<p className="truncate font-mono text-xs text-muted-foreground">
 												{agent.description
@@ -464,69 +534,51 @@ export default function AgentsPage() {
 													onClick={() => router.push(`/agents/${agent.id}`)}
 												>
 													<PencilIcon className="size-4" />
-													{t("configure")}
+													{agent.canEdit ? t("configure") : tList("view")}
 												</DropdownMenuItem>
-												<DropdownMenuItem
-													onClick={() =>
-														setShareResource({
-															kind: "agent",
-															id: agent.id,
-															name: agent.name,
-															description: agent.description,
-														})
-													}
-												>
-													<Share2 className="size-4" />
-													{tShare("action")}
-												</DropdownMenuItem>
-												<DropdownMenuItem
-													onClick={async () => {
-														try {
-															const res = await fetch(
-																`/api/marketplace/items`,
-																{
-																	method: "POST",
-																	headers: {
-																		"Content-Type": "application/json",
-																	},
-																	body: JSON.stringify({
-																		workspaceId,
-																		agentId: agent.id,
-																		version: "1.0.0",
-																		name: agent.name,
-																		description: agent.description || "",
-																		draftOnly: true,
-																	}),
-																},
-															);
-															if (!res.ok) {
-																const err = await res.json();
-																throw new Error(
-																	err.error || "Publication échouée",
-																);
-															}
-															toast.success(tShare("publishedDraft"));
-															await refreshAgents();
-														} catch (err) {
-															toast.error(
-																err instanceof Error
-																	? err.message
-																	: "Une erreur est survenue",
-															);
+												{agent.canClone !== false ? (
+													<DropdownMenuItem
+														onClick={() => void cloneAgent(agent)}
+													>
+														<CopyIcon className="size-4" />
+														{tList("clone")}
+													</DropdownMenuItem>
+												) : null}
+												{agent.canEdit ? (
+													<DropdownMenuItem
+														onClick={() =>
+															setShareResource({
+																kind: "agent",
+																id: agent.id,
+																name: agent.name,
+																description: agent.description,
+															})
 														}
-													}}
-												>
-													<Store className="size-4" />
-													{tShare("publish")}
-												</DropdownMenuItem>
-												<DropdownMenuSeparator />
-												<DropdownMenuItem
-													variant="destructive"
-													onClick={() => setDeleteAgentId(agent.id)}
-												>
-													<Trash2Icon className="size-4" />
-													{t("configurePage.delete")}
-												</DropdownMenuItem>
+													>
+														<Share2 className="size-4" />
+														{tShare("action")}
+													</DropdownMenuItem>
+												) : null}
+												{agent.canEdit ? (
+													<DropdownMenuItem
+														onClick={() => void publishAgent(agent)}
+													>
+														<Store className="size-4" />
+														{tShare("publish")}
+													</DropdownMenuItem>
+												) : null}
+												{agent.canEdit ? (
+													<>
+														<DropdownMenuSeparator />
+														<DropdownMenuItem
+															variant="destructive"
+															onClick={() => setDeleteAgentId(agent.id)}
+														>
+															<Trash2Icon className="size-4" />
+															{t("configurePage.delete")}
+														</DropdownMenuItem>
+													</>
+												) : null}
 											</DropdownMenuContent>
 										</DropdownMenu>
 									</div>

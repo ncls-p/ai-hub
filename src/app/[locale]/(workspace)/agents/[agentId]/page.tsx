@@ -266,6 +266,10 @@ export default function AgentConfigurePage() {
 
   async function saveEssential(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!agent?.canEdit) {
+      toast.error(t("configurePage.cloneToEditHint"));
+      return;
+    }
     if (!agentId || !workspaceId) return;
     setSaving(true);
     try {
@@ -374,6 +378,10 @@ export default function AgentConfigurePage() {
   }
 
   async function saveCapabilities() {
+    if (!agent?.canEdit) {
+      toast.error(t("configurePage.cloneToEditHint"));
+      return;
+    }
     if (!agentId || !workspaceId) return;
     setSaving(true);
     try {
@@ -448,8 +456,32 @@ export default function AgentConfigurePage() {
     }
   }
 
-  async function handleDelete() {
+  async function handleClone() {
     if (!agentId || !workspaceId) return;
+    try {
+      const res = await fetch(`/api/workspace/agents/${agentId}/clone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+      if (!res.ok) {
+        throw new Error(
+          (await res.json().catch(() => null))?.error ||
+            t("list.toastCloneFailed"),
+        );
+      }
+      const data = (await res.json()) as { agent?: Agent };
+      toast.success(t("list.toastCloned"));
+      if (data.agent?.id) window.location.href = `/agents/${data.agent.id}`;
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : t("list.toastCloneFailed"),
+      );
+    }
+  }
+
+  async function handleDelete() {
+    if (!agentId || !workspaceId || !agent?.canEdit) return;
     setDeleting(true);
     try {
       const res = await fetch(
@@ -491,6 +523,7 @@ export default function AgentConfigurePage() {
     enabledBuiltinCount + enabledMcpCount + enabledCustomCount;
   const capabilitiesCount =
     totalEnabledTools + selectedKnowledgeIds.length + selectedSkillIds.length;
+  const canEdit = agent?.canEdit ?? false;
 
   return (
     <WorkspacePage
@@ -499,6 +532,15 @@ export default function AgentConfigurePage() {
       width="default"
     >
       <div className="flex flex-col gap-6">
+        {!canEdit ? (
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">
+              {t("configurePage.lockedTitle")}
+            </p>
+            <p className="mt-1">{t("configurePage.lockedDescription")}</p>
+          </div>
+        ) : null}
+
         <AgentHeader
           agent={agent}
           providers={providers}
@@ -507,6 +549,8 @@ export default function AgentConfigurePage() {
           totalEnabledTools={totalEnabledTools}
           enabledMcpCount={enabledMcpCount}
           selectedKnowledgeIds={selectedKnowledgeIds}
+          canEdit={canEdit}
+          onCloneAction={() => void handleClone()}
           onShowDeleteDialogAction={() => setShowDeleteDialog(true)}
         />
 
@@ -530,6 +574,7 @@ export default function AgentConfigurePage() {
                 models={models}
                 saving={saving}
                 canAdminCurate={agent?.canAdminCurate ?? false}
+                readOnly={!canEdit}
                 onSaveAction={saveEssential}
               />
             </TabsContent>
@@ -553,6 +598,7 @@ export default function AgentConfigurePage() {
                 selectedSkillIds={selectedSkillIds}
                 setSelectedSkillIdsAction={setSelectedSkillIds}
                 saving={saving}
+                readOnly={!canEdit}
                 onSaveAction={() => void saveCapabilities()}
               />
             </TabsContent>

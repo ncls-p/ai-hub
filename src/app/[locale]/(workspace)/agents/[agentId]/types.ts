@@ -12,6 +12,8 @@ export type Agent = {
 	isRecommended: boolean;
 	curationLabel: string | null;
 	canAdminCurate: boolean;
+	canEdit?: boolean;
+	canClone?: boolean;
 };
 
 export type Provider = { id: string; name: string; kind: string };

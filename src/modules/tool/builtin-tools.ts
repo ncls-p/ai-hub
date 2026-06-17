@@ -3,6 +3,20 @@ import { z } from "zod";
 
 import type { ToolRiskLevel } from "./builtin-tools-catalog";
 import {
+	actionPlanInputSchema,
+	businessDocumentInputSchema,
+	createActionPlanArtifact,
+	createBusinessDocumentArtifact,
+	createDecisionMatrixArtifact,
+	createEmailPackArtifact,
+	createMeetingBriefArtifact,
+	createSpreadsheetArtifact,
+	decisionMatrixInputSchema,
+	emailPackInputSchema,
+	meetingBriefInputSchema,
+	spreadsheetInputSchema,
+} from "./business-artifact-tools";
+import {
 	createSlideDeckArtifact,
 	slideDeckInputSchema,
 } from "./slide-deck-tool";
@@ -608,6 +622,72 @@ export const builtInTools = [
 		execute: createSlideDeckArtifact,
 	},
 	{
+		id: "00000000-0000-4000-8000-000000000018",
+		name: "create_business_document",
+		displayName: "Business document",
+		description:
+			"Create printable briefs, reports, proposals, policies, SOPs, and memos.",
+		riskLevel: "medium",
+		category: "Work",
+		inputSchema: businessDocumentInputSchema,
+		execute: createBusinessDocumentArtifact,
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000019",
+		name: "create_spreadsheet",
+		displayName: "Spreadsheet",
+		description:
+			"Create a clean printable table with insights and CSV export text.",
+		riskLevel: "medium",
+		category: "Data",
+		inputSchema: spreadsheetInputSchema,
+		execute: createSpreadsheetArtifact,
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000020",
+		name: "create_meeting_brief",
+		displayName: "Meeting brief",
+		description:
+			"Turn meeting context into an agenda, decisions, and action-item brief.",
+		riskLevel: "medium",
+		category: "Work",
+		inputSchema: meetingBriefInputSchema,
+		execute: createMeetingBriefArtifact,
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000021",
+		name: "create_action_plan",
+		displayName: "Action plan",
+		description:
+			"Create a phased project plan with owners, deadlines, and risks.",
+		riskLevel: "medium",
+		category: "Work",
+		inputSchema: actionPlanInputSchema,
+		execute: createActionPlanArtifact,
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000022",
+		name: "create_decision_matrix",
+		displayName: "Decision matrix",
+		description:
+			"Compare options with weighted criteria and a clear recommendation.",
+		riskLevel: "medium",
+		category: "Work",
+		inputSchema: decisionMatrixInputSchema,
+		execute: createDecisionMatrixArtifact,
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000023",
+		name: "create_email_pack",
+		displayName: "Email pack",
+		description:
+			"Draft polished business emails, follow-ups, announcements, and outreach variants.",
+		riskLevel: "medium",
+		category: "Write",
+		inputSchema: emailPackInputSchema,
+		execute: createEmailPackArtifact,
+	},
+	{
 		id: "00000000-0000-4000-8000-000000000006",
 		name: "random_number",
 		displayName: "Random number",
@@ -815,7 +895,11 @@ const commonSchemas: Record<string, unknown> = {
 			},
 			accentColor: { type: "string", default: "#25adc5" },
 			aspectRatio: { type: "string", enum: ["16:9", "4:3"], default: "16:9" },
-			animation: { type: "string", enum: ["rise", "fade", "none"], default: "rise" },
+			animation: {
+				type: "string",
+				enum: ["rise", "fade", "none"],
+				default: "rise",
+			},
 			height: { type: "number", default: 560, minimum: 360, maximum: 900 },
 			showPrintButton: { type: "boolean", default: true },
 			slides: {
@@ -827,7 +911,14 @@ const commonSchemas: Record<string, unknown> = {
 					properties: {
 						layout: {
 							type: "string",
-							enum: ["title", "section", "bullets", "two_column", "quote", "closing"],
+							enum: [
+								"title",
+								"section",
+								"bullets",
+								"two_column",
+								"quote",
+								"closing",
+							],
 							default: "bullets",
 						},
 						kicker: { type: "string" },
@@ -835,7 +926,11 @@ const commonSchemas: Record<string, unknown> = {
 						body: { type: "string" },
 						bullets: { type: "array", items: { type: "string" }, default: [] },
 						secondaryTitle: { type: "string" },
-						secondaryBullets: { type: "array", items: { type: "string" }, default: [] },
+						secondaryBullets: {
+							type: "array",
+							items: { type: "string" },
+							default: [],
+						},
 						quote: { type: "string" },
 						attribution: { type: "string" },
 						metricValue: { type: "string" },
@@ -850,6 +945,90 @@ const commonSchemas: Record<string, unknown> = {
 			},
 		},
 		required: ["title", "slides"],
+	},
+	create_business_document: {
+		type: "object",
+		properties: {
+			title: { type: "string" },
+			documentType: {
+				type: "string",
+				enum: ["brief", "memo", "report", "proposal", "policy", "sop"],
+			},
+			audience: { type: "string" },
+			executiveSummary: { type: "string" },
+			sections: { type: "array", items: { type: "object" } },
+			nextSteps: { type: "array", items: { type: "string" } },
+			height: { type: "number", default: 620 },
+		},
+		required: ["title", "sections"],
+	},
+	create_spreadsheet: {
+		type: "object",
+		properties: {
+			title: { type: "string" },
+			summary: { type: "string" },
+			columns: { type: "array", items: { type: "string" } },
+			rows: {
+				type: "array",
+				items: { type: "array", items: { type: "string" } },
+			},
+			insights: { type: "array", items: { type: "string" } },
+			height: { type: "number", default: 620 },
+		},
+		required: ["title", "columns", "rows"],
+	},
+	create_meeting_brief: {
+		type: "object",
+		properties: {
+			title: { type: "string" },
+			date: { type: "string" },
+			attendees: { type: "array", items: { type: "string" } },
+			objective: { type: "string" },
+			agenda: { type: "array", items: { type: "string" } },
+			decisions: { type: "array", items: { type: "string" } },
+			actionItems: { type: "array", items: { type: "object" } },
+			height: { type: "number", default: 620 },
+		},
+		required: ["title"],
+	},
+	create_action_plan: {
+		type: "object",
+		properties: {
+			title: { type: "string" },
+			objective: { type: "string" },
+			phases: { type: "array", items: { type: "object" } },
+			actionItems: { type: "array", items: { type: "object" } },
+			risks: { type: "array", items: { type: "string" } },
+			height: { type: "number", default: 620 },
+		},
+		required: ["title", "phases"],
+	},
+	create_decision_matrix: {
+		type: "object",
+		properties: {
+			title: { type: "string" },
+			context: { type: "string" },
+			criteria: { type: "array", items: { type: "object" } },
+			options: { type: "array", items: { type: "object" } },
+			recommendation: { type: "string" },
+			height: { type: "number", default: 620 },
+		},
+		required: ["title", "criteria", "options"],
+	},
+	create_email_pack: {
+		type: "object",
+		properties: {
+			title: { type: "string" },
+			goal: { type: "string" },
+			audience: { type: "string" },
+			tone: {
+				type: "string",
+				enum: ["direct", "friendly", "executive", "sales", "support"],
+			},
+			emails: { type: "array", items: { type: "object" } },
+			height: { type: "number", default: 620 },
+		},
+		required: ["title", "emails"],
 	},
 	random_number: {
 		type: "object",
