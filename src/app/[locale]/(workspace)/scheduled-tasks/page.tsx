@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { BotIcon, CalendarClockIcon } from "lucide-react";
+import { CalendarClockIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -65,7 +65,7 @@ export default function ScheduledTasksPage() {
 				<PageLoading label={t("loadingAgents")} />
 			) : agents.length === 0 ? (
 				<PageEmptyState
-					icon={BotIcon}
+					icon={CalendarClockIcon}
 					title={t("noAssistants.title")}
 					description={t("noAssistants.description")}
 					className="surface-panel"

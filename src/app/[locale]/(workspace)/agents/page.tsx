@@ -5,7 +5,8 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { AdvancedSection } from "@/components/ui/advanced-section";
 import {
-	BotIcon,
+	CheckCircle2Icon,
+	MessageCircleIcon,
 	PlusIcon,
 	SearchIcon,
 	Loader2,
@@ -382,7 +383,7 @@ export default function AgentsPage() {
 										)}
 									>
 										<div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
-											<BotIcon className="size-4" aria-hidden="true" />
+											<MessageCircleIcon className="size-4" aria-hidden="true" />
 										</div>
 										<div className="min-w-0 flex-1">
 											<div className="flex items-center gap-2">
@@ -399,7 +400,7 @@ export default function AgentsPage() {
 													)}
 												>
 													{isReady ? (
-														<BotIcon className="size-3" aria-hidden="true" />
+														<CheckCircle2Icon className="size-3" aria-hidden="true" />
 													) : (
 														<ClockIcon className="size-3" aria-hidden="true" />
 													)}
@@ -456,7 +457,7 @@ export default function AgentsPage() {
 														)
 													}
 												>
-													<BotIcon className="size-4" />
+													<MessageCircleIcon className="size-4" />
 													{isReady ? tCommon("chatNow") : tChat("finishSetup")}
 												</DropdownMenuItem>
 												<DropdownMenuItem

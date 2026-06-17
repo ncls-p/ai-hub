@@ -1,7 +1,7 @@
 import {
 	BookMarked,
 	BookOpen,
-	Bot,
+	MessageCircle,
 	Package,
 	Plug,
 	Puzzle,
@@ -15,7 +15,7 @@ const itemIconMap: Record<
 	string,
 	React.ComponentType<{ className?: string }>
 > = {
-	agent: Bot,
+	agent: MessageCircle,
 	skill: Package,
 	custom_tool: Wrench,
 	prompt_template: BookOpen,

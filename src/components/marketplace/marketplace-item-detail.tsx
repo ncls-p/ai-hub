@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
-	Bot,
 	ChevronDown,
 	FileText,
 	KeyRound,
@@ -125,7 +124,7 @@ function AgentManifestSection({ manifest }: { manifest: MarketplaceManifest }) {
 				/>
 			</div>
 			{manifest.agent.systemPrompt ? (
-				<CollapsibleSection title={t("instructions")} icon={Bot}>
+				<CollapsibleSection title={t("instructions")} icon={FileText}>
 					<p className="whitespace-pre-wrap text-sm leading-relaxed">
 						{manifest.agent.systemPrompt}
 					</p>

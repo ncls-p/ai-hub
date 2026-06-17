@@ -3,7 +3,6 @@
 import { Link } from "@/i18n/navigation";
 import { useState, useSyncExternalStore, type ComponentProps } from "react";
 import {
-  BotIcon,
   MessageSquarePlusIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
@@ -226,11 +225,6 @@ export function ChatLayout({
 
   const agentSelector = (
     <div className="flex items-center gap-2">
-      <div className="hidden items-center gap-1.5 sm:flex">
-        <div className="flex size-6 items-center justify-center rounded-md border bg-muted text-muted-foreground">
-          <BotIcon className="size-3" aria-hidden="true" />
-        </div>
-      </div>
       <Select
         value={selectedAgentId ?? undefined}
         onValueChange={onSelectAgent}
@@ -245,14 +239,8 @@ export function ChatLayout({
         <SelectContent>
           <SelectGroup>
             {agents.map((agent) => (
-              <SelectItem key={agent.id} value={agent.id} className="gap-2">
-                <div className="flex items-center gap-2">
-                  <BotIcon
-                    className="size-3.5 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  {agent.name}
-                </div>
+              <SelectItem key={agent.id} value={agent.id}>
+                {agent.name}
               </SelectItem>
             ))}
           </SelectGroup>

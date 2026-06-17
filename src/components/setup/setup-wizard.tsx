@@ -4,7 +4,6 @@ import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import {
-  BotIcon,
   CheckCircle2Icon,
   Loader2,
   MessageSquareIcon,
@@ -45,7 +44,7 @@ import { cn } from "@/lib/utils";
 const steps = [
   { id: "provider", label: "Connect AI", icon: PlugZapIcon },
   { id: "model", label: "Pick Model", icon: CheckCircle2Icon },
-  { id: "agent", label: "Start Chatting", icon: BotIcon },
+  { id: "agent", label: "Start Chatting", icon: MessageSquareIcon },
 ] as const;
 
 type StepId = (typeof steps)[number]["id"];
@@ -911,7 +910,7 @@ export function SetupWizard({
         <Card className="animate-in-up">
           <CardHeader>
             <CardTitle className="flex items-center gap-2.5">
-              <BotIcon className="size-5 text-primary" aria-hidden="true" />
+              <MessageSquareIcon className="size-5 text-primary" aria-hidden="true" />
               Almost there
             </CardTitle>
             <CardDescription>

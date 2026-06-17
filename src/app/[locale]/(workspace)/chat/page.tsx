@@ -4,8 +4,8 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-	BotIcon,
 	ChevronDownIcon,
+	MessageSquareIcon,
 	Loader2,
 	PlusIcon,
 	Settings2Icon,
@@ -883,7 +883,7 @@ export default function ChatPage() {
 				<Empty className="min-h-80 w-full">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
-							<BotIcon aria-hidden="true" />
+							<MessageSquareIcon aria-hidden="true" />
 						</EmptyMedia>
 						<EmptyTitle>{t("noAssistants")}</EmptyTitle>
 						<EmptyDescription>{t("noAssistantsDescription")}</EmptyDescription>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BotIcon, WorkflowIcon } from "lucide-react";
+import { WorkflowIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -156,7 +156,7 @@ export function CustomToolBuilderSettings() {
 		>
 			<div className="space-y-5">
 				<div className="flex gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-					<BotIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+					<WorkflowIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
 					<div>
 						<p className="font-medium text-foreground">{t("secretsTitle")}</p>
 						<p className="mt-1">{t("secretsDescription")}</p>
