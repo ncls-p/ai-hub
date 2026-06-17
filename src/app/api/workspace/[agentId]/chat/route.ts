@@ -554,29 +554,43 @@ async function isFirstUserMessageInConversation(
 function htmlArtifactCodeFromValue(value: unknown) {
 	if (typeof value !== "object" || value === null) return null;
 	const record = value as Record<string, unknown>;
-	const source =
-		record.kind === "html_artifact" && typeof record.html === "string"
-			? record
-			: typeof record.html === "string"
-				? record
-				: null;
-	if (!source) return null;
+	if (record.kind !== "html_artifact" && record.kind !== undefined) return null;
+	const html = record.html;
+	if (typeof html !== "string") return null;
+	const source = {
+		title: record.title,
+		html,
+		css: record.css,
+		js: record.js,
+		deck: record.deck,
+	};
 
-	return [
+	const sections = [
 		`Title: ${typeof source.title === "string" ? source.title : "Interactive preview"}`,
+	];
+	if (source.deck && typeof source.deck === "object") {
+		sections.push("Deck JSON:", JSON.stringify(source.deck, null, 2));
+	}
+	sections.push(
 		"HTML:",
 		source.html,
 		"CSS:",
 		typeof source.css === "string" ? source.css : "",
 		"JavaScript:",
 		typeof source.js === "string" ? source.js : "",
-	].join("\n");
+	);
+	return sections.join("\n");
 }
 
 function htmlArtifactCodeFromToolMetadata(metadata: unknown) {
 	if (typeof metadata !== "object" || metadata === null) return null;
 	const record = metadata as Record<string, unknown>;
-	if (record.toolName !== "render_html_artifact") return null;
+	if (
+		record.toolName !== "render_html_artifact" &&
+		record.toolName !== "create_slide_deck"
+	) {
+		return null;
+	}
 	return (
 		htmlArtifactCodeFromValue(record.input) ??
 		htmlArtifactCodeFromValue(record.output)
@@ -1031,8 +1045,11 @@ export async function POST(
 						availableToolNames.includes("web_search")
 							? "For web or current-events searches, use web_search only."
 							: null,
+						availableToolNames.includes("create_slide_deck")
+							? "When the user asks for slides, a deck, presentation, pitch deck, PDF slides, or follow-up edits to an existing deck, use create_slide_deck. It creates an interactive click-through HTML deck with print-to-PDF styling; explain briefly that PDF export is static because modern PDF viewers do not preserve JavaScript click animations."
+							: null,
 						availableToolNames.includes("render_html_artifact")
-							? "When the user asks for a visual design, diagram, UI mockup, chart-like schema, or interactive demo, use render_html_artifact with self-contained HTML, CSS, and optional JavaScript so it appears directly in the chat. The user can view and copy the code from the artifact card, so do not duplicate the full code in your final text unless explicitly asked."
+							? "When the user asks for a visual design, diagram, UI mockup, chart-like schema, or interactive demo that is not specifically a slide deck, use render_html_artifact with self-contained HTML, CSS, and optional JavaScript so it appears directly in the chat. The user can view and copy the code from the artifact card, so do not duplicate the full code in your final text unless explicitly asked."
 							: null,
 						`Use at most ${maxToolCalls} tool calls.`,
 						"When that limit is reached, do not call another tool; answer the user from the tool results and context already available. If the information is incomplete, say what is known and what remains uncertain.",

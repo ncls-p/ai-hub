@@ -2,6 +2,10 @@ import { createHash, randomInt, randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import type { ToolRiskLevel } from "./builtin-tools-catalog";
+import {
+	createSlideDeckArtifact,
+	slideDeckInputSchema,
+} from "./slide-deck-tool";
 
 export type { ToolRiskLevel } from "./builtin-tools-catalog";
 
@@ -593,6 +597,17 @@ export const builtInTools = [
 		}),
 	},
 	{
+		id: "00000000-0000-4000-8000-000000000017",
+		name: "create_slide_deck",
+		displayName: "Slide deck",
+		description:
+			"Create or revise an interactive slide deck with click-to-reveal steps and PDF print/export styling.",
+		riskLevel: "medium",
+		category: "Create",
+		inputSchema: slideDeckInputSchema,
+		execute: createSlideDeckArtifact,
+	},
+	{
 		id: "00000000-0000-4000-8000-000000000006",
 		name: "random_number",
 		displayName: "Random number",
@@ -787,6 +802,54 @@ const commonSchemas: Record<string, unknown> = {
 			height: { type: "number", default: 420, minimum: 160, maximum: 900 },
 		},
 		required: ["html"],
+	},
+	create_slide_deck: {
+		type: "object",
+		properties: {
+			title: { type: "string", description: "Presentation title." },
+			subtitle: { type: "string" },
+			theme: {
+				type: "string",
+				enum: ["minimal", "deodis", "midnight", "warm"],
+				default: "deodis",
+			},
+			accentColor: { type: "string", default: "#25adc5" },
+			aspectRatio: { type: "string", enum: ["16:9", "4:3"], default: "16:9" },
+			animation: { type: "string", enum: ["rise", "fade", "none"], default: "rise" },
+			height: { type: "number", default: 560, minimum: 360, maximum: 900 },
+			showPrintButton: { type: "boolean", default: true },
+			slides: {
+				type: "array",
+				minItems: 1,
+				maxItems: 30,
+				items: {
+					type: "object",
+					properties: {
+						layout: {
+							type: "string",
+							enum: ["title", "section", "bullets", "two_column", "quote", "closing"],
+							default: "bullets",
+						},
+						kicker: { type: "string" },
+						title: { type: "string" },
+						body: { type: "string" },
+						bullets: { type: "array", items: { type: "string" }, default: [] },
+						secondaryTitle: { type: "string" },
+						secondaryBullets: { type: "array", items: { type: "string" }, default: [] },
+						quote: { type: "string" },
+						attribution: { type: "string" },
+						metricValue: { type: "string" },
+						metricLabel: { type: "string" },
+						imageUrl: { type: "string", format: "uri" },
+						imageAlt: { type: "string" },
+						footer: { type: "string" },
+						notes: { type: "string" },
+					},
+					required: ["title"],
+				},
+			},
+		},
+		required: ["title", "slides"],
 	},
 	random_number: {
 		type: "object",

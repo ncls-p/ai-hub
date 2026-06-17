@@ -53,6 +53,15 @@ export const BUILTIN_TOOL_SUMMARIES: BuiltInToolSummary[] = [
 		category: "Create",
 	},
 	{
+		id: "00000000-0000-4000-8000-000000000017",
+		name: "create_slide_deck",
+		displayName: "Slide deck",
+		description:
+			"Create interactive presentations with click reveals and PDF print/export styling.",
+		riskLevel: "medium",
+		category: "Create",
+	},
+	{
 		id: "00000000-0000-4000-8000-000000000006",
 		name: "random_number",
 		displayName: "Random number",

@@ -420,7 +420,7 @@ function LazyArtifactFrame({
 				<iframe
 					title={title}
 					srcDoc={srcDoc}
-					sandbox="allow-scripts"
+					sandbox="allow-scripts allow-modals"
 					loading="lazy"
 					className="h-full w-full bg-white"
 				/>
@@ -546,7 +546,7 @@ function HtmlArtifactCard({
 							<iframe
 								title={`${artifact.title} fullscreen`}
 								srcDoc={fullscreenSrcDoc}
-								sandbox="allow-scripts"
+								sandbox="allow-scripts allow-modals"
 								className="h-full w-full bg-white"
 							/>
 						</div>
