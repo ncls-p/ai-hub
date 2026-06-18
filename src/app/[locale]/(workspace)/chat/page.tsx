@@ -1133,14 +1133,18 @@ export default function ChatPage() {
 										{t("continueLast")}
 									</Button>
 								) : null}
-								{!canChat ? (
-									<Button asChild>
-										<Link href="/setup">
-											<Settings2Icon className="size-4" aria-hidden="true" />
-											{t("finishSetup")}
-										</Link>
-									</Button>
-								) : null}
+								<Button asChild variant={canChat ? "outline" : "default"}>
+									<Link href={canChat ? "/agents" : "/setup"}>
+										<Settings2Icon className="size-4" aria-hidden="true" />
+										{canChat ? t("createAgent") : t("finishSetup")}
+									</Link>
+								</Button>
+								<Button asChild variant="outline">
+									<Link href="/knowledge">{t("addKnowledge")}</Link>
+								</Button>
+								<Button asChild variant="outline">
+									<Link href="/providers">{t("configureProvider")}</Link>
+								</Button>
 							</div>
 						</div>
 					</div>

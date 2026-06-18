@@ -57,7 +57,16 @@
     "manageAssistants": "Manage assistants",
     "openSettings": "Assistant settings",
     "continueLast": "Continue last conversation",
+    "chooseAssistant": "Choose assistant",
+    "currentAssistant": "Current assistant",
+    "assistantSearch": "Search assistants…",
+    "organizationAssistants": "Organization",
+    "myAssistants": "My assistants",
+    "statusReady": "Ready",
+    "statusNeedsSetup": "Needs setup",
+    "noAssistantMatches": "No assistant matches.",
     "configureProvider": "Connect AI",
+    "addKnowledge": "Add documents",
     "createAgent": "Create assistant"
   },
   "setup": {
@@ -203,6 +212,39 @@
       "createAndConfigure": "Create and configure",
       "createNextTitle": "After creation",
       "createNextDescription": "You’ll go straight to the assistant page to choose its model, logo, and capabilities.",
+      "templateLabel": "Starting point",
+      "templates": {
+        "support": {
+          "name": "Support assistant",
+          "description": "Answers customer questions with a clear, calm, solution-oriented tone.",
+          "prompt": "You are a customer support assistant. Answer clearly, ask questions when needed, suggest concrete next steps, and flag when a request should be handed to a human."
+        },
+        "hr": {
+          "name": "HR assistant",
+          "description": "Helps teams understand procedures, internal policies, and HR documents.",
+          "prompt": "You are an internal HR assistant. Explain policies carefully, state the limits of your knowledge, and recommend contacting HR for sensitive or personal cases."
+        },
+        "documents": {
+          "name": "Document assistant",
+          "description": "Analyzes, summarizes, and compares documents or knowledge bases.",
+          "prompt": "You are a document analysis assistant. Summarize information, cite available sources, separate facts from assumptions, and point out missing context."
+        },
+        "sales": {
+          "name": "Sales assistant",
+          "description": "Drafts emails, offers, customer replies, and commercial summaries.",
+          "prompt": "You are a B2B sales assistant. Help write concise, contextual messages with clear next steps and a professional tone."
+        },
+        "project": {
+          "name": "Project manager",
+          "description": "Turns discussions into action plans, decisions, and operational follow-up.",
+          "prompt": "You are a project management assistant. Clarify goals, break work into steps, identify risks/dependencies, and suggest dated actions when useful."
+        },
+        "blank": {
+          "name": "Custom assistant",
+          "description": "Start blank and define the assistant’s role freely.",
+          "prompt": "You are a helpful, clear, and careful assistant. Adapt your answers to the user’s needs."
+        }
+      },
       "slug": "Slug",
       "slugPlaceholder": "my-assistant",
       "access": "Access",
@@ -354,6 +396,12 @@
     "basesCount": "{count, plural, one {# base} other {# bases}}",
     "selectedDocumentsCount": "{count, plural, one {# document here} other {# documents here}}",
     "attachAssistant": "Attach to assistant",
+    "attachDialogTitle": "Attach this base to an assistant",
+    "noAttachAgents": "No editable assistant available.",
+    "agentNeedsModel": "Model required before use",
+    "errorLoadAgents": "Failed to load assistants",
+    "errorAttachAgent": "Failed to attach base to assistant",
+    "toastAttachedAgent": "Base attached to assistant",
     "optionalSearch": "Test search",
     "optionalSearchHint": "Optional: check what an assistant will find in this base.",
     "editBaseTitle": "Edit knowledge base",

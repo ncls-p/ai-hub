@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState, type DragEvent } from "react";
-import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import {
 	BookOpenIcon,
@@ -16,6 +15,7 @@ import { ListRow } from "@/components/list-row";
 import { PageEmptyState } from "@/components/page-empty-state";
 import { PageLoading } from "@/components/page-loading";
 import { SectionHeader } from "@/components/section-header";
+import { ModelLogo } from "@/components/providers/model-logo";
 import { WorkspacePage } from "@/components/workspace-page";
 import { AdvancedSection } from "@/components/ui/advanced-section";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,15 @@ interface SearchResult {
 	content: string;
 	score: number;
 }
+interface KnowledgeAgent {
+	id: string;
+	name: string;
+	description: string | null;
+	activeVersionId: string | null;
+	logoUrl?: string | null;
+	modelDisplayName?: string | null;
+	canEdit?: boolean;
+}
 
 function statusVariant(status: string) {
 	if (status === "ready") return "secondary" as const;
@@ -91,6 +100,10 @@ export default function KnowledgePage() {
 		name: "",
 		description: "",
 	});
+	const [attachOpen, setAttachOpen] = useState(false);
+	const [attachAgents, setAttachAgents] = useState<KnowledgeAgent[]>([]);
+	const [loadingAttachAgents, setLoadingAttachAgents] = useState(false);
+	const [attachingAgentId, setAttachingAgentId] = useState<string | null>(null);
 
 	const loadBases = useCallback(async () => {
 		if (!workspaceId) return;
@@ -118,6 +131,65 @@ export default function KnowledgePage() {
 		if (!res.ok) throw new Error("Failed to load documents");
 		setDocuments(await res.json());
 	}, [workspaceId, selectedId]);
+
+	async function openAttachDialog() {
+		if (!workspaceId || !selectedId) return;
+		setAttachOpen(true);
+		setLoadingAttachAgents(true);
+		try {
+			const res = await fetch(
+				`/api/workspace/agents?workspaceId=${workspaceId}&includeModelMeta=true`,
+			);
+			if (!res.ok) throw new Error(t("errorLoadAgents"));
+			const data = (await res.json()) as
+				| { agents?: KnowledgeAgent[] }
+				| KnowledgeAgent[];
+			setAttachAgents(Array.isArray(data) ? data : (data.agents ?? []));
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : t("errorLoadAgents"),
+			);
+		} finally {
+			setLoadingAttachAgents(false);
+		}
+	}
+
+	async function attachBaseToAgent(agentId: string) {
+		if (!workspaceId || !selectedId) return;
+		setAttachingAgentId(agentId);
+		try {
+			const bindingsRes = await fetch(
+				`/api/workspace/agents/${agentId}/knowledge?workspaceId=${workspaceId}`,
+			);
+			const currentBindings = bindingsRes.ok
+				? ((
+						(await bindingsRes.json()) as {
+							bindings?: Array<{ knowledgeBaseId: string }>;
+						}
+					).bindings ?? [])
+				: [];
+			const knowledgeBaseIds = Array.from(
+				new Set([
+					...currentBindings.map((binding) => binding.knowledgeBaseId),
+					selectedId,
+				]),
+			);
+			const res = await fetch(`/api/workspace/agents/${agentId}/knowledge`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ workspaceId, knowledgeBaseIds }),
+			});
+			if (!res.ok) throw new Error(t("errorAttachAgent"));
+			toast.success(t("toastAttachedAgent"));
+			setAttachOpen(false);
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : t("errorAttachAgent"),
+			);
+		} finally {
+			setAttachingAgentId(null);
+		}
+	}
 
 	async function ingestFromContent(title: string, content: string) {
 		if (!workspaceId || !selectedId || !title.trim() || !content.trim()) return;
@@ -311,7 +383,9 @@ export default function KnowledgePage() {
 								setBaseForm({ ...baseForm, name: e.target.value })
 							}
 						/>
-						<Label htmlFor="knowledge-description">{t("descriptionLabel")}</Label>
+						<Label htmlFor="knowledge-description">
+							{t("descriptionLabel")}
+						</Label>
 						<Input
 							id="knowledge-description"
 							name="knowledge-description"
@@ -489,8 +563,13 @@ export default function KnowledgePage() {
 										{selectedBase?.description || t("documentsHint")}
 									</p>
 								</div>
-								<Button asChild size="sm" variant="outline">
-									<Link href="/agents">{t("attachAssistant")}</Link>
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									onClick={() => void openAttachDialog()}
+								>
+									{t("attachAssistant")}
 								</Button>
 							</div>
 
@@ -650,7 +729,67 @@ export default function KnowledgePage() {
 							<Button variant="outline" onClick={() => setEditingBase(null)}>
 								{tCommon("cancel")}
 							</Button>
-							<Button onClick={() => void updateBase()}>{tCommon("save")}</Button>
+							<Button onClick={() => void updateBase()}>
+								{tCommon("save")}
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+				<Dialog open={attachOpen} onOpenChange={setAttachOpen}>
+					<DialogContent className="max-h-[85vh] overflow-y-auto">
+						<DialogHeader>
+							<DialogTitle>{t("attachDialogTitle")}</DialogTitle>
+						</DialogHeader>
+						<div className="grid gap-2">
+							{loadingAttachAgents ? (
+								<div className="flex items-center justify-center py-8">
+									<Loader2 className="size-5 animate-spin text-muted-foreground" />
+								</div>
+							) : attachAgents.length === 0 ? (
+								<p className="py-6 text-center text-sm text-muted-foreground">
+									{t("noAttachAgents")}
+								</p>
+							) : (
+								attachAgents.map((agent) => {
+									const canAttach = Boolean(
+										agent.canEdit && agent.activeVersionId,
+									);
+									return (
+										<button
+											key={agent.id}
+											type="button"
+											disabled={!canAttach || attachingAgentId !== null}
+											className="flex items-center gap-3 rounded-xl border p-3 text-left text-sm transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
+											onClick={() => void attachBaseToAgent(agent.id)}
+										>
+											<ModelLogo
+												logoUrl={agent.logoUrl}
+												label={agent.name}
+												size="md"
+											/>
+											<span className="min-w-0 flex-1">
+												<span className="block truncate font-medium">
+													{agent.name}
+												</span>
+												<span className="block truncate text-xs text-muted-foreground">
+													{agent.modelDisplayName || t("agentNeedsModel")}
+												</span>
+											</span>
+											{attachingAgentId === agent.id ? (
+												<Loader2
+													className="size-4 animate-spin"
+													aria-hidden="true"
+												/>
+											) : null}
+										</button>
+									);
+								})
+							)}
+						</div>
+						<DialogFooter>
+							<Button variant="outline" onClick={() => setAttachOpen(false)}>
+								{tCommon("cancel")}
+							</Button>
 						</DialogFooter>
 					</DialogContent>
 				</Dialog>

@@ -2,11 +2,13 @@
 
 import { Link } from "@/i18n/navigation";
 import { useState, useSyncExternalStore, type ComponentProps } from "react";
+import { useTranslations } from "next-intl";
 import {
 	ChevronDownIcon,
 	MessageSquarePlusIcon,
 	PanelLeftCloseIcon,
 	PanelLeftOpenIcon,
+	SearchIcon,
 	Settings2Icon,
 } from "lucide-react";
 
@@ -40,8 +42,11 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const HISTORY_OPEN_STORAGE_KEY = "chat-unified-sidebar-open";
@@ -164,8 +169,10 @@ export function ChatLayout({
 	onSetupComplete,
 	children,
 }: ChatLayoutProps) {
+	const t = useTranslations("chat");
 	const shell = useWorkspaceShell();
 	const [setupOpen, setSetupOpen] = useState(false);
+	const [agentSearch, setAgentSearch] = useState("");
 	const sidebarOpen = useSyncExternalStore(
 		subscribeHistoryOpen,
 		getStoredHistoryOpen,
@@ -250,17 +257,33 @@ export function ChatLayout({
 		},
 	};
 
-	const selectedAgentLabel = selectedAgent?.name ?? "Choose assistant";
+	const selectedAgentLabel = selectedAgent?.name ?? t("chooseAssistant");
+	const normalizedAgentSearch = agentSearch.trim().toLowerCase();
+	const visibleAgents = normalizedAgentSearch
+		? agents.filter(
+				(agent) =>
+					agent.name.toLowerCase().includes(normalizedAgentSearch) ||
+					(agent.description ?? "")
+						.toLowerCase()
+						.includes(normalizedAgentSearch),
+			)
+		: agents;
+	const organizationAgents = visibleAgents.filter(
+		(agent) => agent.isGlobal || agent.isRecommended || agent.canEdit === false,
+	);
+	const personalAgents = visibleAgents.filter(
+		(agent) => agent.isGlobal !== true && agent.isRecommended !== true && agent.canEdit !== false,
+	);
 	const agentSelector = (
 		<div className="relative z-10 flex min-w-0 items-center gap-2">
-			<DropdownMenu>
+			<DropdownMenu onOpenChange={(open) => !open && setAgentSearch("")}>
 				<DropdownMenuTrigger asChild>
 					<Button
 						type="button"
 						variant="outline"
 						size="sm"
 						className="h-8 min-w-0 max-w-[min(100%,13rem)] justify-between gap-2 px-2 font-medium sm:max-w-72 sm:min-w-56"
-						aria-label="Current assistant"
+						aria-label={t("currentAssistant")}
 					>
 						<span className="flex min-w-0 items-center gap-2">
 							{selectedAgent ? (
@@ -278,17 +301,86 @@ export function ChatLayout({
 						/>
 					</Button>
 				</DropdownMenuTrigger>
-				<DropdownMenuContent align="center" className="w-64">
-					{agents.map((agent) => (
-						<DropdownMenuItem
-							key={agent.id}
-							className="gap-2"
-							onClick={() => onSelectAgent(agent.id)}
-						>
-							<ModelLogo logoUrl={agent.logoUrl} label={agent.name} size="sm" />
-							<span className="min-w-0 truncate">{agent.name}</span>
-						</DropdownMenuItem>
-					))}
+				<DropdownMenuContent align="center" className="w-80">
+					<div className="p-1" onKeyDown={(event) => event.stopPropagation()}>
+						<div className="relative">
+							<SearchIcon
+								className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+								aria-hidden="true"
+							/>
+							<Input
+								name="assistant-search"
+								autoComplete="off"
+								value={agentSearch}
+								onChange={(event) => setAgentSearch(event.target.value)}
+								placeholder={t("assistantSearch")}
+								className="h-8 pl-8 text-sm"
+							/>
+						</div>
+					</div>
+					{organizationAgents.length > 0 ? (
+						<>
+							<DropdownMenuLabel>
+								{t("organizationAssistants")}
+							</DropdownMenuLabel>
+							{organizationAgents.map((agent) => (
+								<DropdownMenuItem
+									key={agent.id}
+									className="gap-2"
+									onClick={() => onSelectAgent(agent.id)}
+								>
+									<ModelLogo
+										logoUrl={agent.logoUrl}
+										label={agent.name}
+										size="sm"
+									/>
+									<span className="min-w-0 flex-1 truncate">{agent.name}</span>
+									<span className="shrink-0 text-[11px] text-muted-foreground">
+										{agent.modelDisplayName
+											? t("statusReady")
+											: t("statusNeedsSetup")}
+									</span>
+								</DropdownMenuItem>
+							))}
+						</>
+					) : null}
+					{personalAgents.length > 0 ? (
+						<>
+							{organizationAgents.length > 0 ? <DropdownMenuSeparator /> : null}
+							<DropdownMenuLabel>{t("myAssistants")}</DropdownMenuLabel>
+							{personalAgents.map((agent) => (
+								<DropdownMenuItem
+									key={agent.id}
+									className="gap-2"
+									onClick={() => onSelectAgent(agent.id)}
+								>
+									<ModelLogo
+										logoUrl={agent.logoUrl}
+										label={agent.name}
+										size="sm"
+									/>
+									<span className="min-w-0 flex-1 truncate">{agent.name}</span>
+									<span className="shrink-0 text-[11px] text-muted-foreground">
+										{agent.modelDisplayName
+											? t("statusReady")
+											: t("statusNeedsSetup")}
+									</span>
+								</DropdownMenuItem>
+							))}
+						</>
+					) : null}
+					{visibleAgents.length === 0 ? (
+						<p className="px-2 py-3 text-center text-sm text-muted-foreground">
+							{t("noAssistantMatches")}
+						</p>
+					) : null}
+					<DropdownMenuSeparator />
+					<DropdownMenuItem asChild>
+						<Link href="/agents" className="gap-2">
+							<MessageSquarePlusIcon className="size-4" aria-hidden="true" />
+							{t("createAgent")}
+						</Link>
+					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
 			{!canChat ? (
@@ -297,7 +389,7 @@ export function ChatLayout({
 					className="hidden shrink-0 items-center gap-1 rounded-lg border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning sm:inline-flex"
 				>
 					<Settings2Icon className="size-3" aria-hidden="true" />
-					needs setup
+					{t("statusNeedsSetup")}
 				</Badge>
 			) : null}
 		</div>

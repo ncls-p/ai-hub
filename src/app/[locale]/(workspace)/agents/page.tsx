@@ -69,6 +69,45 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+const AGENT_TEMPLATES = [
+	{
+		id: "support",
+		nameKey: "templates.support.name",
+		descriptionKey: "templates.support.description",
+		promptKey: "templates.support.prompt",
+	},
+	{
+		id: "hr",
+		nameKey: "templates.hr.name",
+		descriptionKey: "templates.hr.description",
+		promptKey: "templates.hr.prompt",
+	},
+	{
+		id: "documents",
+		nameKey: "templates.documents.name",
+		descriptionKey: "templates.documents.description",
+		promptKey: "templates.documents.prompt",
+	},
+	{
+		id: "sales",
+		nameKey: "templates.sales.name",
+		descriptionKey: "templates.sales.description",
+		promptKey: "templates.sales.prompt",
+	},
+	{
+		id: "project",
+		nameKey: "templates.project.name",
+		descriptionKey: "templates.project.description",
+		promptKey: "templates.project.prompt",
+	},
+	{
+		id: "blank",
+		nameKey: "templates.blank.name",
+		descriptionKey: "templates.blank.description",
+		promptKey: "templates.blank.prompt",
+	},
+] as const;
+
 interface Agent {
 	id: string;
 	name: string;
@@ -133,9 +172,11 @@ export default function AgentsPage() {
 	const [creating, setCreating] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [form, setForm] = useState({
+		templateId: "blank",
 		name: "",
 		slug: "",
 		description: "",
+		systemPrompt: "",
 		sharingMode: "personal" as Agent["sharingMode"],
 		shareTargetEmail: "",
 		isGlobal: false,
@@ -209,6 +250,18 @@ export default function AgentsPage() {
 		};
 	}, [workspaceId]);
 
+	function applyTemplate(template: (typeof AGENT_TEMPLATES)[number]) {
+		const name = tList(template.nameKey);
+		setForm((current) => ({
+			...current,
+			templateId: template.id,
+			name,
+			slug: slugifyAgentName(name),
+			description: tList(template.descriptionKey),
+			systemPrompt: tList(template.promptKey),
+		}));
+	}
+
 	const handleCreate = async () => {
 		if (!workspaceId || !form.name.trim()) return;
 		const slug = form.slug.trim() || slugifyAgentName(form.name);
@@ -221,6 +274,7 @@ export default function AgentsPage() {
 					name: form.name.trim(),
 					slug,
 					description: form.description.trim() || undefined,
+					systemPrompt: form.systemPrompt.trim() || undefined,
 					workspaceId,
 					sharingMode: form.sharingMode,
 					shareTargetEmail:
@@ -242,9 +296,11 @@ export default function AgentsPage() {
 			toast.success(tList("toastCreated"));
 			setShowCreateDialog(false);
 			setForm({
+				templateId: "blank",
 				name: "",
 				slug: "",
 				description: "",
+				systemPrompt: "",
 				sharingMode: "personal",
 				shareTargetEmail: "",
 				isGlobal: false,
@@ -663,6 +719,31 @@ export default function AgentsPage() {
 						<DialogDescription>{tList("guideDescription")}</DialogDescription>
 					</DialogHeader>
 					<div className="flex flex-col gap-4">
+						<div className="flex flex-col gap-2">
+							<Label>{tList("templateLabel")}</Label>
+							<div className="grid grid-cols-2 gap-2">
+								{AGENT_TEMPLATES.map((template) => (
+									<button
+										key={template.id}
+										type="button"
+										className={cn(
+											"rounded-xl border p-3 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+											form.templateId === template.id &&
+												"border-primary/50 bg-primary/5",
+										)}
+										onClick={() => applyTemplate(template)}
+									>
+										<span className="block font-medium">
+											{tList(template.nameKey)}
+										</span>
+										<span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">
+											{tList(template.descriptionKey)}
+										</span>
+									</button>
+								))}
+							</div>
+						</div>
+
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="agent-name">{t("name")}</Label>
 							<Input

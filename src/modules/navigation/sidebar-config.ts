@@ -66,10 +66,9 @@ registerNavTemplates(advancedCapabilityNavItems);
 registerNavTemplates(configNavItems);
 registerNavTemplates(adminNavItems);
 
-const PRIMARY_SECTION_IDS = new Set<string>([
-	...primaryNavItems.map((item) => item.href),
-	...capabilitiesNavItems.map((item) => item.href),
-]);
+const PRIMARY_SECTION_IDS = new Set<string>(
+	primaryNavItems.map((item) => item.href),
+);
 const PLANNING_SECTION_IDS = new Set<string>(
 	planningNavItems.map((item) => item.href),
 );

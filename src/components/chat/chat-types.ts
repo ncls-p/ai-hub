@@ -5,6 +5,9 @@ export interface ChatAgent {
 	activeVersionId: string | null;
 	logoUrl?: string | null;
 	modelDisplayName?: string | null;
+	isGlobal?: boolean;
+	isRecommended?: boolean;
+	canEdit?: boolean;
 	modelLogoUrl?: string | null;
 }
 

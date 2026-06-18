@@ -57,7 +57,16 @@
     "manageAssistants": "Gérer les assistants",
     "openSettings": "Réglages de l’assistant",
     "continueLast": "Reprendre la dernière conversation",
+    "chooseAssistant": "Choisir un assistant",
+    "currentAssistant": "Assistant actuel",
+    "assistantSearch": "Rechercher un assistant…",
+    "organizationAssistants": "Organisation",
+    "myAssistants": "Mes assistants",
+    "statusReady": "Prêt",
+    "statusNeedsSetup": "À configurer",
+    "noAssistantMatches": "Aucun assistant ne correspond.",
     "configureProvider": "Connecter l’IA",
+    "addKnowledge": "Ajouter des documents",
     "createAgent": "Créer un assistant"
   },
   "setup": {
@@ -203,6 +212,39 @@
       "createAndConfigure": "Créer et configurer",
       "createNextTitle": "Après la création",
       "createNextDescription": "Vous arriverez directement sur la fiche de l’assistant pour choisir son modèle, son logo et ses capacités.",
+      "templateLabel": "Point de départ",
+      "templates": {
+        "support": {
+          "name": "Assistant support",
+          "description": "Répond aux questions clients avec un ton clair, calme et orienté solution.",
+          "prompt": "Tu es un assistant de support client. Réponds clairement, pose des questions si nécessaire, propose des étapes concrètes et signale quand une demande doit être transmise à un humain."
+        },
+        "hr": {
+          "name": "Assistant RH",
+          "description": "Aide les équipes à comprendre procédures, politiques internes et documents RH.",
+          "prompt": "Tu es un assistant RH interne. Explique les politiques avec prudence, cite les limites de tes connaissances et recommande de contacter l’équipe RH pour les cas sensibles ou personnels."
+        },
+        "documents": {
+          "name": "Assistant documents",
+          "description": "Analyse, résume et compare des documents ou bases de connaissances.",
+          "prompt": "Tu es un assistant d’analyse documentaire. Résume les informations, cite les sources disponibles, distingue les faits des hypothèses et indique les passages manquants."
+        },
+        "sales": {
+          "name": "Assistant commercial",
+          "description": "Rédige e-mails, offres, réponses clients et synthèses commerciales.",
+          "prompt": "Tu es un assistant commercial B2B. Aide à rédiger des messages concis, adaptés au contexte, avec des prochaines étapes claires et un ton professionnel."
+        },
+        "project": {
+          "name": "Chef de projet",
+          "description": "Transforme les discussions en plans d’action, décisions et suivis opérationnels.",
+          "prompt": "Tu es un assistant chef de projet. Clarifie les objectifs, découpe le travail en étapes, identifie risques/dépendances et propose des actions datées quand c’est utile."
+        },
+        "blank": {
+          "name": "Assistant personnalisé",
+          "description": "Commencer vide et définir librement le rôle de l’assistant.",
+          "prompt": "Tu es un assistant utile, clair et prudent. Adapte tes réponses au besoin de l’utilisateur."
+        }
+      },
       "slug": "Slug",
       "slugPlaceholder": "mon-assistant",
       "access": "Accès",
@@ -354,6 +396,12 @@
     "basesCount": "{count, plural, one {# base} other {# bases}}",
     "selectedDocumentsCount": "{count, plural, one {# document ici} other {# documents ici}}",
     "attachAssistant": "Lier à un assistant",
+    "attachDialogTitle": "Lier cette base à un assistant",
+    "noAttachAgents": "Aucun assistant modifiable disponible.",
+    "agentNeedsModel": "Modèle à configurer avant utilisation",
+    "errorLoadAgents": "Impossible de charger les assistants",
+    "errorAttachAgent": "Impossible de lier la base à l’assistant",
+    "toastAttachedAgent": "Base liée à l’assistant",
     "optionalSearch": "Tester la recherche",
     "optionalSearchHint": "Optionnel : vérifiez ce qu’un assistant retrouvera dans cette base.",
     "editBaseTitle": "Modifier la base",
