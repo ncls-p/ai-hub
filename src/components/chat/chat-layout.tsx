@@ -466,7 +466,7 @@ export function ChatLayout({
 						<ChatSidebar {...desktopSidebarProps} className="w-full" />
 						<div
 							role="separator"
-							aria-label="Resize conversations"
+							aria-label={t("resizeConversations")}
 							aria-orientation="vertical"
 							aria-valuemin={MIN_HISTORY_WIDTH}
 							aria-valuemax={MAX_HISTORY_WIDTH}
@@ -496,7 +496,7 @@ export function ChatLayout({
 								size="icon"
 								className="hidden size-8 rounded-lg md:inline-flex"
 								aria-label={
-									sidebarOpen ? "Close conversations" : "Open conversations"
+									sidebarOpen ? t("closeConversations") : t("openConversations")
 								}
 								onClick={() => updateSidebarOpen({ open: !sidebarOpen })}
 							>
@@ -516,7 +516,7 @@ export function ChatLayout({
 										variant="ghost"
 										size="icon"
 										className="size-8 rounded-lg md:hidden"
-										aria-label="Open conversations"
+										aria-label={t("openConversations")}
 									>
 										<PanelLeftOpenIcon className="size-4" aria-hidden="true" />
 									</Button>
@@ -526,7 +526,7 @@ export function ChatLayout({
 									className="w-[min(100vw-2rem,22rem)] p-0"
 								>
 									<SheetHeader className="sr-only">
-										<SheetTitle>Conversations</SheetTitle>
+										<SheetTitle>{t("conversations")}</SheetTitle>
 									</SheetHeader>
 									<ChatSidebar {...mobileSidebarProps} />
 								</SheetContent>
@@ -542,14 +542,14 @@ export function ChatLayout({
 									size="sm"
 									variant="outline"
 									className="hidden h-8 gap-1.5 rounded-lg px-3 text-xs font-medium sm:inline-flex"
-									aria-label="New conversation"
+									aria-label={t("newConversation")}
 									onClick={onNewConversation}
 								>
 									<MessageSquarePlusIcon
 										className="size-3.5"
 										aria-hidden="true"
 									/>
-									New chat
+									{t("newConversation")}
 								</Button>
 							) : null}
 							<Button
@@ -557,7 +557,7 @@ export function ChatLayout({
 								size="icon"
 								variant="ghost"
 								className="size-8 rounded-lg sm:hidden"
-								aria-label="New conversation"
+								aria-label={t("newConversation")}
 								onClick={onNewConversation}
 							>
 								<MessageSquarePlusIcon className="size-4" aria-hidden="true" />
@@ -570,7 +570,7 @@ export function ChatLayout({
 									onClick={() => setSetupOpen(true)}
 								>
 									<Settings2Icon className="size-3.5" aria-hidden="true" />
-									Finish setup
+									{t("finishSetup")}
 								</Button>
 							) : null}
 							<Button
@@ -578,7 +578,7 @@ export function ChatLayout({
 								variant="ghost"
 								size="icon"
 								className="size-8 rounded-lg"
-								aria-label="Configure assistant"
+								aria-label={t("configureAssistant")}
 							>
 								<Link
 									href={
@@ -599,16 +599,14 @@ export function ChatLayout({
 			<Dialog open={setupOpen} onOpenChange={setSetupOpen}>
 				<DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
 					<DialogHeader>
-						<DialogTitle>Finish assistant setup</DialogTitle>
-						<DialogDescription>
-							Connect a model so you can start chatting.
-						</DialogDescription>
+						<DialogTitle>{t("finishSetup")}</DialogTitle>
+						<DialogDescription>{t("setupDialogDescription")}</DialogDescription>
 					</DialogHeader>
 					<SetupWizard
 						mode="dialog"
 						initialAgentId={selectedAgentId}
-						onCancel={() => setSetupOpen(false)}
-						onComplete={() => {
+						onCancelAction={() => setSetupOpen(false)}
+						onCompleteAction={() => {
 							setSetupOpen(false);
 							onSetupComplete?.();
 						}}

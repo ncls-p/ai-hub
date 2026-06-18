@@ -68,7 +68,6 @@ export default function ScheduledTasksPage() {
 					icon={CalendarClockIcon}
 					title={t("noAssistants.title")}
 					description={t("noAssistants.description")}
-					className="surface-panel"
 				>
 					<div className="flex flex-wrap justify-center gap-2">
 						<Button asChild>
@@ -80,11 +79,7 @@ export default function ScheduledTasksPage() {
 					</div>
 				</PageEmptyState>
 			) : (
-				<div className="relative">
-					<div
-						className="pointer-events-none absolute -right-10 -top-10 hidden size-44 rounded-full bg-primary/8 blur-3xl sm:block"
-						aria-hidden="true"
-					/>
+				<div>
 					<div className="mb-5 flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/24 p-4 text-sm text-muted-foreground">
 						<div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
 							<CalendarClockIcon className="size-5" aria-hidden="true" />

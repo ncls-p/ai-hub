@@ -23,13 +23,17 @@ export function WorkspaceEmptyState({
 	className?: string;
 }) {
 	return (
-		<Empty className={cn("min-h-48 w-full surface-panel", className)}>
+		<Empty className={cn("min-h-48 w-full border bg-card", className)}>
 			<EmptyHeader>
 				{icon ? <EmptyMedia variant="icon">{icon}</EmptyMedia> : null}
 				<EmptyTitle>{title}</EmptyTitle>
-				{description ? <EmptyDescription>{description}</EmptyDescription> : null}
+				{description ? (
+					<EmptyDescription>{description}</EmptyDescription>
+				) : null}
 			</EmptyHeader>
-			{actions ? <div className="flex flex-wrap justify-center gap-2">{actions}</div> : null}
+			{actions ? (
+				<div className="flex flex-wrap justify-center gap-2">{actions}</div>
+			) : null}
 		</Empty>
 	);
 }

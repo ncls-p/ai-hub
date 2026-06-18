@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CopyIcon, KeyRoundIcon, Loader2, PlusIcon, Trash2Icon } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import {
+	CopyIcon,
+	KeyRoundIcon,
+	Loader2,
+	PlusIcon,
+	Trash2Icon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +33,8 @@ type ApiKeyRow = {
 };
 
 export function WorkspaceApiKeys() {
+	const t = useTranslations("admin.apiKeys");
+	const locale = useLocale();
 	const { workspaceId } = useWorkspace();
 	const [keys, setKeys] = useState<ApiKeyRow[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -38,22 +47,20 @@ export function WorkspaceApiKeys() {
 		const res = await fetch(
 			`/api/workspace/api-keys?workspaceId=${workspaceId}`,
 		);
-		if (!res.ok) throw new Error("Unable to load API keys");
+		if (!res.ok) throw new Error(t("loadFailed"));
 		const data = (await res.json()) as { keys: ApiKeyRow[] };
 		setKeys(data.keys);
-	}, [workspaceId]);
+	}, [t, workspaceId]);
 
 	useEffect(() => {
 		if (!workspaceId) return;
 		// eslint-disable-next-line react-hooks/set-state-in-effect -- async key bootstrap
 		void load()
 			.catch((error) =>
-				toast.error(
-					error instanceof Error ? error.message : "Unable to load API keys",
-				),
+				toast.error(error instanceof Error ? error.message : t("loadFailed")),
 			)
 			.finally(() => setLoading(false));
-	}, [load, workspaceId]);
+	}, [load, t, workspaceId]);
 
 	async function createKey() {
 		if (!workspaceId || !name.trim()) return;
@@ -64,16 +71,15 @@ export function WorkspaceApiKeys() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ workspaceId, name: name.trim() }),
 			});
-			if (!res.ok) throw new Error((await res.json()).error || "Failed");
+			if (!res.ok)
+				throw new Error((await res.json()).error || t("createFailed"));
 			const data = (await res.json()) as { rawKey: string };
 			setRevealedKey(data.rawKey);
 			setName("");
 			await load();
-			toast.success("API key created — copy it now, it won't be shown again");
+			toast.success(t("created"));
 		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : "Unable to create API key",
-			);
+			toast.error(error instanceof Error ? error.message : t("createFailed"));
 		} finally {
 			setCreating(false);
 		}
@@ -86,11 +92,11 @@ export function WorkspaceApiKeys() {
 			{ method: "DELETE" },
 		);
 		if (!res.ok) {
-			toast.error("Unable to revoke key");
+			toast.error(t("revokeFailed"));
 			return;
 		}
 		await load();
-		toast.success("API key revoked");
+		toast.success(t("revoked"));
 	}
 
 	return (
@@ -98,12 +104,12 @@ export function WorkspaceApiKeys() {
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<KeyRoundIcon className="size-4" aria-hidden="true" />
-					API Keys
+					{t("cardTitle")}
 				</CardTitle>
 				<CardDescription>
-					Create keys for programmatic access. Use{" "}
-					<code className="text-xs">Authorization: Bearer &lt;key&gt;</code> on
-					supported routes like chat.
+					{t.rich("cardDescription", {
+						code: (chunks) => <code className="text-xs">{chunks}</code>,
+					})}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
@@ -112,9 +118,10 @@ export function WorkspaceApiKeys() {
 					suppressHydrationWarning
 				>
 					<div className="grid flex-1 gap-2">
-						<Label htmlFor="api-key-name">Key name</Label>
+						<Label htmlFor="api-key-name">{t("nameLabel")}</Label>
 						<Input
 							id="api-key-name"
+							name="api-key-name"
 							autoComplete="off"
 							data-1p-ignore
 							data-bwignore
@@ -126,21 +133,22 @@ export function WorkspaceApiKeys() {
 							onChange={(event) => setName(event.target.value)}
 						/>
 					</div>
-					<Button disabled={creating || !name.trim()} onClick={() => void createKey()}>
+					<Button
+						disabled={creating || !name.trim()}
+						onClick={() => void createKey()}
+					>
 						{creating ? (
 							<Loader2 className="animate-spin" aria-hidden="true" />
 						) : (
-							<>
-								<PlusIcon data-icon="inline-start" aria-hidden="true" />
-								Create Key
-							</>
+							<PlusIcon data-icon="inline-start" aria-hidden="true" />
 						)}
+						{t("createButton")}
 					</Button>
 				</div>
 
 				{revealedKey ? (
 					<div className="rounded-xl border border-warning/35 bg-warning/10 p-3 text-sm">
-						<p className="font-medium">Copy your new API key</p>
+						<p className="font-medium">{t("copyTitle")}</p>
 						<div className="mt-2 flex items-center gap-2">
 							<code className="flex-1 truncate rounded bg-background px-2 py-1 text-xs">
 								{revealedKey}
@@ -148,10 +156,10 @@ export function WorkspaceApiKeys() {
 							<Button
 								size="sm"
 								variant="outline"
-								aria-label="Copy new API key"
+								aria-label={t("copyKey")}
 								onClick={() => {
 									void navigator.clipboard.writeText(revealedKey);
-									toast.success("Copied");
+									toast.success(t("copied"));
 								}}
 							>
 								<CopyIcon aria-hidden="true" />
@@ -163,7 +171,7 @@ export function WorkspaceApiKeys() {
 				{loading ? (
 					<Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
 				) : keys.length === 0 ? (
-					<p className="text-sm text-muted-foreground">No API keys yet.</p>
+					<p className="text-sm text-muted-foreground">{t("empty")}</p>
 				) : (
 					<ul className="divide-y divide-border/70 rounded-xl border">
 						{keys.map((key) => (
@@ -176,17 +184,22 @@ export function WorkspaceApiKeys() {
 									<p className="text-xs text-muted-foreground">
 										{key.keyPrefix}… ·{" "}
 										{key.lastUsedAt
-											? `Last used ${new Date(key.lastUsedAt).toLocaleString()}`
-											: "Never used"}
+											? t("lastUsed", {
+													date: new Intl.DateTimeFormat(locale, {
+														dateStyle: "medium",
+														timeStyle: "short",
+													}).format(new Date(key.lastUsedAt)),
+												})
+											: t("neverUsed")}
 									</p>
 								</div>
 								<div className="flex items-center gap-2">
-									<Badge variant="outline">Active</Badge>
+									<Badge variant="outline">{t("active")}</Badge>
 									<Button
 										size="icon-sm"
 										variant="ghost"
 										onClick={() => void revokeKey(key.id)}
-										aria-label={`Revoke ${key.name}`}
+										aria-label={t("revokeLabel", { name: key.name })}
 									>
 										<Trash2Icon aria-hidden="true" />
 									</Button>

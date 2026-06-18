@@ -21,7 +21,7 @@ export default function SetupPage() {
 		<WorkspacePage title={t("title")} description={t("description")} width="narrow">
 			<SetupWizard
 				mode="page"
-				onComplete={(agentId) => {
+				onCompleteAction={(agentId) => {
 					router.push(`/chat?agentId=${agentId}`);
 				}}
 			/>

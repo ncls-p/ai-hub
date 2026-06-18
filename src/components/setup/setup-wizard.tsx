@@ -42,9 +42,9 @@ import { fetchJson } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 const steps = [
-  { id: "provider", label: "Connect AI", icon: PlugZapIcon },
-  { id: "model", label: "Pick Model", icon: CheckCircle2Icon },
-  { id: "agent", label: "Start Chatting", icon: MessageSquareIcon },
+  { id: "provider", icon: PlugZapIcon },
+  { id: "model", icon: CheckCircle2Icon },
+  { id: "agent", icon: MessageSquareIcon },
 ] as const;
 
 type StepId = (typeof steps)[number]["id"];
@@ -121,6 +121,7 @@ function ModelMetadata({
   hostedBy?: string | null;
   enabled?: boolean;
 }) {
+  const t = useTranslations("setup.modelMetadata");
   const enabledCapabilities = Object.entries(capabilities ?? {})
     .filter(([, value]) => value)
     .map(([key]) => key);
@@ -141,19 +142,19 @@ function ModelMetadata({
 
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
-      {enabled === false ? <Badge variant="outline">Disabled</Badge> : null}
+      {enabled === false ? <Badge variant="outline">{t("disabled")}</Badge> : null}
       {hostedBy ? <Badge variant="outline">{hostedBy}</Badge> : null}
       {contextWindowLabel ? (
-        <Badge variant="outline">Context {contextWindowLabel}</Badge>
+        <Badge variant="outline">{t("context", { value: contextWindowLabel })}</Badge>
       ) : null}
       {maxOutputTokensLabel ? (
-        <Badge variant="outline">Max output {maxOutputTokensLabel}</Badge>
+        <Badge variant="outline">{t("maxOutput", { value: maxOutputTokensLabel })}</Badge>
       ) : null}
       {inputTokenCost ? (
-        <Badge variant="outline">Input {inputTokenCost}</Badge>
+        <Badge variant="outline">{t("input", { value: inputTokenCost })}</Badge>
       ) : null}
       {outputTokenCost ? (
-        <Badge variant="outline">Output {outputTokenCost}</Badge>
+        <Badge variant="outline">{t("output", { value: outputTokenCost })}</Badge>
       ) : null}
       {enabledCapabilities.map((capability) => (
         <Badge key={capability} variant="secondary" className="capitalize">
@@ -235,16 +236,17 @@ function SetupStepper({ currentStep }: { currentStep: StepId }) {
 export type SetupWizardProps = {
   mode?: "page" | "dialog";
   initialAgentId?: string | null;
-  onComplete?: (agentId: string) => void;
-  onCancel?: () => void;
+  onCompleteAction?: (agentId: string) => void;
+  onCancelAction?: () => void;
 };
 
 export function SetupWizard({
   mode = "page",
   initialAgentId = null,
-  onComplete,
-  onCancel,
+  onCompleteAction,
+  onCancelAction,
 }: SetupWizardProps) {
+  const t = useTranslations("setup");
   const { workspaceId } = useWorkspace();
   const [step, setStep] = useState<StepId>("provider");
   const [providers, setProviders] = useState<ProviderSummary[]>([]);
@@ -265,14 +267,14 @@ export function SetupWizard({
     baseUrl: string;
     apiKey: string;
   }>({
-    name: "My AI Provider",
+    name: t("defaultProviderName"),
     kind: "openai-compatible",
     baseUrl: "",
     apiKey: "",
   });
   const [manualModelId, setManualModelId] = useState("");
   const [agentForm, setAgentForm] = useState({
-    name: "My Assistant",
+    name: t("defaultAssistantName"),
   });
 
   useEffect(() => {
@@ -348,13 +350,13 @@ export function SetupWizard({
       );
       setDiscoveredModels(rows);
       if (rows.length === 0) {
-        toast.info("No models returned by this provider");
+        toast.info(t("toasts.noModelsReturned"));
       } else {
-        toast.success(`Discovered ${rows.length} models`);
+        toast.success(t("toasts.modelsDiscovered", { count: rows.length }));
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to discover models",
+        error instanceof Error ? error.message : t("toasts.discoverFailed"),
       );
     } finally {
       setDiscoveringModels(false);
@@ -383,10 +385,10 @@ export function SetupWizard({
       setProviders((current) => [provider, ...current]);
       setProviderId(provider.id);
       setStep("model");
-      toast.success("Connection saved");
+      toast.success(t("toasts.providerSaved"));
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to create connection",
+        error instanceof Error ? error.message : t("toasts.providerCreateFailed"),
       );
     } finally {
       setBusy(false);
@@ -406,13 +408,13 @@ export function SetupWizard({
         },
       );
       if (data.status === "healthy") {
-        toast.success(data.message || "Connection verified");
+        toast.success(data.message || t("toasts.connectionVerified"));
       } else {
-        toast.error(data.message || "Connection test returned an issue");
+        toast.error(data.message || t("toasts.connectionIssue"));
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Connection test failed",
+        error instanceof Error ? error.message : t("toasts.connectionTestFailed"),
       );
     } finally {
       setBusy(false);
@@ -446,10 +448,10 @@ export function SetupWizard({
       setModels((current) => [...current, model]);
       setModelDbId(model.id);
       setManualModelId("");
-      toast.success("Model selected");
+      toast.success(t("toasts.modelSelected"));
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to add model",
+        error instanceof Error ? error.message : t("toasts.modelAddFailed"),
       );
     } finally {
       setBusy(false);
@@ -493,11 +495,11 @@ export function SetupWizard({
       }
 
       await fetch("/api/onboarding", { method: "POST" });
-      toast.success("Assistant is ready");
-      if (completedAgentId) onComplete?.(completedAgentId);
+      toast.success(t("toasts.assistantReady"));
+      if (completedAgentId) onCompleteAction?.(completedAgentId);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to finish setup",
+        error instanceof Error ? error.message : t("toasts.finishFailed"),
       );
     } finally {
       setBusy(false);
@@ -527,20 +529,22 @@ export function SetupWizard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2.5">
               <PlugZapIcon className="size-5 text-primary" aria-hidden="true" />
-              Connect your AI provider
+              {t("providerTitle")}
             </CardTitle>
             <CardDescription>
-              Enter the details below. You can always add more providers later.
+              {t("providerStepDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="provider-name">Connection name</FieldLabel>
+                <FieldLabel htmlFor="provider-name">{t("connectionName")}</FieldLabel>
                 <FieldContent>
                   <Input
                     id="provider-name"
-                    placeholder="e.g. OpenAI Production"
+                    name="setup-provider-name"
+                    autoComplete="organization"
+                    placeholder={t("connectionNamePlaceholder")}
                     value={providerForm.name}
                     onChange={(event) =>
                       setProviderForm({
@@ -553,7 +557,7 @@ export function SetupWizard({
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="provider-kind">Provider type</FieldLabel>
+                <FieldLabel htmlFor="provider-kind">{t("providerType")}</FieldLabel>
                 <FieldContent>
                   <Select
                     value={providerForm.kind}
@@ -581,10 +585,13 @@ export function SetupWizard({
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="base-url">Service URL</FieldLabel>
+                <FieldLabel htmlFor="base-url">{t("serviceUrl")}</FieldLabel>
                 <FieldContent>
                   <Input
                     id="base-url"
+                    name="setup-provider-base-url"
+                    inputMode="url"
+                    autoComplete="url"
                     placeholder="https://api.openai.com/v1"
                     value={providerForm.baseUrl}
                     onChange={(event) =>
@@ -595,17 +602,19 @@ export function SetupWizard({
                     }
                   />
                   <FieldDescription>
-                    Leave blank if your provider uses a default endpoint.
+                    {t("serviceUrlHint")}
                   </FieldDescription>
                 </FieldContent>
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="api-key">API key</FieldLabel>
+                <FieldLabel htmlFor="api-key">{t("apiKey")}</FieldLabel>
                 <FieldContent>
                   <Input
                     id="api-key"
+                    name="setup-provider-api-key"
                     type="password"
+                    autoComplete="off"
                     placeholder="sk-…"
                     value={providerForm.apiKey}
                     onChange={(event) =>
@@ -629,7 +638,7 @@ export function SetupWizard({
                   ) : (
                     <PlugZapIcon data-icon="inline-start" aria-hidden="true" />
                   )}
-                  Save & continue
+                  {t("saveContinue")}
                 </Button>
                 {providers.length > 0 ? (
                   <Button
@@ -638,7 +647,7 @@ export function SetupWizard({
                     disabled={loadingProviders}
                     onClick={() => setStep("model")}
                   >
-                    Skip — use existing
+                    {t("useExistingConnection")}
                   </Button>
                 ) : null}
               </div>
@@ -656,17 +665,17 @@ export function SetupWizard({
                 className="size-5 text-primary"
                 aria-hidden="true"
               />
-              Pick a model
+              {t("modelTitle")}
             </CardTitle>
             <CardDescription>
-              Choose which model this assistant will use.
+              {t("modelStepDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <FieldGroup>
               {providers.length > 0 ? (
                 <Field>
-                  <FieldLabel htmlFor="setup-provider">Connection</FieldLabel>
+                  <FieldLabel htmlFor="setup-provider">{t("connection")}</FieldLabel>
                   <FieldContent>
                     <Select
                       value={providerId ?? undefined}
@@ -676,7 +685,7 @@ export function SetupWizard({
                       }}
                     >
                       <SelectTrigger id="setup-provider" className="w-full">
-                        <SelectValue placeholder="Select connection" />
+                        <SelectValue placeholder={t("selectConnection")} />
                       </SelectTrigger>
                       <SelectContent>
                         {providers.map((provider) => (
@@ -705,7 +714,7 @@ export function SetupWizard({
                       aria-hidden="true"
                     />
                   )}
-                  Test
+                  {t("testConnection")}
                 </Button>
                 <Button
                   type="button"
@@ -721,14 +730,14 @@ export function SetupWizard({
                       aria-hidden="true"
                     />
                   )}
-                  Discover
+                  {t("discoverModels")}
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={() => setStep("provider")}
                 >
-                  Change connection
+                  {t("changeConnection")}
                 </Button>
               </div>
 
@@ -737,10 +746,10 @@ export function SetupWizard({
                 <div className="rounded-xl border border-border/70 overflow-hidden">
                   <div className="border-b border-border/60 bg-muted/30 px-4 py-3">
                     <p className="text-sm font-medium">
-                      Available models ({discoveredModels.length})
+                      {t("availableModels", { count: discoveredModels.length })}
                     </p>
                     <FieldDescription>
-                      Click &quot;Use&quot; to register and select a model.
+                      {t("discoveredModelsHint")}
                     </FieldDescription>
                   </div>
                   <div className="max-h-72 overflow-y-auto divide-y divide-border/40">
@@ -767,7 +776,7 @@ export function SetupWizard({
                                   variant="secondary"
                                   className="bg-primary/10 text-primary"
                                 >
-                                  Selected
+                                  {t("selected")}
                                 </Badge>
                               )}
                             </div>
@@ -796,23 +805,23 @@ export function SetupWizard({
                             onClick={() => {
                               if (savedModel) {
                                 setModelDbId(savedModel.id);
-                                toast.success("Model selected");
+                                toast.success(t("toasts.modelSelected"));
                                 return;
                               }
                               void addAndSelectModel(model);
                             }}
                           >
                             {isSelected ? (
-                              "Selected"
+                              t("selected")
                             ) : savedModel ? (
-                              "Use"
+                              t("useModel")
                             ) : (
                               <>
                                 <PlusIcon
                                   data-icon="inline-start"
                                   aria-hidden="true"
                                 />
-                                Use
+                                {t("useModel")}
                               </>
                             )}
                           </Button>
@@ -827,7 +836,7 @@ export function SetupWizard({
               {models.length > 0 && (
                 <Field>
                   <FieldLabel htmlFor="setup-model">
-                    Model for this assistant
+                    {t("modelForAssistant")}
                   </FieldLabel>
                   <FieldContent>
                     <Select
@@ -836,7 +845,7 @@ export function SetupWizard({
                       disabled={loadingModels}
                     >
                       <SelectTrigger id="setup-model" className="w-full">
-                        <SelectValue placeholder="Select model" />
+                        <SelectValue placeholder={t("selectModel")} />
                       </SelectTrigger>
                       <SelectContent>
                         {models.map((model) => (
@@ -863,13 +872,15 @@ export function SetupWizard({
               {/* Manual model ID */}
               <Field>
                 <FieldLabel htmlFor="manual-model">
-                  Or enter a model ID
+                  {t("manualModelLabel")}
                 </FieldLabel>
                 <FieldContent>
                   <div className="flex gap-2">
                     <Input
                       id="manual-model"
-                      placeholder="gpt-4o-mini"
+                      name="setup-manual-model"
+                      autoComplete="off"
+                      placeholder="gpt-4o-mini…"
                       value={manualModelId}
                       onChange={(event) => setManualModelId(event.target.value)}
                     />
@@ -879,7 +890,7 @@ export function SetupWizard({
                       disabled={busy || !providerId || !manualModelId.trim()}
                       onClick={() => void addAndSelectModel()}
                     >
-                      Add
+                      {t("addModel")}
                     </Button>
                   </div>
                 </FieldContent>
@@ -887,8 +898,7 @@ export function SetupWizard({
 
               {models.length === 0 && (
                 <FieldDescription>
-                  No models registered yet — discover them above or enter a
-                  model ID manually.
+                  {t("noRegisteredModels")}
                 </FieldDescription>
               )}
 
@@ -898,7 +908,7 @@ export function SetupWizard({
                 onClick={() => setStep("agent")}
                 disabled={!modelDbId}
               >
-                Continue
+                {t("continue")}
               </Button>
             </FieldGroup>
           </CardContent>
@@ -911,10 +921,10 @@ export function SetupWizard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2.5">
               <MessageSquareIcon className="size-5 text-primary" aria-hidden="true" />
-              Almost there
+              {t("agentTitle")}
             </CardTitle>
             <CardDescription>
-              Give your assistant a name and you&apos;re ready to chat.
+              {t("agentStepDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -923,13 +933,13 @@ export function SetupWizard({
               <div className="rounded-xl border border-border/70 bg-muted/30 p-4">
                 <div className="flex flex-col gap-2 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Connection</span>
+                    <span className="text-muted-foreground">{t("connection")}</span>
                     <span className="font-medium">
                       {selectedProvider?.name}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Model</span>
+                    <span className="text-muted-foreground">{t("model")}</span>
                     <span className="font-medium">
                       {selectedModel?.displayName ?? selectedModel?.modelId}
                     </span>
@@ -939,15 +949,17 @@ export function SetupWizard({
 
               {agentId ? (
                 <FieldDescription>
-                  This will attach the selected model to your current assistant.
+                  {t("currentAssistantHint")}
                 </FieldDescription>
               ) : (
                 <Field>
-                  <FieldLabel htmlFor="agent-name">Assistant name</FieldLabel>
+                  <FieldLabel htmlFor="agent-name">{t("assistantName")}</FieldLabel>
                   <FieldContent>
                     <Input
                       id="agent-name"
-                      placeholder="e.g. My AI Assistant"
+                      name="setup-agent-name"
+                      autoComplete="off"
+                      placeholder={t("assistantNamePlaceholder")}
                       value={agentForm.name}
                       onChange={(event) =>
                         setAgentForm({ name: event.target.value })
@@ -973,19 +985,19 @@ export function SetupWizard({
                       aria-hidden="true"
                     />
                   )}
-                  Start chatting
+                  {t("startChat")}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setStep("model")}
                 >
-                  Back
+                  {t("back")}
                 </Button>
                 {mode === "page" && (
                   <Button variant="ghost" asChild>
                     <Link href={agentId ? `/chat?agentId=${agentId}` : "/chat"}>
-                      Skip for now
+                      {t("skipForNow")}
                     </Link>
                   </Button>
                 )}
@@ -995,9 +1007,9 @@ export function SetupWizard({
         </Card>
       )}
 
-      {onCancel && (
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
+      {onCancelAction && (
+        <Button type="button" variant="ghost" onClick={onCancelAction}>
+          {t("cancel")}
         </Button>
       )}
     </div>

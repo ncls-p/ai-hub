@@ -143,7 +143,7 @@ export function AppShell({
             href="#workspace-main"
             className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-full focus:border focus:border-border/70 focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-lg"
           >
-            Skip to content
+            {tShell("skipToContent")}
           </a>
           <div className="flex min-h-0 flex-1 flex-row">
             {!isChatRoute ? <WorkspaceSidebar shell={shellValue} /> : null}
