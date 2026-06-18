@@ -1,9 +1,11 @@
-import { and, eq, isNull, not, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, not, sql } from "drizzle-orm";
 import { encryptValue, decryptValue } from "@/lib/crypto";
 import { audit } from "@/server/domain/services/audit";
 import { db } from "@/server/infrastructure/db";
 import {
 	agentKnowledgeBindings,
+	agents,
+	agentVersions,
 	documentChunks,
 	documentEmbeddings,
 	documents,
@@ -494,18 +496,51 @@ export async function getKnowledgeBindingsForVersion(agentVersionId: string) {
 	return rows;
 }
 
+async function getWorkspaceIdForAgentVersion(agentVersionId: string) {
+	const [row] = await db
+		.select({ workspaceId: agents.workspaceId })
+		.from(agentVersions)
+		.innerJoin(agents, eq(agentVersions.agentId, agents.id))
+		.where(eq(agentVersions.id, agentVersionId))
+		.limit(1);
+	if (!row) throw new Error("Agent version not found");
+	return row.workspaceId;
+}
+
 export async function replaceKnowledgeBindingsForVersion(
 	agentVersionId: string,
 	knowledgeBaseIds: string[],
 ) {
+	const uniqueKnowledgeBaseIds = [...new Set(knowledgeBaseIds)];
+	if (uniqueKnowledgeBaseIds.length > 0) {
+		const workspaceId = await getWorkspaceIdForAgentVersion(agentVersionId);
+		const availableKnowledgeBases = await db
+			.select({ id: knowledgeBases.id })
+			.from(knowledgeBases)
+			.where(
+				and(
+					eq(knowledgeBases.workspaceId, workspaceId),
+					isNull(knowledgeBases.archivedAt),
+					inArray(knowledgeBases.id, uniqueKnowledgeBaseIds),
+				),
+			);
+		const availableIds = new Set(
+			availableKnowledgeBases.map((knowledgeBase) => knowledgeBase.id),
+		);
+		const invalidKnowledgeBaseId = uniqueKnowledgeBaseIds.find(
+			(knowledgeBaseId) => !availableIds.has(knowledgeBaseId),
+		);
+		if (invalidKnowledgeBaseId) throw new Error("Knowledge base not found");
+	}
+
 	await db
 		.delete(agentKnowledgeBindings)
 		.where(eq(agentKnowledgeBindings.agentVersionId, agentVersionId));
 
-	if (knowledgeBaseIds.length === 0) return;
+	if (uniqueKnowledgeBaseIds.length === 0) return;
 
 	await db.insert(agentKnowledgeBindings).values(
-		knowledgeBaseIds.map((knowledgeBaseId) => ({
+		uniqueKnowledgeBaseIds.map((knowledgeBaseId) => ({
 			agentVersionId,
 			knowledgeBaseId,
 		})),

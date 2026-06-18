@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getSession } from "@/modules/auth/session";
-import { getActiveVersion } from "@/modules/agent/use-cases";
 import {
-	getSkillBindingsForVersion,
-	replaceSkillBindingsForVersion,
-} from "@/modules/skills/use-cases";
+	getActiveVersion,
+	getVisibleAgentById,
+	updateAgent,
+} from "@/modules/agent/use-cases";
+import { isAdminRole } from "@/modules/admin/use-cases";
+import { getSkillBindingsForVersion } from "@/modules/skills/use-cases";
 import { authorization } from "@/server/domain/services/authorization";
-import { db } from "@/server/infrastructure/db";
-import { agents } from "@/server/infrastructure/db/schema";
 import { logger } from "@/lib/logger";
 
 const routeParamsSchema = z.object({ agentId: z.uuid() });
@@ -50,6 +49,16 @@ export async function GET(
 				{ error: "Forbidden", reason: permission.reason },
 				{ status: 403 },
 			);
+		}
+
+		const agent = await getVisibleAgentById(
+			parsedParams.data.agentId,
+			parsedQuery.data.workspaceId,
+			session.user.id,
+			isAdminRole(session.user.role),
+		);
+		if (!agent) {
+			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 		}
 
 		const version = await getActiveVersion(parsedParams.data.agentId);
@@ -99,27 +108,28 @@ export async function PUT(
 			);
 		}
 
-		const [agent] = await db
-			.select()
-			.from(agents)
-			.where(eq(agents.id, agentId))
-			.limit(1);
-		if (!agent || agent.workspaceId !== workspaceId) {
+		const { version } = await updateAgent({
+			agentId,
+			workspaceId,
+			userId: session.user.id,
+			canAdminCurate: isAdminRole(session.user.role),
+			skillBindings: skillIds,
+		});
+		const bindings = await getSkillBindingsForVersion(version.id);
+		return NextResponse.json({ version, bindings });
+	} catch (error) {
+		if ((error as Error).message === "Agent not found") {
 			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 		}
-
-		const version = await getActiveVersion(agentId);
-		if (!version) {
+		if (
+			(error as Error).message ===
+			"Only the creator or an admin can update this agent"
+		) {
 			return NextResponse.json(
-				{ error: "No active agent version" },
-				{ status: 400 },
+				{ error: (error as Error).message },
+				{ status: 403 },
 			);
 		}
-
-		await replaceSkillBindingsForVersion(version.id, workspaceId, skillIds);
-		const bindings = await getSkillBindingsForVersion(version.id);
-		return NextResponse.json({ bindings });
-	} catch (error) {
 		if ((error as Error).message === "Skill not found") {
 			return NextResponse.json({ error: "Skill not found" }, { status: 400 });
 		}

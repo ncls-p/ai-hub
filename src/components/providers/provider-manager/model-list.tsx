@@ -25,7 +25,9 @@ const MAX_LOGO_BYTES = 256 * 1024;
 function readLogoFile(file: File) {
 	return new Promise<string>((resolve, reject) => {
 		if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
-			reject(new Error("Use a bitmap image such as PNG, JPG, WebP, GIF, or AVIF."));
+			reject(
+				new Error("Use a bitmap image such as PNG, JPG, WebP, GIF, or AVIF."),
+			);
 			return;
 		}
 		if (file.size > MAX_LOGO_BYTES) {
@@ -83,9 +85,7 @@ export function ModelsPanel(props: ModelsPanelProps) {
 	if (props.providers.length > 0 && !props.loadingProviders) {
 		return (
 			<div className="rounded-xl border border-dashed bg-card p-8 text-center">
-				<p className="text-sm text-muted-foreground">
-					{t("selectProvider")}
-				</p>
+				<p className="text-sm text-muted-foreground">{t("selectProvider")}</p>
 			</div>
 		);
 	}
@@ -362,7 +362,9 @@ function RegisteredModelRow({
 		try {
 			onUpdateModelLogo(model.id, await readLogoFile(file));
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : "Invalid image file");
+			toast.error(
+				error instanceof Error ? error.message : "Invalid image file",
+			);
 		}
 	}
 

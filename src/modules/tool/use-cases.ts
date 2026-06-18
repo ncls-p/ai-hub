@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { encryptValue } from "@/lib/crypto";
 import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
 import {
 	agentToolBindings,
+	agents,
 	agentVersions,
 	customTools,
 	mcpServers,
@@ -51,19 +52,37 @@ export async function replaceToolBindingsForVersion(
 	await insertToolBindingsForVersion(agentVersionId, bindings);
 }
 
+async function getWorkspaceIdForAgentVersion(agentVersionId: string) {
+	const [row] = await db
+		.select({ workspaceId: agents.workspaceId })
+		.from(agentVersions)
+		.innerJoin(agents, eq(agentVersions.agentId, agents.id))
+		.where(eq(agentVersions.id, agentVersionId))
+		.limit(1);
+	if (!row) throw new Error("Agent version not found");
+	return row.workspaceId;
+}
+
 export async function insertToolBindingsForVersion(
 	agentVersionId: string,
 	bindings: ToolBindingInput[],
 ) {
 	if (bindings.length === 0) return;
 
+	const workspaceId = await getWorkspaceIdForAgentVersion(agentVersionId);
 	const values = await Promise.all(
 		bindings.map(async (binding) => {
 			if (binding.toolSource === "custom") {
 				const [customTool] = await db
 					.select()
 					.from(customTools)
-					.where(eq(customTools.id, binding.toolId))
+					.where(
+						and(
+							eq(customTools.id, binding.toolId),
+							eq(customTools.workspaceId, workspaceId),
+							isNull(customTools.archivedAt),
+						),
+					)
 					.limit(1);
 				if (!customTool) throw new Error("Custom tool not found");
 
@@ -78,12 +97,16 @@ export async function insertToolBindingsForVersion(
 
 			if (binding.toolSource === "mcp") {
 				const [tool] = await db
-					.select()
+					.select({ requireApproval: mcpTools.requireApproval })
 					.from(mcpTools)
+					.innerJoin(mcpServers, eq(mcpTools.mcpServerId, mcpServers.id))
 					.where(
 						and(
 							eq(mcpTools.id, binding.toolId),
 							eq(mcpTools.mcpServerId, binding.mcpServerId),
+							eq(mcpServers.workspaceId, workspaceId),
+							eq(mcpServers.enabled, true),
+							isNull(mcpServers.archivedAt),
 						),
 					)
 					.limit(1);

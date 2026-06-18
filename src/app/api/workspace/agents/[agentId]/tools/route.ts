@@ -169,6 +169,28 @@ export async function PUT(
 		const bindings = await getToolBindingsForVersion(version.id);
 		return NextResponse.json({ version, bindings });
 	} catch (error) {
+		if ((error as Error).message === "Agent not found") {
+			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+		}
+		if (
+			error instanceof Error &&
+			[
+				"Tool not found",
+				"Custom tool not found",
+				"MCP tool not found",
+			].includes(error.message)
+		) {
+			return NextResponse.json({ error: error.message }, { status: 400 });
+		}
+		if (
+			(error as Error).message ===
+			"Only the creator or an admin can update this agent"
+		) {
+			return NextResponse.json(
+				{ error: (error as Error).message },
+				{ status: 403 },
+			);
+		}
 		logger.error("Failed to update agent tools", {}, error as Error);
 		return NextResponse.json(
 			{ error: "Internal server error" },

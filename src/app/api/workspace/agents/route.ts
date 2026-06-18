@@ -201,6 +201,9 @@ export async function POST(req: NextRequest) {
 				"Model not found",
 				"Model requires a provider",
 				"Tool not found",
+				"Custom tool not found",
+				"MCP tool not found",
+				"Knowledge base not found",
 				"Share target user not found",
 				"Share target user is required",
 			].includes(error.message)
@@ -253,12 +256,42 @@ export async function GET(req: NextRequest) {
 		}
 
 		const canAdminCurate = isAdminRole(session.user.role);
-		const createPermission = await authorization.requirePermission(
-			{ principalType: "user", principalId: session.user.id },
-			"agents.create",
-			"workspace",
-			workspaceId,
-		);
+		const permissionContext = {
+			principalType: "user" as const,
+			principalId: session.user.id,
+		};
+		const [
+			canCreateAgent,
+			canUpdateAgents,
+			canManageProviderSettings,
+			canManageModels,
+		] = await Promise.all([
+			authorization.hasPermission(
+				permissionContext,
+				"agents.create",
+				"workspace",
+				workspaceId,
+			),
+			authorization.hasPermission(
+				permissionContext,
+				"agents.update",
+				"workspace",
+				workspaceId,
+			),
+			authorization.hasPermission(
+				permissionContext,
+				"providers.update",
+				"workspace",
+				workspaceId,
+			),
+			authorization.hasPermission(
+				permissionContext,
+				"models.manage",
+				"workspace",
+				workspaceId,
+			),
+		]);
+		const canManageProviders = canManageProviderSettings && canManageModels;
 		const list = await listAgents(workspaceId, session.user.id, canAdminCurate);
 		const defaultPreferences = await getAgentDefaultPreferences(
 			workspaceId,
@@ -286,13 +319,16 @@ export async function GET(req: NextRequest) {
 							?.logoUrl,
 					}
 				: {}),
-			canEdit: canEditAgent(agent, session.user.id, canAdminCurate),
-			canClone: createPermission.granted,
+			canEdit:
+				canUpdateAgents && canEditAgent(agent, session.user.id, canAdminCurate),
+			canClone: canCreateAgent,
 		}));
 
 		return NextResponse.json({
 			agents: agentsWithAccess,
 			canAdminCurate,
+			canCreateAgent,
+			canManageProviders,
 			...defaultPreferences,
 		});
 	} catch (error) {

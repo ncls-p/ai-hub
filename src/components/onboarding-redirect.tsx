@@ -25,7 +25,7 @@ export function OnboardingRedirect() {
 				if (cancelled || completed) return;
 
 				const permissions = await fetchWorkspacePermissions(workspaceId!);
-				if (cancelled || !permissions.canViewProviders) return;
+				if (cancelled || !permissions.canManageProviders) return;
 
 				const providers = await fetchJson<unknown[]>(
 					`/api/workspace/providers?workspaceId=${workspaceId}`,

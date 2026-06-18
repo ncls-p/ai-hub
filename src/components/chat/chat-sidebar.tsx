@@ -70,6 +70,7 @@ interface ChatSidebarProps {
 	loading?: boolean;
 	onSelectConversation: (conversationId: string) => void;
 	onNewConversation: () => void;
+	canCreateAgent?: boolean;
 	onRenameConversation?: (conversationId: string, title: string) => void;
 	onDeleteConversation?: (conversationId: string) => void;
 	onCreateConversationFolder?: (name: string) => void;
@@ -317,7 +318,10 @@ function ConversationItem({
 						</span>
 					</button>
 					{pinned ? (
-						<PinIcon className="size-3 shrink-0 text-primary" aria-hidden="true" />
+						<PinIcon
+							className="size-3 shrink-0 text-primary"
+							aria-hidden="true"
+						/>
 					) : null}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
@@ -369,6 +373,7 @@ export function ChatSidebar({
 	loading,
 	onSelectConversation,
 	onNewConversation,
+	canCreateAgent = false,
 	onRenameConversation,
 	onDeleteConversation,
 	onCreateConversationFolder,
@@ -407,6 +412,7 @@ export function ChatSidebar({
 		() => (shell ? buildMenuGroups(shell) : []),
 		[shell],
 	);
+	const canConfigureProviders = Boolean(shell?.permissions.canManageProviders);
 	const sortedConversations = useMemo(() => {
 		return [...conversations].sort((a, b) => {
 			const aPinned = a.pinnedAt ? 0 : 1;
@@ -415,9 +421,7 @@ export function ChatSidebar({
 			const aOrder = a.sidebarOrder ?? Number.MAX_SAFE_INTEGER;
 			const bOrder = b.sidebarOrder ?? Number.MAX_SAFE_INTEGER;
 			if (aOrder !== bOrder) return aOrder - bOrder;
-			return (
-				new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-			);
+			return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
 		});
 	}, [conversations]);
 	const pinnedConversations = useMemo(
@@ -429,7 +433,8 @@ export function ChatSidebar({
 		[sortedConversations],
 	);
 	const topLevelConversations = useMemo(
-		() => unpinnedConversations.filter((conversation) => !conversation.folderId),
+		() =>
+			unpinnedConversations.filter((conversation) => !conversation.folderId),
 		[unpinnedConversations],
 	);
 	const folderSections = useMemo(() => {
@@ -622,9 +627,7 @@ export function ChatSidebar({
 									<MessageSquareIcon className="size-4" aria-hidden="true" />
 								</Button>
 							</TooltipTrigger>
-							<TooltipContent side="right">
-								{conversation.title}
-							</TooltipContent>
+							<TooltipContent side="right">{conversation.title}</TooltipContent>
 						</Tooltip>
 					))}
 				</div>
@@ -652,10 +655,7 @@ export function ChatSidebar({
 									onClick={() => onCollapsedChange(true)}
 									className="size-7 rounded-md"
 								>
-									<PanelLeftCloseIcon
-										className="size-3.5"
-										aria-hidden="true"
-									/>
+									<PanelLeftCloseIcon className="size-3.5" aria-hidden="true" />
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent>Collapse sidebar</TooltipContent>
@@ -764,24 +764,30 @@ export function ChatSidebar({
 										Start a new chat to begin.
 									</EmptyDescription>
 								</EmptyHeader>
-								<div className="mt-4 flex flex-wrap justify-center gap-2 text-xs">
-									<Button
-										asChild
-										variant="link"
-										size="sm"
-										className="h-auto px-0 text-muted-foreground/70"
-									>
-										<Link href="/providers">Configure a provider</Link>
-									</Button>
-									<Button
-										asChild
-										variant="link"
-										size="sm"
-										className="h-auto px-0 text-muted-foreground/70"
-									>
-										<Link href="/agents">Create an agent</Link>
-									</Button>
-								</div>
+								{canConfigureProviders || canCreateAgent ? (
+									<div className="mt-4 flex flex-wrap justify-center gap-2 text-xs">
+										{canConfigureProviders ? (
+											<Button
+												asChild
+												variant="link"
+												size="sm"
+												className="h-auto px-0 text-muted-foreground/70"
+											>
+												<Link href="/providers">Configure a provider</Link>
+											</Button>
+										) : null}
+										{canCreateAgent ? (
+											<Button
+												asChild
+												variant="link"
+												size="sm"
+												className="h-auto px-0 text-muted-foreground/70"
+											>
+												<Link href="/agents">Create an agent</Link>
+											</Button>
+										) : null}
+									</div>
+								) : null}
 							</Empty>
 						</div>
 					) : (
@@ -792,7 +798,10 @@ export function ChatSidebar({
 									onDragOver={(event) => event.preventDefault()}
 									onDrop={(event) => {
 										event.preventDefault();
-										reorderDraggedConversation({ folderId: null, pinned: true });
+										reorderDraggedConversation({
+											folderId: null,
+											pinned: true,
+										});
 									}}
 								>
 									<div className="flex items-center gap-1 px-2 pb-1 text-[11px] font-medium text-muted-foreground">
@@ -803,122 +812,144 @@ export function ChatSidebar({
 								</section>
 							) : null}
 
-							{folderSections.map(({ folder, conversations: folderConversations }) => {
-								const open = !closedFolderIds.has(folder.id);
-								const isEditingFolder = editingFolderId === folder.id;
+							{folderSections.map(
+								({ folder, conversations: folderConversations }) => {
+									const open = !closedFolderIds.has(folder.id);
+									const isEditingFolder = editingFolderId === folder.id;
 
-								return (
-									<section key={folder.id} className="flex flex-col gap-px">
-										<div
-											className="group/folder flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/60"
-											onDragOver={(event) => event.preventDefault()}
-											onDrop={(event) => {
-												event.preventDefault();
-												reorderDraggedConversation({
-													folderId: folder.id,
-													pinned: false,
-												});
-											}}
-										>
-											<FolderIcon className="size-3.5 shrink-0" aria-hidden="true" />
-											{isEditingFolder ? (
-												<div className="flex min-w-0 flex-1 items-center gap-1">
-													<Input
-														value={editingFolderName}
-														onChange={(event) =>
-															setEditingFolderName(event.target.value)
-														}
-														onKeyDown={(event) => {
-															if (event.key === "Enter") {
-																const name = editingFolderName.trim();
-																if (name) {
-																	onRenameConversationFolder?.(folder.id, name);
-																	setEditingFolderId(null);
-																}
+									return (
+										<section key={folder.id} className="flex flex-col gap-px">
+											<div
+												className="group/folder flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/60"
+												onDragOver={(event) => event.preventDefault()}
+												onDrop={(event) => {
+													event.preventDefault();
+													reorderDraggedConversation({
+														folderId: folder.id,
+														pinned: false,
+													});
+												}}
+											>
+												<FolderIcon
+													className="size-3.5 shrink-0"
+													aria-hidden="true"
+												/>
+												{isEditingFolder ? (
+													<div className="flex min-w-0 flex-1 items-center gap-1">
+														<Input
+															value={editingFolderName}
+															onChange={(event) =>
+																setEditingFolderName(event.target.value)
 															}
-															if (event.key === "Escape") setEditingFolderId(null);
-														}}
-														className="h-6 min-w-0 rounded-md px-2 text-xs"
-														autoFocus
-													/>
-												</div>
-											) : (
-												<button
-													type="button"
-													className="flex min-w-0 flex-1 items-center gap-1 text-left"
-													onClick={() => toggleFolder(folder.id)}
-												>
-													<ChevronDownIcon
-														className={cn(
-															"size-3 shrink-0 transition-transform",
-															!open && "-rotate-90",
-														)}
-														aria-hidden="true"
-													/>
-													<span className="truncate font-medium">{folder.name}</span>
-													<span className="text-muted-foreground/50">
-														{folderConversations.length}
-													</span>
-												</button>
-											)}
-											<DropdownMenu>
-												<DropdownMenuTrigger asChild>
-													<Button
-														type="button"
-														size="icon-sm"
-														variant="ghost"
-														className="size-6 opacity-0 group-hover/folder:opacity-100 data-[state=open]:opacity-100"
-														aria-label="Folder actions"
-													>
-														<MoreHorizontalIcon className="size-3" aria-hidden="true" />
-													</Button>
-												</DropdownMenuTrigger>
-												<DropdownMenuContent align="end">
-													<DropdownMenuItem
-														onSelect={() => {
-															setEditingFolderId(folder.id);
-															setEditingFolderName(folder.name);
-														}}
-														className="gap-2"
-													>
-														<PencilIcon className="size-3.5" aria-hidden="true" />
-														Rename
-													</DropdownMenuItem>
-													<DropdownMenuItem
-														variant="destructive"
-														onSelect={() => onDeleteConversationFolder?.(folder.id)}
-														className="gap-2"
-													>
-														<Trash2Icon className="size-3.5" aria-hidden="true" />
-														Delete folder
-													</DropdownMenuItem>
-												</DropdownMenuContent>
-											</DropdownMenu>
-										</div>
-										{open ? (
-											<div className="flex flex-col gap-px pl-3">
-												{folderConversations.length > 0 ? (
-													folderConversations.map(renderConversation)
-												) : (
-													<div
-														className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground/60"
-														onDragOver={(event) => event.preventDefault()}
-														onDrop={(event) => {
-															event.preventDefault();
-															reorderDraggedConversation({
-																folderId: folder.id,
-																pinned: false,
-															});
-														}}
-													>
-														Drop chats here
+															onKeyDown={(event) => {
+																if (event.key === "Enter") {
+																	const name = editingFolderName.trim();
+																	if (name) {
+																		onRenameConversationFolder?.(
+																			folder.id,
+																			name,
+																		);
+																		setEditingFolderId(null);
+																	}
+																}
+																if (event.key === "Escape")
+																	setEditingFolderId(null);
+															}}
+															className="h-6 min-w-0 rounded-md px-2 text-xs"
+															autoFocus
+														/>
 													</div>
+												) : (
+													<button
+														type="button"
+														className="flex min-w-0 flex-1 items-center gap-1 text-left"
+														onClick={() => toggleFolder(folder.id)}
+													>
+														<ChevronDownIcon
+															className={cn(
+																"size-3 shrink-0 transition-transform",
+																!open && "-rotate-90",
+															)}
+															aria-hidden="true"
+														/>
+														<span className="truncate font-medium">
+															{folder.name}
+														</span>
+														<span className="text-muted-foreground/50">
+															{folderConversations.length}
+														</span>
+													</button>
 												)}
+												<DropdownMenu>
+													<DropdownMenuTrigger asChild>
+														<Button
+															type="button"
+															size="icon-sm"
+															variant="ghost"
+															className="size-6 opacity-0 group-hover/folder:opacity-100 data-[state=open]:opacity-100"
+															aria-label="Folder actions"
+														>
+															<MoreHorizontalIcon
+																className="size-3"
+																aria-hidden="true"
+															/>
+														</Button>
+													</DropdownMenuTrigger>
+													<DropdownMenuContent align="end">
+														<DropdownMenuItem
+															onSelect={() => {
+																setEditingFolderId(folder.id);
+																setEditingFolderName(folder.name);
+															}}
+															className="gap-2"
+														>
+															<PencilIcon
+																className="size-3.5"
+																aria-hidden="true"
+															/>
+															Rename
+														</DropdownMenuItem>
+														<DropdownMenuItem
+															variant="destructive"
+															onSelect={() =>
+																onDeleteConversationFolder?.(folder.id)
+															}
+															className="gap-2"
+														>
+															<Trash2Icon
+																className="size-3.5"
+																aria-hidden="true"
+															/>
+															Delete folder
+														</DropdownMenuItem>
+													</DropdownMenuContent>
+												</DropdownMenu>
 											</div>
-										) : null}
-									</section>
-								);
-							})}
+											{open ? (
+												<div className="flex flex-col gap-px pl-3">
+													{folderConversations.length > 0 ? (
+														folderConversations.map(renderConversation)
+													) : (
+														<div
+															className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground/60"
+															onDragOver={(event) => event.preventDefault()}
+															onDrop={(event) => {
+																event.preventDefault();
+																reorderDraggedConversation({
+																	folderId: folder.id,
+																	pinned: false,
+																});
+															}}
+														>
+															Drop chats here
+														</div>
+													)}
+												</div>
+											) : null}
+										</section>
+									);
+								},
+							)}
 
 							<section
 								className="flex flex-col gap-px"

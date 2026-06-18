@@ -412,12 +412,13 @@ export async function replaceSkillBindingsForVersion(
 	workspaceId: string,
 	skillIds: string[],
 ) {
-	await db
-		.delete(agentSkillBindings)
-		.where(eq(agentSkillBindings.agentVersionId, agentVersionId));
-
 	const uniqueSkillIds = [...new Set(skillIds)];
-	if (uniqueSkillIds.length === 0) return;
+	if (uniqueSkillIds.length === 0) {
+		await db
+			.delete(agentSkillBindings)
+			.where(eq(agentSkillBindings.agentVersionId, agentVersionId));
+		return;
+	}
 
 	const availableSkills = await db
 		.select({ id: agentSkills.id })
@@ -433,6 +434,10 @@ export async function replaceSkillBindingsForVersion(
 		(skillId) => !availableIds.has(skillId),
 	);
 	if (invalidSkillId) throw new Error("Skill not found");
+
+	await db
+		.delete(agentSkillBindings)
+		.where(eq(agentSkillBindings.agentVersionId, agentVersionId));
 
 	await db.insert(agentSkillBindings).values(
 		uniqueSkillIds.map((skillId) => ({

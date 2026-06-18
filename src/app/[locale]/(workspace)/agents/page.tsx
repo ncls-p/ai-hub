@@ -202,6 +202,7 @@ export default function AgentsPage() {
 	const [agents, setAgents] = useState<Agent[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [canAdminCurate, setCanAdminCurate] = useState(false);
+	const [canCreateAgent, setCanCreateAgent] = useState(false);
 	const [organizationDefaultAgentId, setOrganizationDefaultAgentId] = useState<
 		string | null
 	>(null);
@@ -247,6 +248,7 @@ export default function AgentsPage() {
 			const nextAgents = Array.isArray(data) ? data : data.agents;
 			setAgents(nextAgents);
 			setCanAdminCurate(Boolean(data.canAdminCurate));
+			setCanCreateAgent(Boolean(data.canCreateAgent));
 			setOrganizationDefaultAgentId(data.organizationDefaultAgentId ?? null);
 			setUserDefaultAgentId(data.userDefaultAgentId ?? null);
 		} catch (err) {
@@ -276,6 +278,7 @@ export default function AgentsPage() {
 					const nextAgents = Array.isArray(data) ? data : data.agents;
 					setAgents(nextAgents);
 					setCanAdminCurate(Boolean(data.canAdminCurate));
+					setCanCreateAgent(Boolean(data.canCreateAgent));
 					setOrganizationDefaultAgentId(
 						data.organizationDefaultAgentId ?? null,
 					);
@@ -518,10 +521,12 @@ export default function AgentsPage() {
 			description={tList("pageDescription")}
 			width="default"
 			actions={
-				<Button size="sm" onClick={() => setShowCreateDialog(true)}>
-					<PlusIcon className="size-4" aria-hidden="true" />
-					{t("create")}
-				</Button>
+				canCreateAgent ? (
+					<Button size="sm" onClick={() => setShowCreateDialog(true)}>
+						<PlusIcon className="size-4" aria-hidden="true" />
+						{t("create")}
+					</Button>
+				) : null
 			}
 		>
 			<div className="flex flex-col gap-6">
@@ -553,10 +558,12 @@ export default function AgentsPage() {
 									</p>
 								</div>
 							</div>
-							<Button size="sm" onClick={() => setShowCreateDialog(true)}>
-								<PlusIcon className="size-4" aria-hidden="true" />
-								{t("create")}
-							</Button>
+							{canCreateAgent ? (
+								<Button size="sm" onClick={() => setShowCreateDialog(true)}>
+									<PlusIcon className="size-4" aria-hidden="true" />
+									{t("create")}
+								</Button>
+							) : null}
 						</div>
 					</div>
 					<ol className="mt-5 grid gap-2 sm:grid-cols-3">
@@ -625,14 +632,16 @@ export default function AgentsPage() {
 							<p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
 								{tList("emptyDescription")}
 							</p>
-							<Button
-								size="sm"
-								className="mt-4"
-								onClick={() => setShowCreateDialog(true)}
-							>
-								<PlusIcon className="size-4" aria-hidden="true" />
-								{tList("emptyCta")}
-							</Button>
+							{canCreateAgent ? (
+								<Button
+									size="sm"
+									className="mt-4"
+									onClick={() => setShowCreateDialog(true)}
+								>
+									<PlusIcon className="size-4" aria-hidden="true" />
+									{tList("emptyCta")}
+								</Button>
+							) : null}
 						</div>
 					) : filteredAgents.length === 0 ? (
 						<div className="px-5 py-8 text-center text-sm text-muted-foreground">
@@ -830,7 +839,10 @@ export default function AgentsPage() {
 			</div>
 
 			{/* Create dialog */}
-			<Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+			<Dialog
+				open={canCreateAgent && showCreateDialog}
+				onOpenChange={setShowCreateDialog}
+			>
 				<DialogContent className="max-w-md">
 					<DialogHeader>
 						<DialogTitle>{t("createTitle")}</DialogTitle>

@@ -44,9 +44,13 @@ export async function GET(req: NextRequest) {
 			canViewUsage,
 			canViewAudit,
 			canViewProviders,
+			canManageProviderSettings,
+			canManageModels,
 			canConfigureTools,
 			canViewTools,
 			canGetMcpServers,
+			canManageKnowledgeBases,
+			canCreateAgent,
 			canManageApiKeys,
 			canManageWorkspace,
 		] = await Promise.all([
@@ -55,6 +59,18 @@ export async function GET(req: NextRequest) {
 			authorization.hasPermission(
 				ctx,
 				"providers.viewMetadata",
+				"workspace",
+				workspaceId,
+			),
+			authorization.hasPermission(
+				ctx,
+				"providers.update",
+				"workspace",
+				workspaceId,
+			),
+			authorization.hasPermission(
+				ctx,
+				"models.manage",
 				"workspace",
 				workspaceId,
 			),
@@ -73,6 +89,18 @@ export async function GET(req: NextRequest) {
 			),
 			authorization.hasPermission(
 				ctx,
+				"knowledgeBases.manage",
+				"workspace",
+				workspaceId,
+			),
+			authorization.hasPermission(
+				ctx,
+				"agents.create",
+				"workspace",
+				workspaceId,
+			),
+			authorization.hasPermission(
+				ctx,
 				"apiKeys.manage",
 				"workspace",
 				workspaceId,
@@ -85,13 +113,18 @@ export async function GET(req: NextRequest) {
 			),
 		]);
 
+		const canManageProviders = canManageProviderSettings && canManageModels;
+
 		return NextResponse.json({
 			canViewUsage,
 			canViewAudit,
 			canViewProviders,
+			canManageProviders,
 			canConfigureTools,
 			canViewTools,
 			canGetMcpServers,
+			canManageKnowledgeBases,
+			canCreateAgent,
 			canManageApiKeys,
 			canManageWorkspace,
 		});

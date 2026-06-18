@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 
+import { RequireWorkspaceAccess } from "@/components/require-workspace-access";
 import { SetupWizard } from "@/components/setup/setup-wizard";
 import { PageLoading } from "@/components/page-loading";
 import { WorkspacePage } from "@/components/workspace-page";
@@ -18,13 +19,19 @@ export default function SetupPage() {
 	}
 
 	return (
-		<WorkspacePage title={t("title")} description={t("description")} width="narrow">
-			<SetupWizard
-				mode="page"
-				onCompleteAction={(agentId) => {
-					router.push(`/chat?agentId=${agentId}`);
-				}}
-			/>
-		</WorkspacePage>
+		<RequireWorkspaceAccess required={["canManageProviders", "canCreateAgent"]}>
+			<WorkspacePage
+				title={t("title")}
+				description={t("description")}
+				width="narrow"
+			>
+				<SetupWizard
+					mode="page"
+					onCompleteAction={(agentId) => {
+						router.push(`/chat?agentId=${agentId}`);
+					}}
+				/>
+			</WorkspacePage>
+		</RequireWorkspaceAccess>
 	);
 }

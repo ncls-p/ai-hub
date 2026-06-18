@@ -4,7 +4,7 @@ import { ProvidersPageClient } from "./providers-client";
 
 export default function ProvidersPage() {
 	return (
-		<RequireWorkspaceAccess required="canViewProviders">
+		<RequireWorkspaceAccess required="canManageProviders">
 			<ProvidersPageClient />
 		</RequireWorkspaceAccess>
 	);

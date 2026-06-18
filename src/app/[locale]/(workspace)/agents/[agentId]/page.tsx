@@ -75,45 +75,10 @@ export default function AgentConfigurePage() {
 	const loadData = useCallback(async () => {
 		if (!agentId || !workspaceId) return;
 
-		const [
-			agentRes,
-			providersRes,
-			toolsRes,
-			mcpRes,
-			customToolsRes,
-			kbRes,
-			skillsRes,
-			bindingsRes,
-			knowledgeBindingsRes,
-			skillBindingsRes,
-		] = await Promise.all([
-			fetch(`/api/workspace/agents/${agentId}?workspaceId=${workspaceId}`),
-			fetch(`/api/workspace/providers?workspaceId=${workspaceId}`),
-			fetch(`/api/workspace/tools?workspaceId=${workspaceId}`),
-			fetch(`/api/workspace/mcp-servers?workspaceId=${workspaceId}`),
-			fetch(`/api/workspace/custom-tools?workspaceId=${workspaceId}`),
-			fetch(`/api/workspace/knowledge-bases?workspaceId=${workspaceId}`),
-			fetch(`/api/workspace/skills?workspaceId=${workspaceId}`),
-			fetch(
-				`/api/workspace/agents/${agentId}/tools?workspaceId=${workspaceId}`,
-			),
-			fetch(
-				`/api/workspace/agents/${agentId}/knowledge?workspaceId=${workspaceId}`,
-			),
-			fetch(
-				`/api/workspace/agents/${agentId}/skills?workspaceId=${workspaceId}`,
-			),
-		]);
-
-		if (
-			!agentRes.ok ||
-			!providersRes.ok ||
-			!toolsRes.ok ||
-			!mcpRes.ok ||
-			!customToolsRes.ok ||
-			!kbRes.ok ||
-			!skillsRes.ok
-		) {
+		const agentRes = await fetch(
+			`/api/workspace/agents/${agentId}?workspaceId=${workspaceId}`,
+		);
+		if (!agentRes.ok) {
 			throw new Error("Unable to load agent settings");
 		}
 
@@ -139,6 +104,71 @@ export default function AgentConfigurePage() {
 						versions.find((version) => version.isActive) ?? versions[0] ?? null;
 				}
 			}
+		}
+
+		setAgent(nextAgent);
+		setForm(
+			buildAgentFormFromVersion(
+				nextAgent,
+				activeVersion,
+				nextAgent.shareTargetEmail,
+			),
+		);
+
+		if (!nextAgent.canEdit) {
+			setProviders([]);
+			setModels([]);
+			setBuiltinTools([]);
+			setMcpServers([]);
+			setMcpTools([]);
+			setCustomTools([]);
+			setKnowledgeBases([]);
+			setSkills([]);
+			setBuiltinBindings({});
+			setMcpBindings({});
+			setCustomBindings({});
+			setSelectedKnowledgeIds([]);
+			setSelectedSkillIds([]);
+			return;
+		}
+
+		const [
+			providersRes,
+			toolsRes,
+			mcpRes,
+			customToolsRes,
+			kbRes,
+			skillsRes,
+			bindingsRes,
+			knowledgeBindingsRes,
+			skillBindingsRes,
+		] = await Promise.all([
+			fetch(`/api/workspace/providers?workspaceId=${workspaceId}`),
+			fetch(`/api/workspace/tools?workspaceId=${workspaceId}`),
+			fetch(`/api/workspace/mcp-servers?workspaceId=${workspaceId}`),
+			fetch(`/api/workspace/custom-tools?workspaceId=${workspaceId}`),
+			fetch(`/api/workspace/knowledge-bases?workspaceId=${workspaceId}`),
+			fetch(`/api/workspace/skills?workspaceId=${workspaceId}`),
+			fetch(
+				`/api/workspace/agents/${agentId}/tools?workspaceId=${workspaceId}`,
+			),
+			fetch(
+				`/api/workspace/agents/${agentId}/knowledge?workspaceId=${workspaceId}`,
+			),
+			fetch(
+				`/api/workspace/agents/${agentId}/skills?workspaceId=${workspaceId}`,
+			),
+		]);
+
+		if (
+			!providersRes.ok ||
+			!toolsRes.ok ||
+			!mcpRes.ok ||
+			!customToolsRes.ok ||
+			!kbRes.ok ||
+			!skillsRes.ok
+		) {
+			throw new Error("Unable to load agent settings");
 		}
 
 		const providerRows = (await providersRes.json()) as Provider[];
@@ -187,7 +217,6 @@ export default function AgentConfigurePage() {
 			)
 		).flat();
 
-		setAgent(nextAgent);
 		setProviders(providerRows);
 		setModels(modelRows);
 		setBuiltinTools(builtinRows);
@@ -196,14 +225,6 @@ export default function AgentConfigurePage() {
 		setCustomTools(customToolRows);
 		setKnowledgeBases(kbRows);
 		setSkills(skillRows);
-
-		setForm(
-			buildAgentFormFromVersion(
-				nextAgent,
-				activeVersion,
-				nextAgent.shareTargetEmail,
-			),
-		);
 
 		const nextBuiltin: ToolBindingState = {};
 		for (const tool of builtinRows) {
@@ -617,107 +638,113 @@ export default function AgentConfigurePage() {
 					onShowDeleteDialogAction={() => setShowDeleteDialog(true)}
 				/>
 
-				<div className="rounded-2xl border bg-card p-4 animate-in-fade stagger-2">
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-						<div>
-							<h3 className="text-base font-semibold">
-								{t("configurePage.setupTitle")}
-							</h3>
-							<p className="mt-1 text-sm text-muted-foreground">
-								{t("configurePage.setupDescription")}
-							</p>
-						</div>
-						{hasModel && agent?.id ? (
-							<Button asChild size="sm">
-								<Link href={`/chat?agentId=${agent.id}`}>
-									{t("configurePage.openChatCta")}
-								</Link>
-							</Button>
-						) : (
-							<Button
-								type="button"
-								size="sm"
-								variant="outline"
-								onClick={() => setActiveTab("essential")}
-							>
-								{t("configurePage.chooseModelCta")}
-							</Button>
-						)}
-					</div>
-					<div className="mt-4 grid gap-2 md:grid-cols-3">
-						{setupSteps.map((step, index) => (
-							<div
-								key={step.label}
-								className="flex items-center gap-3 rounded-xl border bg-background px-3 py-2"
-							>
-								<span
-									className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
-										step.done
-											? "bg-success/10 text-success"
-											: "bg-muted text-muted-foreground"
-									}`}
-								>
-									{step.done ? "✓" : index + 1}
-								</span>
-								<div className="min-w-0">
-									<p className="truncate text-sm font-medium">{step.label}</p>
-									<p className="text-xs text-muted-foreground">{step.status}</p>
-								</div>
+				{canEdit ? (
+					<div className="rounded-2xl border bg-card p-4 animate-in-fade stagger-2">
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+							<div>
+								<h3 className="text-base font-semibold">
+									{t("configurePage.setupTitle")}
+								</h3>
+								<p className="mt-1 text-sm text-muted-foreground">
+									{t("configurePage.setupDescription")}
+								</p>
 							</div>
-						))}
+							{hasModel && agent?.id ? (
+								<Button asChild size="sm">
+									<Link href={`/chat?agentId=${agent.id}`}>
+										{t("configurePage.openChatCta")}
+									</Link>
+								</Button>
+							) : (
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									onClick={() => setActiveTab("essential")}
+								>
+									{t("configurePage.chooseModelCta")}
+								</Button>
+							)}
+						</div>
+						<div className="mt-4 grid gap-2 md:grid-cols-3">
+							{setupSteps.map((step, index) => (
+								<div
+									key={step.label}
+									className="flex items-center gap-3 rounded-xl border bg-background px-3 py-2"
+								>
+									<span
+										className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+											step.done
+												? "bg-success/10 text-success"
+												: "bg-muted text-muted-foreground"
+										}`}
+									>
+										{step.done ? "✓" : index + 1}
+									</span>
+									<div className="min-w-0">
+										<p className="truncate text-sm font-medium">{step.label}</p>
+										<p className="text-xs text-muted-foreground">
+											{step.status}
+										</p>
+									</div>
+								</div>
+							))}
+						</div>
 					</div>
-				</div>
+				) : null}
 
-				<div className="rounded-2xl border bg-card px-5 pb-5 pt-5 animate-in-fade stagger-3">
-					<Tabs value={activeTab} onValueChange={setActiveTab}>
-						<TabsList className="w-full flex-wrap sm:w-auto">
-							<TabsTrigger value="essential" className="gap-2">
-								{t("tabs.essential")}
-							</TabsTrigger>
-							<TabsTrigger value="capabilities" className="gap-2">
-								{t("tabs.capabilities")}
-								<TabBadge count={capabilitiesCount} />
-							</TabsTrigger>
-						</TabsList>
+				{canEdit ? (
+					<div className="rounded-2xl border bg-card px-5 pb-5 pt-5 animate-in-fade stagger-3">
+						<Tabs value={activeTab} onValueChange={setActiveTab}>
+							<TabsList className="w-full flex-wrap sm:w-auto">
+								<TabsTrigger value="essential" className="gap-2">
+									{t("tabs.essential")}
+								</TabsTrigger>
+								<TabsTrigger value="capabilities" className="gap-2">
+									{t("tabs.capabilities")}
+									<TabBadge count={capabilitiesCount} />
+								</TabsTrigger>
+							</TabsList>
 
-						<TabsContent value="essential" className="mt-4">
-							<EssentialTab
-								form={form}
-								setFormAction={setForm}
-								providers={providers}
-								models={models}
-								saving={saving}
-								canAdminCurate={agent?.canAdminCurate ?? false}
-								readOnly={!canEdit}
-								onSaveAction={saveEssential}
-							/>
-						</TabsContent>
+							<TabsContent value="essential" className="mt-4">
+								<EssentialTab
+									form={form}
+									setFormAction={setForm}
+									providers={providers}
+									models={models}
+									saving={saving}
+									canAdminCurate={agent?.canAdminCurate ?? false}
+									readOnly={!canEdit}
+									onSaveAction={saveEssential}
+								/>
+							</TabsContent>
 
-						<TabsContent value="capabilities" className="mt-4">
-							<CapabilitiesTab
-								builtinTools={builtinTools}
-								builtinBindings={builtinBindings}
-								setBuiltinBindingsAction={setBuiltinBindings}
-								mcpServers={mcpServers}
-								mcpTools={mcpTools}
-								mcpBindings={mcpBindings}
-								setMcpBindingsAction={setMcpBindings}
-								customTools={customTools}
-								customBindings={customBindings}
-								setCustomBindingsAction={setCustomBindings}
-								knowledgeBases={knowledgeBases}
-								selectedKnowledgeIds={selectedKnowledgeIds}
-								setSelectedKnowledgeIdsAction={setSelectedKnowledgeIds}
-								skills={skills}
-								selectedSkillIds={selectedSkillIds}
-								setSelectedSkillIdsAction={setSelectedSkillIds}
-								saving={saving}
-								readOnly={!canEdit}
-								onSaveAction={() => void saveCapabilities()}
-							/>
-						</TabsContent>
-					</Tabs>
-				</div>
+							<TabsContent value="capabilities" className="mt-4">
+								<CapabilitiesTab
+									builtinTools={builtinTools}
+									builtinBindings={builtinBindings}
+									setBuiltinBindingsAction={setBuiltinBindings}
+									mcpServers={mcpServers}
+									mcpTools={mcpTools}
+									mcpBindings={mcpBindings}
+									setMcpBindingsAction={setMcpBindings}
+									customTools={customTools}
+									customBindings={customBindings}
+									setCustomBindingsAction={setCustomBindings}
+									knowledgeBases={knowledgeBases}
+									selectedKnowledgeIds={selectedKnowledgeIds}
+									setSelectedKnowledgeIdsAction={setSelectedKnowledgeIds}
+									skills={skills}
+									selectedSkillIds={selectedSkillIds}
+									setSelectedSkillIdsAction={setSelectedSkillIds}
+									saving={saving}
+									readOnly={!canEdit}
+									onSaveAction={() => void saveCapabilities()}
+								/>
+							</TabsContent>
+						</Tabs>
+					</div>
+				) : null}
 			</div>
 
 			<DeleteDialog

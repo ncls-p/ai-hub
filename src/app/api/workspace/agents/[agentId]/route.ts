@@ -158,12 +158,24 @@ export async function GET(
 			shareTargetEmail = target?.email ?? null;
 		}
 
-		const createPermission = await authorization.requirePermission(
-			{ principalType: "user", principalId: session.user.id },
-			"agents.create",
-			"workspace",
-			workspaceId,
-		);
+		const permissionContext = {
+			principalType: "user" as const,
+			principalId: session.user.id,
+		};
+		const [canCreateAgent, canUpdateAgents] = await Promise.all([
+			authorization.hasPermission(
+				permissionContext,
+				"agents.create",
+				"workspace",
+				workspaceId,
+			),
+			authorization.hasPermission(
+				permissionContext,
+				"agents.update",
+				"workspace",
+				workspaceId,
+			),
+		]);
 
 		return NextResponse.json({
 			...agent,
@@ -171,8 +183,9 @@ export async function GET(
 				agent.promptSuggestionsJson,
 			),
 			canAdminCurate,
-			canEdit: canEditAgent(agent, session.user.id, canAdminCurate),
-			canClone: createPermission.granted,
+			canEdit:
+				canUpdateAgents && canEditAgent(agent, session.user.id, canAdminCurate),
+			canClone: canCreateAgent,
 			shareTargetEmail,
 		});
 	} catch (error) {
@@ -256,14 +269,22 @@ export async function PATCH(
 		}
 		if (
 			error instanceof Error &&
+			error.message === "Only the creator or an admin can update this agent"
+		) {
+			return NextResponse.json({ error: error.message }, { status: 403 });
+		}
+		if (
+			error instanceof Error &&
 			[
 				"Provider not found",
 				"Model not found",
 				"Model requires a provider",
 				"Tool not found",
+				"Custom tool not found",
+				"MCP tool not found",
+				"Knowledge base not found",
 				"Share target user not found",
 				"Share target user is required",
-				"Only the creator or an admin can update this agent",
 			].includes(error.message)
 		) {
 			return NextResponse.json({ error: error.message }, { status: 400 });

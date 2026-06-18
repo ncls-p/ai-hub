@@ -378,9 +378,7 @@ export function ProviderManager({
 				},
 			);
 			if (!res.ok) throw new Error(t("errorUpdateModelLogo"));
-			toast.success(
-				logoUrl ? t("toastLogoAssigned") : t("toastLogoRemoved"),
-			);
+			toast.success(logoUrl ? t("toastLogoAssigned") : t("toastLogoRemoved"));
 			await loadModelsForProvider(selectedProviderId);
 		} catch (error) {
 			toast.error((error as Error).message);

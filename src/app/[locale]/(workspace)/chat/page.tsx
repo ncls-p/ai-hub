@@ -206,6 +206,8 @@ export default function ChatPage() {
 	const [organizationDefaultAgentId, setOrganizationDefaultAgentId] = useState<
 		string | null
 	>(null);
+	const [canCreateAgent, setCanCreateAgent] = useState(false);
+	const [canRunSetup, setCanRunSetup] = useState(false);
 	const [userDefaultAgentId, setUserDefaultAgentId] = useState<string | null>(
 		null,
 	);
@@ -419,6 +421,8 @@ export default function ChatPage() {
 							organizationDefaultAgentId?: string | null;
 							userDefaultAgentId?: string | null;
 							effectiveDefaultAgentId?: string | null;
+							canCreateAgent?: boolean;
+							canManageProviders?: boolean;
 					  }
 					| ChatAgent[]
 				>(`/api/workspace/agents?${agentParams.toString()}`, {
@@ -435,10 +439,19 @@ export default function ChatPage() {
 							organizationDefaultAgentId: null,
 							userDefaultAgentId: null,
 							effectiveDefaultAgentId: null,
+							canCreateAgent: false,
+							canManageProviders: false,
 						}
 					: response;
 				setOrganizationDefaultAgentId(
 					responseDefaults.organizationDefaultAgentId ?? null,
+				);
+				setCanCreateAgent(Boolean(responseDefaults.canCreateAgent));
+				setCanRunSetup(
+					Boolean(
+						responseDefaults.canCreateAgent &&
+							responseDefaults.canManageProviders,
+					),
 				);
 				setUserDefaultAgentId(responseDefaults.userDefaultAgentId ?? null);
 				const params = new URL(window.location.href).searchParams;
@@ -1121,14 +1134,16 @@ export default function ChatPage() {
 						<EmptyTitle>{t("noAssistants")}</EmptyTitle>
 						<EmptyDescription>{t("noAssistantsDescription")}</EmptyDescription>
 					</EmptyHeader>
-					<div className="flex justify-center">
-						<Button asChild>
-							<Link href="/setup">
-								<PlusIcon className="size-4" aria-hidden="true" />
-								{t("finishSetup")}
-							</Link>
-						</Button>
-					</div>
+					{canRunSetup ? (
+						<div className="flex justify-center">
+							<Button asChild>
+								<Link href="/setup">
+									<PlusIcon className="size-4" aria-hidden="true" />
+									{t("finishSetup")}
+								</Link>
+							</Button>
+						</div>
+					) : null}
 				</Empty>
 			</div>
 		);
@@ -1145,6 +1160,8 @@ export default function ChatPage() {
 			organizationDefaultAgentId={organizationDefaultAgentId}
 			userDefaultAgentId={userDefaultAgentId}
 			canChat={canChat}
+			canCreateAgent={canCreateAgent}
+			canRunSetup={canRunSetup}
 			loadingSidebar={loadingContext}
 			hasMoreConversations={hasMoreConversations}
 			loadingMoreConversations={loadingMoreConversations}

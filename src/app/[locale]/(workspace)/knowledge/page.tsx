@@ -39,6 +39,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { fetchWorkspacePermissions } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 interface KnowledgeBase {
@@ -104,6 +105,7 @@ export default function KnowledgePage() {
 	const [attachAgents, setAttachAgents] = useState<KnowledgeAgent[]>([]);
 	const [loadingAttachAgents, setLoadingAttachAgents] = useState(false);
 	const [attachingAgentId, setAttachingAgentId] = useState<string | null>(null);
+	const [canManageKnowledgeBases, setCanManageKnowledgeBases] = useState(false);
 
 	const loadBases = useCallback(async () => {
 		if (!workspaceId) return;
@@ -133,7 +135,7 @@ export default function KnowledgePage() {
 	}, [workspaceId, selectedId]);
 
 	async function openAttachDialog() {
-		if (!workspaceId || !selectedId) return;
+		if (!canManageKnowledgeBases || !workspaceId || !selectedId) return;
 		setAttachOpen(true);
 		setLoadingAttachAgents(true);
 		try {
@@ -155,7 +157,7 @@ export default function KnowledgePage() {
 	}
 
 	async function attachBaseToAgent(agentId: string) {
-		if (!workspaceId || !selectedId) return;
+		if (!canManageKnowledgeBases || !workspaceId || !selectedId) return;
 		setAttachingAgentId(agentId);
 		try {
 			const bindingsRes = await fetch(
@@ -192,7 +194,14 @@ export default function KnowledgePage() {
 	}
 
 	async function ingestFromContent(title: string, content: string) {
-		if (!workspaceId || !selectedId || !title.trim() || !content.trim()) return;
+		if (
+			!canManageKnowledgeBases ||
+			!workspaceId ||
+			!selectedId ||
+			!title.trim() ||
+			!content.trim()
+		)
+			return;
 		const res = await fetch(
 			`/api/workspace/knowledge-bases/${selectedId}/documents`,
 			{
@@ -215,7 +224,7 @@ export default function KnowledgePage() {
 		event.preventDefault();
 		setDragActive(false);
 		const file = event.dataTransfer.files[0];
-		if (!file) return;
+		if (!canManageKnowledgeBases || !file) return;
 		void file.text().then((content) => {
 			void ingestFromContent(file.name, content);
 		});
@@ -226,6 +235,10 @@ export default function KnowledgePage() {
 		let cancelled = false;
 		async function run() {
 			try {
+				const permissions = await fetchWorkspacePermissions(workspaceId!);
+				if (!cancelled) {
+					setCanManageKnowledgeBases(permissions.canManageKnowledgeBases);
+				}
 				await loadBases();
 			} catch (error) {
 				if (!cancelled)
@@ -274,7 +287,8 @@ export default function KnowledgePage() {
 	}, [documents, loadDocuments, selectedId, workspaceId]);
 
 	async function createBase() {
-		if (!workspaceId || !baseForm.name.trim()) return;
+		if (!canManageKnowledgeBases || !workspaceId || !baseForm.name.trim())
+			return;
 		const res = await fetch("/api/workspace/knowledge-bases", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -312,7 +326,7 @@ export default function KnowledgePage() {
 	}
 
 	async function updateBase() {
-		if (!workspaceId || !editingBase) return;
+		if (!canManageKnowledgeBases || !workspaceId || !editingBase) return;
 		const res = await fetch(
 			`/api/workspace/knowledge-bases/${editingBase.id}`,
 			{
@@ -332,7 +346,7 @@ export default function KnowledgePage() {
 	}
 
 	async function deleteBase(baseId: string) {
-		if (!workspaceId) return;
+		if (!canManageKnowledgeBases || !workspaceId) return;
 		if (!window.confirm(t("confirmDeleteBase"))) return;
 		const res = await fetch(
 			`/api/workspace/knowledge-bases/${baseId}?workspaceId=${workspaceId}`,
@@ -344,7 +358,7 @@ export default function KnowledgePage() {
 	}
 
 	async function deleteDocument(documentId: string) {
-		if (!workspaceId || !selectedId) return;
+		if (!canManageKnowledgeBases || !workspaceId || !selectedId) return;
 		if (!window.confirm(t("confirmDeleteDocument"))) return;
 		const res = await fetch(
 			`/api/workspace/knowledge-bases/${selectedId}/documents/${documentId}?workspaceId=${workspaceId}`,
@@ -367,7 +381,10 @@ export default function KnowledgePage() {
 			description={t("description")}
 			width="wide"
 		>
-			<Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+			<Dialog
+				open={canManageKnowledgeBases && showCreateDialog}
+				onOpenChange={setShowCreateDialog}
+			>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>{t("createBaseTitle")}</DialogTitle>
@@ -440,14 +457,16 @@ export default function KnowledgePage() {
 								</p>
 							</div>
 						</div>
-						<Button
-							type="button"
-							size="sm"
-							onClick={() => setShowCreateDialog(true)}
-						>
-							<PlusIcon data-icon="inline-start" />
-							{t("newBase")}
-						</Button>
+						{canManageKnowledgeBases ? (
+							<Button
+								type="button"
+								size="sm"
+								onClick={() => setShowCreateDialog(true)}
+							>
+								<PlusIcon data-icon="inline-start" />
+								{t("newBase")}
+							</Button>
+						) : null}
 					</div>
 				</div>
 				<ol className="mt-5 grid gap-2 sm:grid-cols-3">
@@ -483,14 +502,16 @@ export default function KnowledgePage() {
 							title={t("emptyTitle")}
 							description={t("emptyBasesDescription")}
 						>
-							<Button
-								type="button"
-								size="sm"
-								onClick={() => setShowCreateDialog(true)}
-							>
-								<PlusIcon data-icon="inline-start" />
-								{t("createBaseCta")}
-							</Button>
+							{canManageKnowledgeBases ? (
+								<Button
+									type="button"
+									size="sm"
+									onClick={() => setShowCreateDialog(true)}
+								>
+									<PlusIcon data-icon="inline-start" />
+									{t("createBaseCta")}
+								</Button>
+							) : null}
 						</PageEmptyState>
 					) : (
 						<div className="flex flex-col gap-2">
@@ -514,32 +535,34 @@ export default function KnowledgePage() {
 											</p>
 										) : null}
 									</button>
-									<div className="flex shrink-0 gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
-										<Button
-											type="button"
-											size="icon-sm"
-											variant="ghost"
-											aria-label={t("editAria", { name: base.name })}
-											onClick={() => {
-												setEditingBase(base);
-												setEditBaseForm({
-													name: base.name,
-													description: base.description ?? "",
-												});
-											}}
-										>
-											<PencilIcon aria-hidden="true" />
-										</Button>
-										<Button
-											type="button"
-											size="icon-sm"
-											variant="ghost"
-											aria-label={t("deleteAria", { name: base.name })}
-											onClick={() => void deleteBase(base.id)}
-										>
-											<Trash2Icon aria-hidden="true" />
-										</Button>
-									</div>
+									{canManageKnowledgeBases ? (
+										<div className="flex shrink-0 gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+											<Button
+												type="button"
+												size="icon-sm"
+												variant="ghost"
+												aria-label={t("editAria", { name: base.name })}
+												onClick={() => {
+													setEditingBase(base);
+													setEditBaseForm({
+														name: base.name,
+														description: base.description ?? "",
+													});
+												}}
+											>
+												<PencilIcon aria-hidden="true" />
+											</Button>
+											<Button
+												type="button"
+												size="icon-sm"
+												variant="ghost"
+												aria-label={t("deleteAria", { name: base.name })}
+												onClick={() => void deleteBase(base.id)}
+											>
+												<Trash2Icon aria-hidden="true" />
+											</Button>
+										</div>
+									) : null}
 								</ListRow>
 							))}
 						</div>
@@ -563,72 +586,76 @@ export default function KnowledgePage() {
 										{selectedBase?.description || t("documentsHint")}
 									</p>
 								</div>
-								<Button
-									type="button"
-									size="sm"
-									variant="outline"
-									onClick={() => void openAttachDialog()}
-								>
-									{t("attachAssistant")}
-								</Button>
+								{canManageKnowledgeBases ? (
+									<Button
+										type="button"
+										size="sm"
+										variant="outline"
+										onClick={() => void openAttachDialog()}
+									>
+										{t("attachAssistant")}
+									</Button>
+								) : null}
 							</div>
 
-							<Card>
-								<CardHeader>
-									<CardTitle className="flex items-center gap-2">
-										<BookOpenIcon className="size-5" aria-hidden="true" />
-										{t("documents")}
-									</CardTitle>
-									<CardDescription>{t("documentsHint")}</CardDescription>
-								</CardHeader>
-								<CardContent className="grid gap-3">
-									<div
-										className={cn(
-											"rounded-xl border border-dashed p-6 text-center text-sm transition-colors",
-											dragActive
-												? "border-primary bg-primary/5"
-												: "border-border text-muted-foreground",
-										)}
-										onDragOver={(event) => {
-											event.preventDefault();
-											setDragActive(true);
-										}}
-										onDragLeave={() => setDragActive(false)}
-										onDrop={handleFileDrop}
-									>
-										{t("dropHint")}
-									</div>
-									<Input
-										aria-label={t("documentTitle")}
-										name="document-title"
-										autoComplete="off"
-										placeholder={t("documentTitlePlaceholder")}
-										value={docForm.title}
-										onChange={(e) =>
-											setDocForm({ ...docForm, title: e.target.value })
-										}
-									/>
-									<Textarea
-										aria-label={t("documentContent")}
-										name="document-content"
-										autoComplete="off"
-										className="min-h-40"
-										placeholder={t("documentContentPlaceholder")}
-										value={docForm.content}
-										onChange={(e) =>
-											setDocForm({ ...docForm, content: e.target.value })
-										}
-									/>
-								</CardContent>
-								<CardFooter className="justify-end">
-									<Button
-										onClick={() => void ingestDocument()}
-										disabled={!selectedId}
-									>
-										{t("ingestDocument")}
-									</Button>
-								</CardFooter>
-							</Card>
+							{canManageKnowledgeBases ? (
+								<Card>
+									<CardHeader>
+										<CardTitle className="flex items-center gap-2">
+											<BookOpenIcon className="size-5" aria-hidden="true" />
+											{t("documents")}
+										</CardTitle>
+										<CardDescription>{t("documentsHint")}</CardDescription>
+									</CardHeader>
+									<CardContent className="grid gap-3">
+										<div
+											className={cn(
+												"rounded-xl border border-dashed p-6 text-center text-sm transition-colors",
+												dragActive
+													? "border-primary bg-primary/5"
+													: "border-border text-muted-foreground",
+											)}
+											onDragOver={(event) => {
+												event.preventDefault();
+												setDragActive(true);
+											}}
+											onDragLeave={() => setDragActive(false)}
+											onDrop={handleFileDrop}
+										>
+											{t("dropHint")}
+										</div>
+										<Input
+											aria-label={t("documentTitle")}
+											name="document-title"
+											autoComplete="off"
+											placeholder={t("documentTitlePlaceholder")}
+											value={docForm.title}
+											onChange={(e) =>
+												setDocForm({ ...docForm, title: e.target.value })
+											}
+										/>
+										<Textarea
+											aria-label={t("documentContent")}
+											name="document-content"
+											autoComplete="off"
+											className="min-h-40"
+											placeholder={t("documentContentPlaceholder")}
+											value={docForm.content}
+											onChange={(e) =>
+												setDocForm({ ...docForm, content: e.target.value })
+											}
+										/>
+									</CardContent>
+									<CardFooter className="justify-end">
+										<Button
+											onClick={() => void ingestDocument()}
+											disabled={!selectedId}
+										>
+											{t("ingestDocument")}
+										</Button>
+									</CardFooter>
+								</Card>
+							) : null}
 							<div className="grid gap-2">
 								{documents.map((doc) => (
 									<Card key={doc.id} size="sm">
@@ -640,15 +667,17 @@ export default function KnowledgePage() {
 												<Badge variant={statusVariant(doc.status)}>
 													{statusLabel(doc.status, t)}
 												</Badge>
-												<Button
-													type="button"
-													size="icon-sm"
-													variant="ghost"
-													aria-label={t("deleteAria", { name: doc.title })}
-													onClick={() => void deleteDocument(doc.id)}
-												>
-													<Trash2Icon aria-hidden="true" />
-												</Button>
+												{canManageKnowledgeBases ? (
+													<Button
+														type="button"
+														size="icon-sm"
+														variant="ghost"
+														aria-label={t("deleteAria", { name: doc.title })}
+														onClick={() => void deleteDocument(doc.id)}
+													>
+														<Trash2Icon aria-hidden="true" />
+													</Button>
+												) : null}
 											</div>
 										</CardContent>
 									</Card>
@@ -691,7 +720,7 @@ export default function KnowledgePage() {
 					)}
 				</section>
 				<Dialog
-					open={Boolean(editingBase)}
+					open={canManageKnowledgeBases && Boolean(editingBase)}
 					onOpenChange={() => setEditingBase(null)}
 				>
 					<DialogContent>
@@ -735,7 +764,10 @@ export default function KnowledgePage() {
 						</DialogFooter>
 					</DialogContent>
 				</Dialog>
-				<Dialog open={attachOpen} onOpenChange={setAttachOpen}>
+				<Dialog
+					open={canManageKnowledgeBases && attachOpen}
+					onOpenChange={setAttachOpen}
+				>
 					<DialogContent className="max-h-[85vh] overflow-y-auto">
 						<DialogHeader>
 							<DialogTitle>{t("attachDialogTitle")}</DialogTitle>

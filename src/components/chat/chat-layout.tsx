@@ -125,6 +125,8 @@ interface ChatLayoutProps {
 	organizationDefaultAgentId?: string | null;
 	userDefaultAgentId?: string | null;
 	canChat: boolean;
+	canCreateAgent?: boolean;
+	canRunSetup?: boolean;
 	loadingSidebar?: boolean;
 	onSelectAgent: (agentId: string) => void;
 	onSelectConversation: (conversationId: string) => void;
@@ -158,6 +160,8 @@ export function ChatLayout({
 	organizationDefaultAgentId,
 	userDefaultAgentId,
 	canChat,
+	canCreateAgent = false,
+	canRunSetup = false,
 	loadingSidebar,
 	onSelectAgent,
 	onSelectConversation,
@@ -234,6 +238,7 @@ export function ChatLayout({
 		loading: loadingSidebar,
 		onSelectConversation,
 		onNewConversation,
+		canCreateAgent,
 		onRenameConversation,
 		onDeleteConversation,
 		onCreateConversationFolder,
@@ -427,13 +432,20 @@ export function ChatLayout({
 							) : null}
 						</>
 					) : null}
-					<DropdownMenuSeparator />
-					<DropdownMenuItem asChild>
-						<Link href="/agents" className="gap-2">
-							<MessageSquarePlusIcon className="size-4" aria-hidden="true" />
-							{t("createAgent")}
-						</Link>
-					</DropdownMenuItem>
+					{canCreateAgent ? (
+						<>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem asChild>
+								<Link href="/agents" className="gap-2">
+									<MessageSquarePlusIcon
+										className="size-4"
+										aria-hidden="true"
+									/>
+									{t("createAgent")}
+								</Link>
+							</DropdownMenuItem>
+						</>
+					) : null}
 				</DropdownMenuContent>
 			</DropdownMenu>
 			{!canChat ? (
@@ -562,7 +574,7 @@ export function ChatLayout({
 							>
 								<MessageSquarePlusIcon className="size-4" aria-hidden="true" />
 							</Button>
-							{!canChat ? (
+							{!canChat && canRunSetup ? (
 								<Button
 									type="button"
 									size="sm"
@@ -596,7 +608,7 @@ export function ChatLayout({
 				</main>
 			</div>
 
-			<Dialog open={setupOpen} onOpenChange={setSetupOpen}>
+			<Dialog open={canRunSetup && setupOpen} onOpenChange={setSetupOpen}>
 				<DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
 					<DialogHeader>
 						<DialogTitle>{t("finishSetup")}</DialogTitle>

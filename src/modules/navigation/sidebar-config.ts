@@ -191,7 +191,8 @@ export function collectEligibleNavItems(shell: WorkspaceShellState): NavItem[] {
 			continue;
 		}
 
-		if (id === "/providers" && !permissions.canViewProviders) continue;
+		if (id === "/providers" && !permissions.canManageProviders) continue;
+		if (id === "/custom-tools" && !permissions.canConfigureTools) continue;
 		if (id === "/api-keys" && !permissions.canManageApiKeys) continue;
 
 		const template = NAV_ITEM_TEMPLATES.get(id);

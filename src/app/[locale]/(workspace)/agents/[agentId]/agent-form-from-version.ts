@@ -76,8 +76,7 @@ export function buildAgentFormFromVersion(
 			maxRetries: optionalNumericField(gen?.maxRetries),
 			stopSequences: gen?.stopSequences?.join("\n") ?? "",
 		},
-		responseFormat:
-			responseType === "json_object" ? "json_object" : "text",
+		responseFormat: responseType === "json_object" ? "json_object" : "text",
 		memoryPolicy: {
 			enabled: activeVersion?.memoryPolicyJson?.enabled ?? false,
 			maxMessages: activeVersion?.memoryPolicyJson?.maxMessages ?? 50,
@@ -88,8 +87,7 @@ export function buildAgentFormFromVersion(
 		},
 		approvalPolicy: {
 			requireApprovalForAllTools:
-				activeVersion?.approvalPolicyJson?.requireApprovalForAllTools ??
-				false,
+				activeVersion?.approvalPolicyJson?.requireApprovalForAllTools ?? false,
 		},
 		sharingMode: agent.sharingMode,
 		shareTargetEmail: shareTargetEmail ?? "",
