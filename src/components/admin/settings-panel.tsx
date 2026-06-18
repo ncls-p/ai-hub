@@ -132,6 +132,21 @@ export function SettingsFeatureToggle({
 	);
 }
 
+export function SettingsDisabledNotice({
+	title,
+	description,
+}: {
+	title: string;
+	description: string;
+}) {
+	return (
+		<div className="rounded-xl border border-dashed bg-muted/20 px-4 py-3 text-sm">
+			<p className="font-medium text-foreground">{title}</p>
+			<p className="mt-1 text-muted-foreground">{description}</p>
+		</div>
+	);
+}
+
 export function SettingsMetricRow({
 	label,
 	value,

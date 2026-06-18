@@ -5,8 +5,6 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { AdvancedSection } from "@/components/ui/advanced-section";
 import {
-	ArrowDownIcon,
-	ArrowUpIcon,
 	CheckCircle2Icon,
 	CopyIcon,
 	MessageCircleIcon,
@@ -171,10 +169,6 @@ function slugifyAgentName(value: string) {
 			.replace(/^-+|-+$/g, "")
 			.slice(0, 64) || "assistant"
 	);
-}
-
-function isOrganizationAgent(agent: Agent) {
-	return agent.isGlobal || agent.isRecommended;
 }
 
 function timeAgo(
@@ -500,65 +494,10 @@ export default function AgentsPage() {
 		}
 	}
 
-	async function moveOrganizationAgent(agentId: string, direction: -1 | 1) {
-		if (!workspaceId || !canAdminCurate) return;
-		const organizationAgents = agents.filter(isOrganizationAgent);
-		const currentIndex = organizationAgents.findIndex(
-			(agent) => agent.id === agentId,
-		);
-		const nextIndex = currentIndex + direction;
-		if (
-			currentIndex < 0 ||
-			nextIndex < 0 ||
-			nextIndex >= organizationAgents.length
-		) {
-			return;
-		}
-
-		const nextOrganizationAgents = [...organizationAgents];
-		const [movedAgent] = nextOrganizationAgents.splice(currentIndex, 1);
-		if (!movedAgent) return;
-		nextOrganizationAgents.splice(nextIndex, 0, movedAgent);
-		const nextOrderById = new Map(
-			nextOrganizationAgents.map((agent, index) => [agent.id, index]),
-		);
-		setAgents([
-			...nextOrganizationAgents.map((agent, index) => ({
-				...agent,
-				organizationDisplayOrder: index,
-			})),
-			...agents.filter((agent) => !isOrganizationAgent(agent)),
-		]);
-
-		try {
-			const res = await fetch("/api/workspace/agents/order", {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					workspaceId,
-					agentIds: Array.from(nextOrderById.keys()),
-				}),
-			});
-			if (!res.ok) {
-				const err = await res.json().catch(() => null);
-				throw new Error(err?.error || tList("toastOrderFailed"));
-			}
-			toast.success(tList("toastOrderSaved"));
-		} catch (err) {
-			toast.error(
-				err instanceof Error ? err.message : tList("toastOrderFailed"),
-			);
-			await refreshAgents();
-		}
-	}
-
 	const readyAgentsCount = agents.filter((agent) =>
 		Boolean(agent.activeVersionId && agent.modelDisplayName),
 	).length;
 	const needsSetupCount = agents.length - readyAgentsCount;
-	const organizationAgentIds = agents
-		.filter(isOrganizationAgent)
-		.map((agent) => agent.id);
 	const filteredAgents = agents.filter((agent) => {
 		if (!searchQuery.trim()) return true;
 		const q = searchQuery.toLowerCase();
@@ -705,8 +644,6 @@ export default function AgentsPage() {
 								const isReady = Boolean(
 									agent.activeVersionId && agent.modelDisplayName,
 								);
-								const isOrgAgent = isOrganizationAgent(agent);
-								const orgIndex = organizationAgentIds.indexOf(agent.id);
 								const isOrganizationDefault =
 									agent.id === organizationDefaultAgentId ||
 									agent.isOrganizationDefault;
@@ -784,43 +721,6 @@ export default function AgentsPage() {
 											</p>
 										</div>
 
-										{canAdminCurate && isOrgAgent ? (
-											<div className="hidden shrink-0 items-center gap-1 sm:flex">
-												<Button
-													type="button"
-													variant="ghost"
-													size="icon-sm"
-													disabled={orgIndex <= 0}
-													onClick={() =>
-														void moveOrganizationAgent(agent.id, -1)
-													}
-													aria-label={tList("moveUp")}
-												>
-													<ArrowUpIcon
-														className="size-3.5"
-														aria-hidden="true"
-													/>
-												</Button>
-												<Button
-													type="button"
-													variant="ghost"
-													size="icon-sm"
-													disabled={
-														orgIndex === organizationAgentIds.length - 1
-													}
-													onClick={() =>
-														void moveOrganizationAgent(agent.id, 1)
-													}
-													aria-label={tList("moveDown")}
-												>
-													<ArrowDownIcon
-														className="size-3.5"
-														aria-hidden="true"
-													/>
-												</Button>
-											</div>
-										) : null}
-
 										{/* Quick actions */}
 										<Button
 											variant="ghost"
@@ -884,18 +784,6 @@ export default function AgentsPage() {
 														? tList("myDefaultCurrent")
 														: tList("setMyDefault")}
 												</DropdownMenuItem>
-												{canAdminCurate && isOrgAgent ? (
-													<DropdownMenuItem
-														onClick={() =>
-															void setDefaultAgent("organization", agent.id)
-														}
-													>
-														<StarIcon className="size-4" />
-														{isOrganizationDefault
-															? tList("organizationDefaultCurrent")
-															: tList("setOrganizationDefault")}
-													</DropdownMenuItem>
-												) : null}
 												{agent.canEdit ? (
 													<DropdownMenuItem
 														onClick={() =>

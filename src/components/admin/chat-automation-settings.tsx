@@ -11,6 +11,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
+  SettingsDisabledNotice,
   SettingsFeatureToggle,
   SettingsSection,
   SettingsSectionSkeleton,
@@ -173,6 +174,12 @@ export function ChatAutomationSettings() {
   const savedReady = Boolean(
     state.config.enabled && state.config.providerId && state.config.modelId,
   );
+  const statusLabel = !config.enabled
+    ? t("statusDisabled")
+    : ready
+      ? t("statusReady")
+      : t("statusIncomplete");
+  const statusTone = !config.enabled ? "muted" : ready ? "success" : "warning";
 
   return (
     <SettingsSection
@@ -180,15 +187,25 @@ export function ChatAutomationSettings() {
       title={t("title")}
       description={t("description")}
       stagger="stagger-3"
-      badge={
-        <SettingsStatusBadge
-          label={ready ? t("statusReady") : t("statusIncomplete")}
-          tone={ready ? "success" : "warning"}
-        />
-      }
+      badge={<SettingsStatusBadge label={statusLabel} tone={statusTone} />}
     >
       <div className="space-y-5">
-        {state.providers.length === 0 ? (
+        <SettingsToggleRow
+          id="chat-automation-enabled"
+          label={t("enable")}
+          description={t("enableDescription")}
+          checked={config.enabled}
+          onCheckedChange={(enabled) => setConfig({ ...config, enabled })}
+        />
+
+        {!config.enabled ? (
+          <SettingsDisabledNotice
+            title={t("disabledTitle")}
+            description={t("disabledDescription")}
+          />
+        ) : null}
+
+        {config.enabled && state.providers.length === 0 ? (
           <div className="flex gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm">
             <PlugZapIcon
               className="mt-0.5 size-4 shrink-0 text-amber-600"
@@ -208,7 +225,7 @@ export function ChatAutomationSettings() {
           </div>
         ) : null}
 
-        {!ready ? (
+        {config.enabled && !ready ? (
           <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
             <p className="mb-2 text-sm font-medium">{t("checklistTitle")}</p>
             <ul className="space-y-1.5">
@@ -229,88 +246,84 @@ export function ChatAutomationSettings() {
           </div>
         ) : null}
 
-        <SettingsToggleRow
-          id="chat-automation-enabled"
-          label={t("enable")}
-          description={t("enableDescription")}
-          checked={config.enabled}
-          onCheckedChange={(enabled) => setConfig({ ...config, enabled })}
-        />
+        {config.enabled ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>{t("provider")}</Label>
+                <Select
+                  value={config.providerId || NONE}
+                  onValueChange={(providerId) =>
+                    setConfig({
+                      ...config,
+                      providerId: providerId === NONE ? undefined : providerId,
+                      modelId: undefined,
+                    })
+                  }
+                  disabled={state.providers.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("providerPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>{t("notConfigured")}</SelectItem>
+                    {state.providers.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id}>
+                        {provider.name} · {provider.kind}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("model")}</Label>
+                <Select
+                  value={config.modelId || NONE}
+                  onValueChange={(modelId) =>
+                    setConfig({
+                      ...config,
+                      modelId: modelId === NONE ? undefined : modelId,
+                    })
+                  }
+                  disabled={!config.providerId || filteredModels.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("modelPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>{t("notConfigured")}</SelectItem>
+                    {filteredModels.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.displayName || model.modelId}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>{t("provider")}</Label>
-            <Select
-              value={config.providerId || NONE}
-              onValueChange={(providerId) =>
-                setConfig({
-                  ...config,
-                  providerId: providerId === NONE ? undefined : providerId,
-                  modelId: undefined,
-                })
-              }
-              disabled={state.providers.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("providerPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>{t("notConfigured")}</SelectItem>
-                {state.providers.map((provider) => (
-                  <SelectItem key={provider.id} value={provider.id}>
-                    {provider.name} · {provider.kind}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>{t("model")}</Label>
-            <Select
-              value={config.modelId || NONE}
-              onValueChange={(modelId) =>
-                setConfig({
-                  ...config,
-                  modelId: modelId === NONE ? undefined : modelId,
-                })
-              }
-              disabled={!config.providerId || filteredModels.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("modelPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>{t("notConfigured")}</SelectItem>
-                {filteredModels.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    {model.displayName || model.modelId}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <SettingsFeatureToggle
-            icon={MessageSquareTextIcon}
-            label={t("titles")}
-            description={t("titlesDescription")}
-            checked={config.generateTitles}
-            onCheckedChange={(generateTitles) =>
-              setConfig({ ...config, generateTitles })
-            }
-          />
-          <SettingsFeatureToggle
-            icon={MessageSquareTextIcon}
-            label={t("suggestions")}
-            description={t("suggestionsDescription")}
-            checked={config.generateSuggestions}
-            onCheckedChange={(generateSuggestions) =>
-              setConfig({ ...config, generateSuggestions })
-            }
-          />
-        </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SettingsFeatureToggle
+                icon={MessageSquareTextIcon}
+                label={t("titles")}
+                description={t("titlesDescription")}
+                checked={config.generateTitles}
+                onCheckedChange={(generateTitles) =>
+                  setConfig({ ...config, generateTitles })
+                }
+              />
+              <SettingsFeatureToggle
+                icon={MessageSquareTextIcon}
+                label={t("suggestions")}
+                description={t("suggestionsDescription")}
+                checked={config.generateSuggestions}
+                onCheckedChange={(generateSuggestions) =>
+                  setConfig({ ...config, generateSuggestions })
+                }
+              />
+            </div>
+          </>
+        ) : null}
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4">
           {ready ? (

@@ -2,6 +2,7 @@ import { ShieldAlertIcon } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { WorkspacePage } from "@/components/workspace-page";
+import { AssistantGovernanceSettings } from "@/components/admin/assistant-governance-settings";
 import { ChatAutomationSettings } from "@/components/admin/chat-automation-settings";
 import { CustomToolBuilderSettings } from "@/components/admin/custom-tool-builder-settings";
 import { RegistrationSettings } from "@/components/admin/registration-settings";
@@ -53,6 +54,7 @@ export default async function AdminSettingsPage() {
 					<SystemHealthCard />
 				</div>
 				<SidebarNavigationSettings />
+				<AssistantGovernanceSettings />
 				<ChatAutomationSettings />
 				<CustomToolBuilderSettings />
 			</div>
