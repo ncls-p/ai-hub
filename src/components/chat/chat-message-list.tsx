@@ -9,9 +9,13 @@ import {
 	ChevronDownIcon,
 	ClockIcon,
 	CopyIcon,
+	DownloadIcon,
+	FileIcon,
+	FolderIcon,
 	Maximize2Icon,
 	PencilIcon,
 	RefreshCcwIcon,
+	SaveIcon,
 	ShieldAlertIcon,
 	Trash2Icon,
 	XCircleIcon,
@@ -30,6 +34,7 @@ import {
 	toolNameMatches,
 	type ChatMessage,
 	type ChatMessagePart,
+	type CodeWorkspaceArtifact,
 	type PendingToolApproval,
 } from "@/components/chat/chat-types";
 import type { RichEditorProps } from "@/components/chat/rich-editor";
@@ -110,6 +115,7 @@ function summarizeToolBody(
 	if (isCall) return summarizeToolInput(formatToolName(toolName), body);
 	if (body === null || body === undefined) return "The tool finished.";
 	if (isHtmlArtifactOutput(body)) return `Rendered ${body.title}.`;
+	if (isCodeWorkspaceArtifactOutput(body)) return `Updated ${body.title}.`;
 	if (typeof body === "string") return body.slice(0, 180);
 	if (Array.isArray(body))
 		return `Returned ${body.length} item${body.length === 1 ? "" : "s"}.`;
@@ -145,6 +151,29 @@ function isHtmlArtifactOutput(value: unknown): value is HtmlArtifactOutput {
 		typeof record.js === "string" &&
 		typeof record.height === "number"
 	);
+}
+
+function isCodeWorkspaceArtifactOutput(
+	value: unknown,
+): value is CodeWorkspaceArtifact {
+	if (typeof value !== "object" || value === null) return false;
+	const record = value as Record<string, unknown>;
+	return (
+		record.kind === "code_workspace_artifact" &&
+		typeof record.projectId === "string" &&
+		typeof record.title === "string" &&
+		typeof record.version === "number" &&
+		Array.isArray(record.files)
+	);
+}
+
+function codeWorkspaceArtifactFromPartContent(content: string) {
+	try {
+		const parsed = JSON.parse(content) as unknown;
+		return isCodeWorkspaceArtifactOutput(parsed) ? parsed : null;
+	} catch {
+		return null;
+	}
 }
 
 function htmlArtifactFromToolInput(value: unknown): HtmlArtifactOutput | null {
@@ -567,6 +596,1050 @@ function HtmlArtifactCard({
 	);
 }
 
+export const CODE_WORKSPACE_ARTIFACT_EVENT = "code-workspace-artifact-updated";
+
+function formatBytes(bytes: number) {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${Math.round(bytes / 102.4) / 10} KB`;
+	return `${Math.round(bytes / 1024 / 102.4) / 10} MB`;
+}
+
+function escapeCodeHtml(value: string) {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
+function spanCodeToken(value: string, color: string) {
+	return `<span style="color:${color}">${escapeCodeHtml(value)}</span>`;
+}
+
+function highlightWithRegex(
+	value: string,
+	pattern: RegExp,
+	classify: (token: string) => string | null,
+) {
+	let result = "";
+	let cursor = 0;
+	for (const match of value.matchAll(pattern)) {
+		const index = match.index ?? cursor;
+		const token = match[0];
+		result += escapeCodeHtml(value.slice(cursor, index));
+		const color = classify(token);
+		result += color ? spanCodeToken(token, color) : escapeCodeHtml(token);
+		cursor = index + token.length;
+	}
+	return `${result}${escapeCodeHtml(value.slice(cursor))}`;
+}
+
+function highlightCode(value: string, filePath: string | null) {
+	const extension = filePath?.split(".").pop()?.toLowerCase() ?? "";
+	if (["html", "htm", "xml", "svg"].includes(extension)) {
+		return highlightWithRegex(
+			value,
+			/<!--[\s\S]*?-->|<\/?[\w:-]+\b|\/?>|\b[\w:-]+(?=\=)|"[^"]*"|'[^']*'/g,
+			(token) => {
+				if (token.startsWith("<!--")) return "#6b7280";
+				if (token.startsWith("<") || token === ">" || token === "/>") {
+					return "#2563eb";
+				}
+				if (token.startsWith('"') || token.startsWith("'")) return "#16a34a";
+				return "#9333ea";
+			},
+		);
+	}
+	if (["css"].includes(extension)) {
+		return highlightWithRegex(
+			value,
+			/\/\*[\s\S]*?\*\/|#[\da-fA-F]{3,8}\b|\b[a-zA-Z-]+(?=\s*:)|"[^"]*"|'[^']*'|\b\d+(?:\.\d+)?(?:px|rem|em|%|vh|vw)?\b/g,
+			(token) => {
+				if (token.startsWith("/*")) return "#6b7280";
+				if (token.startsWith("#")) return "#dc2626";
+				if (token.startsWith('"') || token.startsWith("'")) return "#16a34a";
+				if (/^\d/.test(token)) return "#ea580c";
+				return "#9333ea";
+			},
+		);
+	}
+	if (["js", "mjs", "cjs", "json"].includes(extension)) {
+		return highlightWithRegex(
+			value,
+			/\/\*[\s\S]*?\*\/|\/\/[^\n]*|`(?:\\.|[^`])*`|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\b(?:const|let|var|function|return|if|else|for|while|class|import|export|from|async|await|new|true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b/g,
+			(token) => {
+				if (token.startsWith("/*") || token.startsWith("//")) return "#6b7280";
+				if (['"', "'", "`"].some((quote) => token.startsWith(quote))) {
+					return "#16a34a";
+				}
+				if (/^\d/.test(token)) return "#ea580c";
+				return "#2563eb";
+			},
+		);
+	}
+	return escapeCodeHtml(value);
+}
+
+type CodeWorkspaceTreeNode = {
+	name: string;
+	path: string;
+	type: "directory" | "file";
+	file?: CodeWorkspaceArtifact["files"][number];
+	children: CodeWorkspaceTreeNode[];
+};
+
+function buildCodeWorkspaceTree(files: CodeWorkspaceArtifact["files"]) {
+	const root: CodeWorkspaceTreeNode = {
+		name: "",
+		path: "",
+		type: "directory",
+		children: [],
+	};
+	for (const file of files) {
+		const parts = file.path.split("/").filter(Boolean);
+		let current = root;
+		parts.forEach((part, index) => {
+			const isFile = index === parts.length - 1;
+			const nodePath = parts.slice(0, index + 1).join("/");
+			let child = current.children.find(
+				(item) =>
+					item.name === part && item.type === (isFile ? "file" : "directory"),
+			);
+			if (!child) {
+				child = {
+					name: part,
+					path: nodePath,
+					type: isFile ? "file" : "directory",
+					file: isFile ? file : undefined,
+					children: [],
+				};
+				current.children.push(child);
+			}
+			current = child;
+		});
+	}
+	const sortNodes = (nodes: CodeWorkspaceTreeNode[]) => {
+		nodes.sort((a, b) => {
+			if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+			return a.name.localeCompare(b.name);
+		});
+		nodes.forEach((node) => sortNodes(node.children));
+	};
+	sortNodes(root.children);
+	return root.children;
+}
+
+function CodeWorkspaceFileTree({
+	nodes,
+	selectedPath,
+	onSelect,
+	level = 0,
+}: {
+	nodes: CodeWorkspaceTreeNode[];
+	selectedPath: string | null;
+	onSelect: (path: string) => void;
+	level?: number;
+}) {
+	return (
+		<div className={level === 0 ? "space-y-0.5" : undefined}>
+			{nodes.map((node) => {
+				if (node.type === "directory") {
+					return (
+						<div key={node.path}>
+							<div
+								className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground"
+								style={{ paddingLeft: 8 + level * 12 }}
+							>
+								<FolderIcon className="size-3 shrink-0" aria-hidden="true" />
+								<span className="truncate">{node.name}</span>
+							</div>
+							<CodeWorkspaceFileTree
+								nodes={node.children}
+								selectedPath={selectedPath}
+								onSelect={onSelect}
+								level={level + 1}
+							/>
+						</div>
+					);
+				}
+				return (
+					<button
+						key={node.path}
+						type="button"
+						className={cn(
+							"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-muted",
+							selectedPath === node.path && "bg-muted text-foreground",
+						)}
+						style={{ paddingLeft: 8 + level * 12 }}
+						onClick={() => onSelect(node.path)}
+					>
+						<FileIcon
+							className="size-3 shrink-0 text-muted-foreground"
+							aria-hidden="true"
+						/>
+						<span className="min-w-0 flex-1 truncate">{node.name}</span>
+						{node.file ? (
+							<span className="shrink-0 text-[10px] text-muted-foreground/70">
+								{node.file.binary ? "asset" : formatBytes(node.file.size)}
+							</span>
+						) : null}
+					</button>
+				);
+			})}
+		</div>
+	);
+}
+
+function CodeWorkspaceEditor({
+	value,
+	filePath,
+	disabled,
+	onChange,
+	className,
+}: {
+	value: string;
+	filePath: string | null;
+	disabled?: boolean;
+	onChange: (value: string) => void;
+	className?: string;
+}) {
+	const highlightRef = useRef<HTMLPreElement | null>(null);
+	const highlighted = useMemo(
+		() => highlightCode(value, filePath),
+		[filePath, value],
+	);
+
+	function syncScroll(event: React.UIEvent<HTMLTextAreaElement>) {
+		if (!highlightRef.current) return;
+		highlightRef.current.scrollTop = event.currentTarget.scrollTop;
+		highlightRef.current.scrollLeft = event.currentTarget.scrollLeft;
+	}
+
+	return (
+		<div
+			className={cn(
+				"relative min-h-[420px] flex-1 overflow-hidden bg-background",
+				className,
+			)}
+		>
+			<pre
+				ref={highlightRef}
+				aria-hidden="true"
+				className="pointer-events-none absolute inset-0 overflow-auto p-3 font-mono text-[11px] leading-4 whitespace-pre text-foreground"
+				dangerouslySetInnerHTML={{ __html: highlighted || " " }}
+			/>
+			<textarea
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+				onScroll={syncScroll}
+				disabled={disabled}
+				spellCheck={false}
+				wrap="off"
+				className="absolute inset-0 h-full w-full resize-none overflow-auto border-0 bg-transparent p-3 font-mono text-[11px] leading-4 text-transparent caret-foreground outline-none selection:bg-primary/20 focus:ring-0 disabled:opacity-70"
+			/>
+		</div>
+	);
+}
+
+type CodeWorkspaceArtifactEventDetail = {
+	artifact: CodeWorkspaceArtifact;
+	activate?: boolean;
+};
+
+function codeWorkspaceArtifactFromEvent(event: Event) {
+	const detail = (event as CustomEvent<CodeWorkspaceArtifactEventDetail>)
+		.detail;
+	return detail?.artifact ?? null;
+}
+
+function dispatchCodeWorkspaceArtifact(
+	artifact: CodeWorkspaceArtifact,
+	options: { activate?: boolean } = {},
+) {
+	window.dispatchEvent(
+		new CustomEvent<CodeWorkspaceArtifactEventDetail>(
+			CODE_WORKSPACE_ARTIFACT_EVENT,
+			{
+				detail: { artifact, activate: options.activate },
+			},
+		),
+	);
+}
+
+type WorkspaceArtifactDisplay = "full" | "summary";
+
+function CodeWorkspaceArtifactSummary({
+	artifact,
+}: {
+	artifact: CodeWorkspaceArtifact;
+}) {
+	return (
+		<button
+			type="button"
+			className="flex w-full items-center gap-2 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-left text-xs transition-colors hover:bg-primary/10"
+			onClick={() =>
+				dispatchCodeWorkspaceArtifact(artifact, { activate: true })
+			}
+		>
+			<FileIcon className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+			<span className="min-w-0 flex-1">
+				<span className="block truncate font-medium text-foreground">
+					{artifact.title}
+				</span>
+				<span className="block truncate text-[11px] text-muted-foreground">
+					Workspace v{artifact.version} · {artifact.files.length} files
+				</span>
+			</span>
+		</button>
+	);
+}
+
+function codeWorkspaceFileUrl(projectId: string, filePath: string) {
+	return `/api/workspace/code-projects/${projectId}/files?path=${encodeURIComponent(filePath)}`;
+}
+
+function dirnamePath(filePath: string) {
+	const slashIndex = filePath.lastIndexOf("/");
+	return slashIndex === -1 ? "" : filePath.slice(0, slashIndex);
+}
+
+function normalizeWorkspaceHref(fromPath: string, href: string) {
+	if (
+		!href ||
+		href.startsWith("#") ||
+		/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href)
+	) {
+		return null;
+	}
+	const cleanHref = href.split("#")[0]?.split("?")[0] ?? "";
+	const parts = [
+		...dirnamePath(fromPath).split("/"),
+		...cleanHref.split("/"),
+	].filter(Boolean);
+	const normalized: string[] = [];
+	for (const part of parts) {
+		if (part === ".") continue;
+		if (part === "..") {
+			normalized.pop();
+			continue;
+		}
+		normalized.push(part);
+	}
+	const path = normalized.join("/");
+	return path && !path.endsWith("/") ? path : `${path}index.html`;
+}
+
+function metaRefreshTarget(html: string, fromPath: string) {
+	const metaTag = html.match(
+		/<meta\b[^>]*http-equiv=["']?refresh["']?[^>]*>/i,
+	)?.[0];
+	if (!metaTag) return null;
+	const urlMatch = metaTag.match(/url\s*=\s*([^;"'>\s]+)/i);
+	return urlMatch?.[1]
+		? normalizeWorkspaceHref(fromPath, urlMatch[1].trim())
+		: null;
+}
+
+function stripMetaRefresh(html: string) {
+	return html.replace(/<meta\b[^>]*http-equiv=["']?refresh["']?[^>]*>/gi, "");
+}
+
+function isPreviewTokenSegment(value: string | undefined) {
+	return Boolean(
+		value &&
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+				value,
+			),
+	);
+}
+
+function previewRoutePrefix(artifact: CodeWorkspaceArtifact) {
+	const marker = `/api/workspace/code-projects/${artifact.projectId}/preview`;
+	const rawPreviewUrl = artifact.previewUrl?.split("?")[0] ?? marker;
+	const markerIndex = rawPreviewUrl.indexOf(marker);
+	if (markerIndex === -1) return marker;
+	const suffix = rawPreviewUrl.slice(markerIndex + marker.length);
+	const firstSegment = suffix.split("/").filter(Boolean)[0];
+	return isPreviewTokenSegment(firstSegment)
+		? `${marker}/${firstSegment}`
+		: marker;
+}
+
+function absolutePreviewUrl(path: string) {
+	if (typeof window === "undefined") return path;
+	return new URL(path, window.location.origin).toString();
+}
+
+function previewBaseHref(artifact: CodeWorkspaceArtifact, filePath: string) {
+	const directory = dirnamePath(filePath);
+	return absolutePreviewUrl(
+		`${previewRoutePrefix(artifact)}${directory ? `/${directory}` : ""}/`,
+	);
+}
+
+function injectPreviewBase(
+	html: string,
+	artifact: CodeWorkspaceArtifact,
+	path: string,
+) {
+	const baseTag = `<base href="${previewBaseHref(artifact, path)}" />`;
+	if (/<head\b[^>]*>/i.test(html)) {
+		return html.replace(/<head\b([^>]*)>/i, `<head$1>${baseTag}`);
+	}
+	return `${baseTag}${html}`;
+}
+
+function injectPreviewNavigationBridge(
+	html: string,
+	artifact: CodeWorkspaceArtifact,
+	path: string,
+) {
+	const bridgeScript = `<script>(()=>{const projectId=${JSON.stringify(artifact.projectId)};const currentPath=${JSON.stringify(path)};function resolveLocal(href){try{if(!href||href.startsWith('#')||/^(mailto|tel|javascript):/i.test(href))return null;const url=new URL(href,'https://workspace.local/'+currentPath);if(url.origin!=='https://workspace.local')return null;let path=decodeURIComponent(url.pathname.replace(/^\\//,''));if(!path||path.endsWith('/'))path+='index.html';return path;}catch{return null;}}document.addEventListener('click',event=>{const target=event.target&&event.target.closest?event.target.closest('a[href]'):null;if(!target||target.target==='_blank'||target.hasAttribute('download'))return;const path=resolveLocal(target.getAttribute('href')||'');if(!path)return;event.preventDefault();window.parent.postMessage({type:'code-workspace-preview:navigate',projectId,path},'*');},true);})();</script>`;
+	if (/<\/body>/i.test(html)) {
+		return html.replace(/<\/body>/i, `${bridgeScript}</body>`);
+	}
+	return `${html}${bridgeScript}`;
+}
+
+function buildPreviewSrcDoc(
+	html: string,
+	artifact: CodeWorkspaceArtifact,
+	path: string,
+) {
+	return injectPreviewNavigationBridge(
+		injectPreviewBase(stripMetaRefresh(html), artifact, path),
+		artifact,
+		path,
+	);
+}
+
+async function fetchCodeWorkspaceTextFile(projectId: string, filePath: string) {
+	const response = await fetch(codeWorkspaceFileUrl(projectId, filePath));
+	const data = (await response.json().catch(() => null)) as {
+		content?: string;
+		error?: string;
+	} | null;
+	if (!response.ok || typeof data?.content !== "string") {
+		throw new Error(data?.error || "Failed to load file");
+	}
+	return data.content;
+}
+
+function htmlAttributeValue(tag: string, name: string) {
+	const match = tag.match(
+		new RegExp(`${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"),
+	);
+	return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+}
+
+function escapeHtmlAttribute(value: string) {
+	return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+async function replacePreviewMatches(
+	value: string,
+	pattern: RegExp,
+	replacer: (match: RegExpMatchArray) => Promise<string>,
+) {
+	let result = "";
+	let cursor = 0;
+	for (const match of value.matchAll(pattern)) {
+		const index = match.index ?? cursor;
+		result += value.slice(cursor, index);
+		result += await replacer(match);
+		cursor = index + match[0].length;
+	}
+	return `${result}${value.slice(cursor)}`;
+}
+
+async function inlineLocalPreviewStyles(
+	html: string,
+	artifact: CodeWorkspaceArtifact,
+	path: string,
+) {
+	return replacePreviewMatches(html, /<link\b[^>]*>/gi, async (match) => {
+		const tag = match[0];
+		const rel = htmlAttributeValue(tag, "rel")?.toLowerCase() ?? "";
+		if (!rel.split(/\s+/).includes("stylesheet")) return tag;
+		const href = htmlAttributeValue(tag, "href");
+		const stylesheetPath = href ? normalizeWorkspaceHref(path, href) : null;
+		if (
+			!stylesheetPath ||
+			!artifact.files.some(
+				(file) => file.path === stylesheetPath && !file.binary,
+			)
+		) {
+			return tag;
+		}
+		try {
+			const css = await fetchCodeWorkspaceTextFile(
+				artifact.projectId,
+				stylesheetPath,
+			);
+			const media = htmlAttributeValue(tag, "media");
+			return `<style${media ? ` media="${escapeHtmlAttribute(media)}"` : ""}>\n${escapeClosingTags(css)}\n</style>`;
+		} catch {
+			return tag;
+		}
+	});
+}
+
+async function inlineLocalPreviewScripts(
+	html: string,
+	artifact: CodeWorkspaceArtifact,
+	path: string,
+) {
+	return replacePreviewMatches(
+		html,
+		/<script\b[^>]*\bsrc\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)[^>]*>\s*<\/script>/gi,
+		async (match) => {
+			const tag = match[0];
+			const openingTag = tag.match(/^<script\b([^>]*)>/i)?.[1] ?? "";
+			const src = htmlAttributeValue(tag, "src");
+			const scriptPath = src ? normalizeWorkspaceHref(path, src) : null;
+			if (
+				!scriptPath ||
+				!artifact.files.some((file) => file.path === scriptPath && !file.binary)
+			) {
+				return tag;
+			}
+			try {
+				const js = await fetchCodeWorkspaceTextFile(
+					artifact.projectId,
+					scriptPath,
+				);
+				const attrs = openingTag
+					.replace(/\s+src\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, "")
+					.replace(
+						/\s+(?:integrity|crossorigin|referrerpolicy)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+						"",
+					);
+				return `<script${attrs}>\n${escapeClosingTags(js)}\n</script>`;
+			} catch {
+				return tag;
+			}
+		},
+	);
+}
+
+async function inlineLocalPreviewAssets(
+	html: string,
+	artifact: CodeWorkspaceArtifact,
+	path: string,
+) {
+	return inlineLocalPreviewScripts(
+		await inlineLocalPreviewStyles(html, artifact, path),
+		artifact,
+		path,
+	);
+}
+
+function CodeWorkspacePreviewFrame({
+	artifact,
+}: {
+	artifact: CodeWorkspaceArtifact;
+}) {
+	const [previewPath, setPreviewPath] = useState(artifact.rootFile);
+	const [effectivePath, setEffectivePath] = useState(artifact.rootFile);
+	const [srcDoc, setSrcDoc] = useState("");
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		function handlePreviewNavigation(event: MessageEvent) {
+			const data = event.data as {
+				type?: unknown;
+				projectId?: unknown;
+				path?: unknown;
+			};
+			if (
+				data?.type !== "code-workspace-preview:navigate" ||
+				data.projectId !== artifact.projectId ||
+				typeof data.path !== "string"
+			) {
+				return;
+			}
+			if (
+				!artifact.files.some((file) => file.path === data.path && !file.binary)
+			) {
+				setError(`Preview file not found: ${data.path}`);
+				return;
+			}
+			setPreviewPath(data.path);
+		}
+		window.addEventListener("message", handlePreviewNavigation);
+		return () => window.removeEventListener("message", handlePreviewNavigation);
+	}, [artifact.files, artifact.projectId]);
+
+	useEffect(() => {
+		if (!previewPath) return;
+		let cancelled = false;
+		async function loadPreview() {
+			setError(null);
+			try {
+				let path = previewPath ?? "";
+				let html = await fetchCodeWorkspaceTextFile(artifact.projectId, path);
+				const redirectPath = metaRefreshTarget(html, path);
+				if (
+					redirectPath &&
+					artifact.files.some(
+						(file) => file.path === redirectPath && !file.binary,
+					)
+				) {
+					path = redirectPath;
+					html = await fetchCodeWorkspaceTextFile(artifact.projectId, path);
+				}
+				const inlinedHtml = await inlineLocalPreviewAssets(
+					html,
+					artifact,
+					path,
+				);
+				if (!cancelled) {
+					setEffectivePath(path);
+					setSrcDoc(buildPreviewSrcDoc(inlinedHtml, artifact, path));
+				}
+			} catch (loadError) {
+				if (!cancelled) {
+					setSrcDoc("");
+					setError(
+						loadError instanceof Error
+							? loadError.message
+							: "Failed to load preview",
+					);
+				}
+			}
+		}
+		void loadPreview();
+		return () => {
+			cancelled = true;
+		};
+	}, [artifact, previewPath]);
+
+	if (!artifact.rootFile) {
+		return (
+			<div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-muted-foreground">
+				No HTML file was detected. Create an index.html file to enable preview.
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-destructive">
+				{error}
+			</div>
+		);
+	}
+
+	return srcDoc ? (
+		<iframe
+			key={`${artifact.projectId}:${artifact.version}:${effectivePath}`}
+			title={`${artifact.title} preview`}
+			srcDoc={srcDoc}
+			sandbox="allow-scripts allow-modals"
+			className="min-h-[480px] flex-1 bg-white"
+		/>
+	) : (
+		<div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-muted-foreground">
+			Loading preview…
+		</div>
+	);
+}
+
+export function CodeWorkspaceArtifactCard({
+	artifact,
+	variant = "card",
+	activateOnMount = false,
+}: {
+	artifact: CodeWorkspaceArtifact;
+	variant?: "card" | "workbench";
+	activateOnMount?: boolean;
+}) {
+	const [currentArtifact, setCurrentArtifact] = useState(artifact);
+	const [selectedPath, setSelectedPath] = useState<string | null>(
+		artifact.rootFile ??
+			artifact.files.find((file) => !file.binary)?.path ??
+			null,
+	);
+	const [content, setContent] = useState("");
+	const [fileReloadKey, setFileReloadKey] = useState(0);
+	const [loadingFile, setLoadingFile] = useState(false);
+	const [savingFile, setSavingFile] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [fullscreenPane, setFullscreenPane] = useState<
+		"code" | "preview" | null
+	>(null);
+	const selectedFile = currentArtifact.files.find(
+		(file) => file.path === selectedPath,
+	);
+	const fileTree = useMemo(
+		() => buildCodeWorkspaceTree(currentArtifact.files),
+		[currentArtifact.files],
+	);
+
+	useEffect(() => {
+		dispatchCodeWorkspaceArtifact(artifact, { activate: activateOnMount });
+		queueMicrotask(() => setCurrentArtifact(artifact));
+	}, [activateOnMount, artifact]);
+
+	useEffect(() => {
+		function handleWorkspaceUpdate(event: Event) {
+			const nextArtifact = codeWorkspaceArtifactFromEvent(event);
+			if (nextArtifact?.projectId !== artifact.projectId) return;
+			setCurrentArtifact((current) =>
+				nextArtifact.version >= current.version ? nextArtifact : current,
+			);
+		}
+		window.addEventListener(
+			CODE_WORKSPACE_ARTIFACT_EVENT,
+			handleWorkspaceUpdate,
+		);
+		return () => {
+			window.removeEventListener(
+				CODE_WORKSPACE_ARTIFACT_EVENT,
+				handleWorkspaceUpdate,
+			);
+		};
+	}, [artifact.projectId]);
+
+	useEffect(() => {
+		if (
+			selectedPath &&
+			currentArtifact.files.some((file) => file.path === selectedPath)
+		) {
+			return;
+		}
+		queueMicrotask(() => {
+			setSelectedPath(
+				currentArtifact.rootFile ??
+					currentArtifact.files.find((file) => !file.binary)?.path ??
+					null,
+			);
+		});
+	}, [currentArtifact, selectedPath]);
+
+	useEffect(() => {
+		if (!selectedPath || selectedFile?.binary) {
+			queueMicrotask(() => setContent(""));
+			return;
+		}
+		let cancelled = false;
+		async function loadSelectedFile() {
+			setLoadingFile(true);
+			setError(null);
+			try {
+				const response = await fetch(
+					`/api/workspace/code-projects/${currentArtifact.projectId}/files?path=${encodeURIComponent(selectedPath ?? "")}`,
+				);
+				const data = (await response.json().catch(() => null)) as {
+					content?: string;
+					error?: string;
+				} | null;
+				if (!response.ok || typeof data?.content !== "string") {
+					throw new Error(data?.error || "Failed to load file");
+				}
+				if (!cancelled) setContent(data.content);
+			} catch (loadError) {
+				if (!cancelled) {
+					setError(
+						loadError instanceof Error
+							? loadError.message
+							: "Failed to load file",
+					);
+				}
+			} finally {
+				if (!cancelled) setLoadingFile(false);
+			}
+		}
+		void loadSelectedFile();
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		currentArtifact.projectId,
+		fileReloadKey,
+		selectedFile?.binary,
+		selectedPath,
+	]);
+
+	async function saveSelectedFile() {
+		if (!selectedPath || selectedFile?.binary) return;
+		setSavingFile(true);
+		setError(null);
+		try {
+			const response = await fetch(
+				`/api/workspace/code-projects/${currentArtifact.projectId}/files`,
+				{
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ path: selectedPath, content }),
+				},
+			);
+			const nextArtifact = (await response.json().catch(() => null)) as
+				| CodeWorkspaceArtifact
+				| { error?: string }
+				| null;
+			if (!response.ok || !isCodeWorkspaceArtifactOutput(nextArtifact)) {
+				throw new Error(
+					(nextArtifact as { error?: string } | null)?.error ||
+						"Failed to save file",
+				);
+			}
+			setCurrentArtifact(nextArtifact);
+			dispatchCodeWorkspaceArtifact(nextArtifact, { activate: true });
+		} catch (saveError) {
+			setError(
+				saveError instanceof Error ? saveError.message : "Failed to save file",
+			);
+		} finally {
+			setSavingFile(false);
+		}
+	}
+
+	async function deleteSelectedFile() {
+		if (!selectedPath) return;
+		const confirmed = window.confirm(`Delete ${selectedPath}?`);
+		if (!confirmed) return;
+		setSavingFile(true);
+		setError(null);
+		try {
+			const response = await fetch(
+				`/api/workspace/code-projects/${currentArtifact.projectId}/files`,
+				{
+					method: "DELETE",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ path: selectedPath }),
+				},
+			);
+			const nextArtifact = (await response.json().catch(() => null)) as
+				| CodeWorkspaceArtifact
+				| { error?: string }
+				| null;
+			if (!response.ok || !isCodeWorkspaceArtifactOutput(nextArtifact)) {
+				throw new Error(
+					(nextArtifact as { error?: string } | null)?.error ||
+						"Failed to delete file",
+				);
+			}
+			setCurrentArtifact(nextArtifact);
+			dispatchCodeWorkspaceArtifact(nextArtifact, { activate: true });
+		} catch (deleteError) {
+			setError(
+				deleteError instanceof Error
+					? deleteError.message
+					: "Failed to delete file",
+			);
+		} finally {
+			setSavingFile(false);
+		}
+	}
+
+	return (
+		<div
+			className={cn(
+				"overflow-hidden rounded-xl border border-primary/20 bg-background text-xs shadow-sm",
+				variant === "workbench" &&
+					"flex h-full min-h-0 flex-col rounded-none border-0 shadow-none",
+			)}
+		>
+			<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 bg-muted/35 px-3 py-2.5">
+				<div className="min-w-0">
+					<p className="truncate font-medium text-foreground">
+						{currentArtifact.title}
+					</p>
+					<p className="text-[11px] text-muted-foreground">
+						Code workspace · v{currentArtifact.version} ·{" "}
+						{currentArtifact.files.length} files
+					</p>
+				</div>
+				<div className="flex items-center gap-1.5">
+					<Button
+						asChild
+						type="button"
+						variant="outline"
+						size="sm"
+						className="h-7 px-2.5 text-[11px]"
+					>
+						<a href={currentArtifact.downloadUrl}>
+							<DownloadIcon className="size-3" aria-hidden="true" />
+							ZIP
+						</a>
+					</Button>
+				</div>
+			</div>
+			{currentArtifact.message ? (
+				<div className="border-b border-border/40 px-3 py-2 text-[11px] text-muted-foreground">
+					{currentArtifact.message}
+				</div>
+			) : null}
+			<div
+				className={cn(
+					"grid min-h-[520px] grid-cols-1 lg:grid-cols-[13rem_minmax(0,1fr)_minmax(18rem,1fr)]",
+					variant === "workbench" && "min-h-0 flex-1",
+				)}
+			>
+				<div className="border-b border-border/50 bg-muted/20 lg:border-r lg:border-b-0">
+					<div className="border-b border-border/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+						Files
+					</div>
+					<div className="max-h-64 overflow-auto p-2 lg:max-h-[480px]">
+						<CodeWorkspaceFileTree
+							nodes={fileTree}
+							selectedPath={selectedPath}
+							onSelect={setSelectedPath}
+						/>
+					</div>
+				</div>
+				<div className="flex min-w-0 flex-col border-b border-border/50 lg:border-r lg:border-b-0">
+					<div className="flex min-h-10 items-center justify-between gap-2 border-b border-border/40 px-3 py-2">
+						<div className="min-w-0">
+							<p className="truncate font-medium text-foreground">
+								{selectedPath ?? "No file selected"}
+							</p>
+							<p className="text-[10px] text-muted-foreground">
+								{selectedFile?.binary
+									? "Binary asset"
+									: (selectedFile?.mimeType ?? "Select a file")}
+							</p>
+						</div>
+						<div className="flex shrink-0 items-center gap-1.5">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-7 px-2 text-[11px]"
+								disabled={!selectedPath || selectedFile?.binary}
+								onClick={() => setFullscreenPane("code")}
+							>
+								<Maximize2Icon className="size-3" aria-hidden="true" />
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-7 px-2 text-[11px]"
+								disabled={!selectedPath || selectedFile?.binary || loadingFile}
+								onClick={() => setFileReloadKey((key) => key + 1)}
+							>
+								<RefreshCcwIcon className="size-3" aria-hidden="true" />
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className="h-7 px-2 text-[11px]"
+								disabled={!selectedPath || selectedFile?.binary || savingFile}
+								onClick={() => void saveSelectedFile()}
+							>
+								<SaveIcon className="size-3" aria-hidden="true" />
+								Save
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-7 px-2 text-[11px] text-destructive hover:text-destructive"
+								disabled={!selectedPath || savingFile}
+								onClick={() => void deleteSelectedFile()}
+							>
+								<Trash2Icon className="size-3" aria-hidden="true" />
+							</Button>
+						</div>
+					</div>
+					{error ? (
+						<div className="border-b border-destructive/20 bg-destructive/5 px-3 py-2 text-[11px] text-destructive">
+							{error}
+						</div>
+					) : null}
+					{selectedFile?.binary ? (
+						<div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-muted-foreground">
+							Binary assets are served in preview and included in ZIP download.
+						</div>
+					) : (
+						<CodeWorkspaceEditor
+							value={loadingFile ? "Loading file…" : content}
+							filePath={selectedPath}
+							disabled={!selectedPath || loadingFile || savingFile}
+							onChange={setContent}
+						/>
+					)}
+				</div>
+				<div className="flex min-w-0 flex-col bg-white">
+					<div className="flex min-h-10 items-center justify-between gap-2 border-b border-border/40 bg-background px-3 py-2">
+						<div>
+							<p className="font-medium text-foreground">Live preview</p>
+							<p className="text-[10px] text-muted-foreground">
+								{currentArtifact.rootFile ?? "No HTML entry"}
+							</p>
+						</div>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							className="h-7 px-2 text-[11px]"
+							disabled={!currentArtifact.rootFile}
+							onClick={() => setFullscreenPane("preview")}
+						>
+							<Maximize2Icon className="size-3" aria-hidden="true" />
+							Fullscreen
+						</Button>
+					</div>
+					<CodeWorkspacePreviewFrame
+						key={`${currentArtifact.projectId}:${currentArtifact.version}:${currentArtifact.rootFile ?? "no-root"}`}
+						artifact={currentArtifact}
+					/>
+				</div>
+			</div>
+			<Dialog
+				open={fullscreenPane !== null}
+				onOpenChange={(open) => !open && setFullscreenPane(null)}
+			>
+				<DialogContent className="!fixed !inset-0 flex !h-dvh !w-full !translate-x-0 !translate-y-0 flex-col overflow-hidden !rounded-none !border-0 bg-background p-0 sm:!max-w-none">
+					<div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-6">
+						<div className="min-w-0">
+							<DialogTitle className="truncate text-base font-semibold">
+								{fullscreenPane === "preview"
+									? "Live preview"
+									: (selectedPath ?? "Code")}
+							</DialogTitle>
+							<p className="mt-0.5 text-xs text-muted-foreground">
+								{currentArtifact.title} · v{currentArtifact.version}
+							</p>
+						</div>
+						{fullscreenPane === "code" ? (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={!selectedPath || selectedFile?.binary || savingFile}
+								onClick={() => void saveSelectedFile()}
+							>
+								<SaveIcon className="size-3" aria-hidden="true" />
+								Save
+							</Button>
+						) : null}
+					</div>
+					{fullscreenPane === "preview" ? (
+						<div className="flex min-h-0 flex-1 bg-white">
+							<CodeWorkspacePreviewFrame
+								key={`fullscreen:${currentArtifact.projectId}:${currentArtifact.version}:${currentArtifact.rootFile ?? "no-root"}`}
+								artifact={currentArtifact}
+							/>
+						</div>
+					) : null}
+					{fullscreenPane === "code" ? (
+						<CodeWorkspaceEditor
+							value={loadingFile ? "Loading file…" : content}
+							filePath={selectedPath}
+							disabled={!selectedPath || loadingFile || savingFile}
+							onChange={setContent}
+							className="min-h-0 flex-1"
+						/>
+					) : null}
+				</DialogContent>
+			</Dialog>
+		</div>
+	);
+}
+
 function LiveToolInputCard({
 	toolName,
 	inputText,
@@ -605,6 +1678,7 @@ function formatExpandedToolValue(value: unknown, open: boolean) {
 type ToolPartCardProps = {
 	part: ChatMessagePart;
 	approval?: PendingToolApproval;
+	workspaceArtifactDisplay?: WorkspaceArtifactDisplay;
 	onApprove?: (approval: PendingToolApproval) => void;
 	onReject?: (approval: PendingToolApproval) => void;
 };
@@ -612,11 +1686,19 @@ type ToolPartCardProps = {
 const ToolPartCard = memo(function ToolPartCard({
 	part,
 	approval,
+	workspaceArtifactDisplay = "full",
 	onApprove,
 	onReject,
 }: ToolPartCardProps) {
 	const [open, setOpen] = useState(false);
 	const parsed = useMemo(() => parseToolPart(part.content), [part.content]);
+	const fileArtifact = useMemo(
+		() =>
+			part.type === "file"
+				? codeWorkspaceArtifactFromPartContent(part.content)
+				: null,
+		[part.content, part.type],
+	);
 	const friendlyName = useMemo(
 		() => formatToolName(parsed.toolName),
 		[parsed.toolName],
@@ -661,8 +1743,22 @@ const ToolPartCard = memo(function ToolPartCard({
 		[open, parsed.output],
 	);
 
+	if (fileArtifact) {
+		return workspaceArtifactDisplay === "summary" ? (
+			<CodeWorkspaceArtifactSummary artifact={fileArtifact} />
+		) : (
+			<CodeWorkspaceArtifactCard artifact={fileArtifact} />
+		);
+	}
 	if (isHtmlArtifactOutput(parsed.output)) {
 		return <HtmlArtifactCard artifact={parsed.output} />;
+	}
+	if (isCodeWorkspaceArtifactOutput(parsed.output)) {
+		return workspaceArtifactDisplay === "summary" ? (
+			<CodeWorkspaceArtifactSummary artifact={parsed.output} />
+		) : (
+			<CodeWorkspaceArtifactCard artifact={parsed.output} />
+		);
 	}
 	if (inputArtifact) {
 		return <HtmlArtifactCard artifact={inputArtifact} isLive />;
@@ -927,6 +2023,7 @@ function ThinkingPart({
 type MessageContentProps = {
 	message: ChatMessage;
 	showSuggestions?: boolean;
+	workspaceArtifactDisplay?: WorkspaceArtifactDisplay;
 	isEditing: boolean;
 	editingContent: string;
 	isSaving: boolean;
@@ -954,6 +2051,7 @@ const MessageContent = memo(function MessageContent({
 	onRejectTool,
 	onSuggestionClick,
 	showSuggestions = true,
+	workspaceArtifactDisplay = "full",
 }: MessageContentProps) {
 	const content = useMemo(() => textFromMessage(message), [message]);
 	const citations = useMemo(() => citationsFromMessage(message), [message]);
@@ -1010,7 +2108,30 @@ const MessageContent = memo(function MessageContent({
 	}
 
 	if (!isAssistant) {
-		return content;
+		const fileParts = renderableParts.filter((part) => part.type === "file");
+		if (fileParts.length === 0) return content;
+		return (
+			<div className="flex flex-col gap-2">
+				{content ? <div>{content}</div> : null}
+				{fileParts.map((part, partIndex) => {
+					const fileArtifact = codeWorkspaceArtifactFromPartContent(
+						part.content,
+					);
+					if (!fileArtifact) return null;
+					return workspaceArtifactDisplay === "summary" ? (
+						<CodeWorkspaceArtifactSummary
+							key={`${message.id}-${part.type}-${partIndex}`}
+							artifact={fileArtifact}
+						/>
+					) : (
+						<CodeWorkspaceArtifactCard
+							key={`${message.id}-${part.type}-${partIndex}`}
+							artifact={fileArtifact}
+						/>
+					);
+				})}
+			</div>
+		);
 	}
 
 	return (
@@ -1047,12 +2168,30 @@ const MessageContent = memo(function MessageContent({
 							/>
 						);
 					}
+					if (part.type === "file") {
+						const fileArtifact = codeWorkspaceArtifactFromPartContent(
+							part.content,
+						);
+						if (!fileArtifact) return null;
+						return workspaceArtifactDisplay === "summary" ? (
+							<CodeWorkspaceArtifactSummary
+								key={`${message.id}-${part.type}-${partIndex}`}
+								artifact={fileArtifact}
+							/>
+						) : (
+							<CodeWorkspaceArtifactCard
+								key={`${message.id}-${part.type}-${partIndex}`}
+								artifact={fileArtifact}
+							/>
+						);
+					}
 					if (part.type === "tool-call" || part.type === "tool-result") {
 						return (
 							<ToolPartCard
 								key={`${message.id}-${part.type}-${partIndex}`}
 								part={part}
 								approval={approvalByPartIndex.get(partIndex)}
+								workspaceArtifactDisplay={workspaceArtifactDisplay}
 								onApprove={onApproveTool}
 								onReject={onRejectTool}
 							/>
@@ -1091,6 +2230,7 @@ function areMessageContentPropsEqual(
 	return (
 		previous.message === next.message &&
 		previous.showSuggestions === next.showSuggestions &&
+		previous.workspaceArtifactDisplay === next.workspaceArtifactDisplay &&
 		previous.isEditing === next.isEditing &&
 		previous.editingContent === next.editingContent &&
 		previous.isSaving === next.isSaving &&
@@ -1103,6 +2243,7 @@ interface ChatMessageListProps {
 	messages: ChatMessage[];
 	sending: boolean;
 	loading?: boolean;
+	workspaceArtifactDisplay?: WorkspaceArtifactDisplay;
 	bottomRef: React.RefObject<HTMLDivElement | null>;
 	onEditMessage?: (
 		message: ChatMessage,
@@ -1121,6 +2262,7 @@ export function ChatMessageList({
 	messages,
 	sending,
 	loading,
+	workspaceArtifactDisplay = "full",
 	bottomRef,
 	onEditMessage,
 	onDeleteMessage,
@@ -1193,6 +2335,7 @@ export function ChatMessageList({
 				const content = textFromMessage(message);
 				const isAssistant = message.role === "assistant";
 				const isUser = message.role === "user";
+				const hasFilePart = message.parts.some((part) => part.type === "file");
 				const canEdit = Boolean(onEditMessage) && (isUser || isAssistant);
 				const canDelete = Boolean(onDeleteMessage);
 				const canRegenerate =
@@ -1221,7 +2364,9 @@ export function ChatMessageList({
 						<div
 							className={cn(
 								"flex flex-col transition-opacity duration-150",
-								isUser ? "max-w-[82%]" : "max-w-[min(100%,48rem)]",
+								isUser && !hasFilePart
+									? "max-w-[82%]"
+									: "max-w-[min(100%,48rem)]",
 								isLast && isAnimating && "animate-in-fade",
 							)}
 						>
@@ -1242,6 +2387,7 @@ export function ChatMessageList({
 									editingContent={isEditing ? editingContent : ""}
 									isSaving={savingMessageId === message.id}
 									isAnimating={isAnimating}
+									workspaceArtifactDisplay={workspaceArtifactDisplay}
 									onEditingContentChange={
 										isEditing ? setEditingContent : undefined
 									}

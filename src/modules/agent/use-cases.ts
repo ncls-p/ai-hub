@@ -751,7 +751,40 @@ export async function cloneAgent(input: CloneAgentInput) {
 	return { agent, version };
 }
 
+const agentUpdateLocks = new Map<string, Promise<void>>();
+
+async function withAgentUpdateLock<T>(
+	agentId: string,
+	operation: () => Promise<T>,
+) {
+	const previous = agentUpdateLocks.get(agentId) ?? Promise.resolve();
+	let release!: () => void;
+	const current = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	agentUpdateLocks.set(
+		agentId,
+		previous.then(
+			() => current,
+			() => current,
+		),
+	);
+	await previous.catch(() => undefined);
+	try {
+		return await operation();
+	} finally {
+		release();
+		if (agentUpdateLocks.get(agentId) === current) {
+			agentUpdateLocks.delete(agentId);
+		}
+	}
+}
+
 export async function updateAgent(input: UpdateAgentInput) {
+	return withAgentUpdateLock(input.agentId, () => updateAgentUnlocked(input));
+}
+
+async function updateAgentUnlocked(input: UpdateAgentInput) {
 	const {
 		agentId,
 		workspaceId,

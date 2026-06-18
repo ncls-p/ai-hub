@@ -43,6 +43,27 @@ export interface ChatMessagePart {
 	content: string;
 }
 
+export interface CodeWorkspaceFileSummary {
+	path: string;
+	size: number;
+	mimeType: string;
+	binary: boolean;
+	hash: string;
+	updatedAt: string;
+}
+
+export interface CodeWorkspaceArtifact {
+	kind: "code_workspace_artifact";
+	projectId: string;
+	title: string;
+	rootFile: string | null;
+	version: number;
+	previewUrl: string | null;
+	downloadUrl: string;
+	files: CodeWorkspaceFileSummary[];
+	message?: string;
+}
+
 export interface ChatMessage {
 	id: string;
 	role: "user" | "assistant" | "system" | "tool";
@@ -122,6 +143,7 @@ export type ChatStreamEvent =
 			toolName: string;
 			output: unknown;
 	  }
+	| { type: "file"; artifact: CodeWorkspaceArtifact }
 	| { type: "citations"; citations: ChatCitation[] };
 
 export type Agent = ChatAgent;
@@ -198,9 +220,14 @@ function mergeToolParts(parts: ChatMessagePart[]): ChatMessagePart[] {
 
 export function renderablePartsFromMessage(message: ChatMessage) {
 	return mergeToolParts(message.parts).filter((part) =>
-		["text", "reasoning", "tool-call", "tool-result", "suggestions"].includes(
-			part.type,
-		),
+		[
+			"text",
+			"file",
+			"reasoning",
+			"tool-call",
+			"tool-result",
+			"suggestions",
+		].includes(part.type),
 	);
 }
 
@@ -267,6 +294,7 @@ export function summarizeToolPart(content: string) {
 export function createLocalMessage(
 	role: "user" | "assistant",
 	content: string,
+	extraParts: ChatMessagePart[] = [],
 ): ChatMessage {
 	return {
 		id:
@@ -275,7 +303,7 @@ export function createLocalMessage(
 				: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
 		role,
 		status: role === "assistant" ? "streaming" : "completed",
-		parts: [{ type: "text", content }],
+		parts: [{ type: "text", content }, ...extraParts],
 		createdAt: new Date().toISOString(),
 	};
 }
@@ -312,6 +340,7 @@ export function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
 		toolName?: unknown;
 		input?: unknown;
 		toolCallId?: unknown;
+		artifact?: unknown;
 		citations?: unknown;
 		sources?: unknown;
 		suggestions?: unknown;
@@ -359,6 +388,9 @@ export function isChatStreamEvent(value: unknown): value is ChatStreamEvent {
 		typeof event.toolCallId === "string" &&
 		typeof event.toolName === "string"
 	) {
+		return true;
+	}
+	if (event.type === "file" && typeof event.artifact === "object") {
 		return true;
 	}
 	if (event.type === "conversation_title" && typeof event.title === "string") {

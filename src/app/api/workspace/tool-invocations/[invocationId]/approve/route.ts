@@ -71,9 +71,15 @@ export async function POST(
 			if (invocation.toolSource === "builtin") {
 				const tool = getBuiltInTool(invocation.toolId);
 				if (!tool) {
-					return NextResponse.json({ error: "Tool not found" }, { status: 404 });
+					return NextResponse.json(
+						{ error: "Tool not found" },
+						{ status: 404 },
+					);
 				}
-				output = await tool.execute(input as never);
+				output = await tool.execute(input as never, {
+					workspaceId: invocation.workspaceId,
+					userId: session.user.id,
+				});
 			} else if (invocation.toolSource === "mcp") {
 				const [tool] = await db
 					.select({ mcpServerId: mcpTools.mcpServerId })

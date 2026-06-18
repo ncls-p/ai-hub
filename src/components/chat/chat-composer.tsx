@@ -1,8 +1,14 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { PaperclipIcon, SendIcon, SquareIcon, XIcon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import {
+	Loader2Icon,
+	PaperclipIcon,
+	SendIcon,
+	SquareIcon,
+	XIcon,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +29,7 @@ interface ChatComposerProps {
 	onStop?: () => void;
 	onQueuedMessageChange?: (id: string, content: string) => void;
 	onQueuedMessageCancel?: (id: string) => void;
+	onUploadCodeWorkspace?: (file: File) => Promise<void>;
 }
 
 export function ChatComposer({
@@ -35,8 +42,11 @@ export function ChatComposer({
 	onStop,
 	onQueuedMessageChange,
 	onQueuedMessageCancel,
+	onUploadCodeWorkspace,
 }: ChatComposerProps) {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [uploadingWorkspace, setUploadingWorkspace] = useState(false);
 
 	// Auto-resize textarea
 	useEffect(() => {
@@ -46,6 +56,18 @@ export function ChatComposer({
 		const newHeight = Math.min(el.scrollHeight, 160);
 		el.style.height = `${newHeight}px`;
 	}, [input]);
+
+	async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+		const file = event.target.files?.[0];
+		event.target.value = "";
+		if (!file || !onUploadCodeWorkspace) return;
+		setUploadingWorkspace(true);
+		try {
+			await onUploadCodeWorkspace(file);
+		} finally {
+			setUploadingWorkspace(false);
+		}
+	}
 
 	return (
 		<form
@@ -90,16 +112,30 @@ export function ChatComposer({
 			<div className="relative mx-auto w-full min-w-0 max-w-4xl">
 				<div className={cn("composer-box rounded-xl sm:rounded-2xl")}>
 					<div className="flex items-end gap-1.5 p-1.5 sm:gap-2 sm:p-2">
-						{/* Attachment button */}
+						<input
+							ref={fileInputRef}
+							type="file"
+							accept=".zip,application/zip,application/x-zip-compressed"
+							className="hidden"
+							onChange={(event) => void handleFileChange(event)}
+						/>
 						<Button
 							type="button"
 							size="icon"
 							variant="ghost"
 							className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground sm:size-9"
-							aria-label="Attach file"
-							disabled={sending || !canChat}
+							aria-label="Upload ZIP code workspace"
+							disabled={uploadingWorkspace || sending || !canChat}
+							onClick={() => fileInputRef.current?.click()}
 						>
-							<PaperclipIcon className="size-4" aria-hidden="true" />
+							{uploadingWorkspace ? (
+								<Loader2Icon
+									className="size-4 animate-spin"
+									aria-hidden="true"
+								/>
+							) : (
+								<PaperclipIcon className="size-4" aria-hidden="true" />
+							)}
 						</Button>
 
 						<Textarea

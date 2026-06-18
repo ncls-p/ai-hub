@@ -16,7 +16,11 @@ import {
 	type QueuedChatMessage,
 } from "@/components/chat/chat-composer";
 import { ChatLayout } from "@/components/chat/chat-layout";
-import { ChatMessageList } from "@/components/chat/chat-message-list";
+import {
+	CODE_WORKSPACE_ARTIFACT_EVENT,
+	ChatMessageList,
+	CodeWorkspaceArtifactCard,
+} from "@/components/chat/chat-message-list";
 import { ModelLogo } from "@/components/providers/model-logo";
 import { QuotaBanner } from "@/components/chat/quota-banner";
 import { textFromMessage } from "@/components/chat/chat-types";
@@ -26,6 +30,7 @@ import type {
 	ChatConversation,
 	ChatConversationFolder,
 	ChatMessage,
+	CodeWorkspaceArtifact,
 	PendingToolApproval,
 } from "@/components/chat/chat-types";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +130,50 @@ function upsertConversation(
 		return { ...item, ...conversation };
 	});
 	return found ? next : [conversation, ...next];
+}
+
+function isCodeWorkspaceArtifact(
+	value: unknown,
+): value is CodeWorkspaceArtifact {
+	if (typeof value !== "object" || value === null) return false;
+	const record = value as Record<string, unknown>;
+	return (
+		record.kind === "code_workspace_artifact" &&
+		typeof record.projectId === "string" &&
+		typeof record.version === "number" &&
+		Array.isArray(record.files)
+	);
+}
+
+function codeWorkspaceArtifactFromPartContent(content: string) {
+	try {
+		const parsed = JSON.parse(content) as unknown;
+		if (isCodeWorkspaceArtifact(parsed)) return parsed;
+		if (typeof parsed !== "object" || parsed === null) return null;
+		const output = (parsed as Record<string, unknown>).output;
+		return isCodeWorkspaceArtifact(output) ? output : null;
+	} catch {
+		return null;
+	}
+}
+
+function latestCodeWorkspaceArtifact(messages: ChatMessage[]) {
+	let latest: CodeWorkspaceArtifact | null = null;
+	for (const message of messages) {
+		for (const part of message.parts) {
+			if (
+				part.type !== "file" &&
+				part.type !== "tool-call" &&
+				part.type !== "tool-result"
+			) {
+				continue;
+			}
+			const artifact = codeWorkspaceArtifactFromPartContent(part.content);
+			if (!artifact) continue;
+			if (!latest || artifact.version >= latest.version) latest = artifact;
+		}
+	}
+	return latest;
 }
 
 function ChatContextBar({
@@ -238,6 +287,9 @@ export default function ChatPage() {
 	const [quota, setQuota] = useState<{ used: number; limit: number } | null>(
 		null,
 	);
+	const [codeWorkspaceArtifact, setCodeWorkspaceArtifact] =
+		useState<CodeWorkspaceArtifact | null>(null);
+	const [interfaceMode, setInterfaceMode] = useState<"chat" | "coding">("chat");
 	const bottomRef = useRef<HTMLDivElement | null>(null);
 	const scrollContainerRef = useRef<HTMLElement | null>(null);
 	const scrollContentRef = useRef<HTMLDivElement | null>(null);
@@ -249,6 +301,7 @@ export default function ChatPage() {
 	const STICK_RESUME_THRESHOLD_PX = 48;
 	const skipNextMessageLoadRef = useRef(false);
 	const processingQueuedMessageRef = useRef(false);
+	const lastAutoOpenedWorkspaceRef = useRef<string | null>(null);
 
 	const selectedAgent = useMemo(
 		() => agents.find((agent) => agent.id === selectedAgentId) ?? null,
@@ -265,6 +318,43 @@ export default function ChatPage() {
 				: [],
 		[selectedAgent],
 	);
+
+	useEffect(() => {
+		function handleCodeWorkspaceArtifact(event: Event) {
+			const detail = (
+				event as CustomEvent<{
+					artifact?: CodeWorkspaceArtifact;
+					activate?: boolean;
+				}>
+			).detail;
+			const artifact = detail?.artifact;
+			if (!artifact?.projectId) return;
+			setCodeWorkspaceArtifact((current) => {
+				if (
+					current?.projectId === artifact.projectId &&
+					artifact.version <= current.version
+				) {
+					return current;
+				}
+				return artifact;
+			});
+			if (!detail.activate) return;
+			const artifactKey = `${artifact.projectId}:${artifact.version}`;
+			if (lastAutoOpenedWorkspaceRef.current === artifactKey) return;
+			lastAutoOpenedWorkspaceRef.current = artifactKey;
+			setInterfaceMode("coding");
+		}
+		window.addEventListener(
+			CODE_WORKSPACE_ARTIFACT_EVENT,
+			handleCodeWorkspaceArtifact,
+		);
+		return () => {
+			window.removeEventListener(
+				CODE_WORKSPACE_ARTIFACT_EVENT,
+				handleCodeWorkspaceArtifact,
+			);
+		};
+	}, []);
 
 	const fetchConversationPage = useCallback(
 		async ({
@@ -392,6 +482,27 @@ export default function ChatPage() {
 	});
 
 	useEffect(() => {
+		const latestArtifact = latestCodeWorkspaceArtifact(messages);
+		if (!latestArtifact) return;
+		queueMicrotask(() => {
+			setCodeWorkspaceArtifact((current) => {
+				if (
+					current?.projectId === latestArtifact.projectId &&
+					latestArtifact.version <= current.version
+				) {
+					return current;
+				}
+				return latestArtifact;
+			});
+			if (!sending) return;
+			const artifactKey = `${latestArtifact.projectId}:${latestArtifact.version}`;
+			if (lastAutoOpenedWorkspaceRef.current === artifactKey) return;
+			lastAutoOpenedWorkspaceRef.current = artifactKey;
+			setInterfaceMode("coding");
+		});
+	}, [messages, sending]);
+
+	useEffect(() => {
 		if (
 			sending ||
 			!canChat ||
@@ -416,11 +527,23 @@ export default function ChatPage() {
 					? current.slice(1)
 					: current.filter((message) => message.id !== nextMessage.id),
 			);
-			void handleSubmit(nextMessage.content.trim()).finally(() => {
+			void handleSubmit(nextMessage.content.trim(), {
+				codeWorkspaceId:
+					interfaceMode === "coding"
+						? codeWorkspaceArtifact?.projectId
+						: undefined,
+			}).finally(() => {
 				processingQueuedMessageRef.current = false;
 			});
 		});
-	}, [canChat, handleSubmit, queuedMessages, sending]);
+	}, [
+		canChat,
+		codeWorkspaceArtifact,
+		handleSubmit,
+		interfaceMode,
+		queuedMessages,
+		sending,
+	]);
 
 	useEffect(() => {
 		if (!workspaceId) return;
@@ -591,7 +714,11 @@ export default function ChatPage() {
 	useEffect(() => {
 		if (!activeConversationId) {
 			skipNextMessageLoadRef.current = false;
-			setMessages([]);
+			queueMicrotask(() => {
+				setMessages([]);
+				setCodeWorkspaceArtifact(null);
+				setInterfaceMode("chat");
+			});
 			return;
 		}
 		if (skipNextMessageLoadRef.current) {
@@ -624,7 +751,11 @@ export default function ChatPage() {
 						upsertConversation(current, loadedConversation),
 					);
 				}
-				setMessages(data.messages ?? []);
+				const loadedMessages = data.messages ?? [];
+				setMessages(loadedMessages);
+				const latestArtifact = latestCodeWorkspaceArtifact(loadedMessages);
+				setCodeWorkspaceArtifact(latestArtifact);
+				if (!latestArtifact) setInterfaceMode("chat");
 			} catch (err) {
 				if (err instanceof Error && err.name !== "AbortError") {
 					toast.error(err.message);
@@ -766,11 +897,16 @@ export default function ChatPage() {
 		setActiveVersion(null);
 		setActiveConversationId(null);
 		setMessages([]);
+		setCodeWorkspaceArtifact(null);
+		setInterfaceMode("chat");
 		window.history.replaceState(null, "", `/chat?agentId=${agentId}`);
 	}
 
 	function selectConversation(conversationId: string) {
 		setQueuedMessages([]);
+		setMessages([]);
+		setCodeWorkspaceArtifact(null);
+		setInterfaceMode("chat");
 		const conversation = conversations.find(
 			(item) => item.id === conversationId,
 		);
@@ -788,6 +924,8 @@ export default function ChatPage() {
 		setQueuedMessages([]);
 		setActiveConversationId(null);
 		setMessages([]);
+		setCodeWorkspaceArtifact(null);
+		setInterfaceMode("chat");
 		window.history.replaceState(
 			null,
 			"",
@@ -831,6 +969,8 @@ export default function ChatPage() {
 			setQueuedMessages([]);
 			setActiveConversationId(null);
 			setMessages([]);
+			setCodeWorkspaceArtifact(null);
+			setInterfaceMode("chat");
 			window.history.replaceState(
 				null,
 				"",
@@ -992,7 +1132,48 @@ export default function ChatPage() {
 			queueMessage(content);
 			return;
 		}
-		void handleSubmit(content);
+		void handleSubmit(content, {
+			codeWorkspaceId:
+				interfaceMode === "coding"
+					? codeWorkspaceArtifact?.projectId
+					: undefined,
+		});
+	}
+
+	async function uploadCodeWorkspace(file: File) {
+		if (!workspaceId || !canChat) return;
+		if (!file.name.toLowerCase().endsWith(".zip")) {
+			toast.error("Upload a .zip file containing HTML/CSS/JS files.");
+			return;
+		}
+		try {
+			const formData = new FormData();
+			formData.set("workspaceId", workspaceId);
+			formData.set("file", file);
+			const response = await fetch("/api/workspace/code-projects/upload", {
+				method: "POST",
+				body: formData,
+			});
+			const data = (await response.json().catch(() => null)) as {
+				artifact?: CodeWorkspaceArtifact;
+				prompt?: string;
+				error?: string;
+			} | null;
+			if (!response.ok || !data?.artifact || !data.prompt) {
+				throw new Error(data?.error || "Failed to upload code workspace");
+			}
+			setCodeWorkspaceArtifact(data.artifact);
+			setInterfaceMode("coding");
+			lastAutoOpenedWorkspaceRef.current = `${data.artifact.projectId}:${data.artifact.version}`;
+			toast.success("Code workspace uploaded in chat");
+			await handleSubmit(data.prompt, { codeWorkspaceArtifact: data.artifact });
+		} catch (error) {
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to upload code workspace",
+			);
+		}
 	}
 
 	function submitSuggestion(content: string) {
@@ -1211,93 +1392,182 @@ export default function ChatPage() {
 			onSetupComplete={() => void reloadAgentContext()}
 		>
 			<ChatContextBar quota={quota} />
-			<section
-				ref={scrollContainerRef}
-				className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [overflow-anchor:none] px-3 py-4 sm:px-4 sm:py-8"
-			>
-				{!loadingMessages && messages.length === 0 ? (
-					<div className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center px-4 py-12 sm:py-16 animate-in-fade">
-						<div className="relative flex w-full flex-col items-center gap-5">
-							<div className="flex max-w-xl flex-col items-center text-center">
-								{selectedAgent ? (
-									<ModelLogo
-										logoUrl={selectedAgent.logoUrl}
-										label={selectedAgent.name}
-										size="lg"
-										imageFit="cover"
-										className="mb-4 rounded-full"
-									/>
-								) : null}
-								<h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-									{canChat
-										? selectedAgent
-											? t("emptyTitleNamed", { name: selectedAgent.name })
-											: t("emptyTitle")
-										: t("finishSetup")}
-								</h2>
-								<p className="mt-2 max-w-sm text-sm text-muted-foreground">
-									{canChat
-										? selectedAgent?.description || t("emptyDescription")
-										: t("emptySetup")}
-								</p>
-							</div>
-
-							{canChat &&
-							(conversations[0] || emptyPromptSuggestions.length > 0) ? (
-								<div className="flex flex-wrap justify-center gap-2">
-									{conversations[0] ? (
-										<Button
-											type="button"
-											variant="outline"
-											onClick={() => selectConversation(conversations[0].id)}
-										>
-											{t("continueLast")}
-										</Button>
-									) : null}
-									{emptyPromptSuggestions.map((suggestion) => (
-										<Button
-											key={suggestion}
-											type="button"
-											variant="outline"
-											onClick={() => submitSuggestion(suggestion)}
-										>
-											{suggestion}
-										</Button>
-									))}
-								</div>
-							) : null}
-						</div>
+			{codeWorkspaceArtifact ? (
+				<div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/60 bg-background px-3 py-2 sm:px-4">
+					<div className="min-w-0">
+						<p className="truncate text-sm font-medium text-foreground">
+							{codeWorkspaceArtifact.title}
+						</p>
+						<p className="text-xs text-muted-foreground">
+							Code workspace · v{codeWorkspaceArtifact.version}
+						</p>
 					</div>
-				) : null}
-				<div ref={scrollContentRef}>
-					<ChatMessageList
-						key={activeConversationId ?? "new-conversation"}
-						messages={messages}
-						sending={sending}
-						loading={loadingMessages}
-						bottomRef={bottomRef}
-						onEditMessage={editMessage}
-						onDeleteMessage={deleteMessage}
-						onResendMessage={resendMessage}
-						onRegenerateAssistant={resendMessage}
-						pendingApprovals={pendingApprovals}
-						onApproveTool={approveToolInvocation}
-						onRejectTool={rejectToolInvocation}
-						onSuggestionClick={submitSuggestion}
-					/>
+					<div className="flex shrink-0 items-center rounded-lg border bg-muted/30 p-0.5">
+						<Button
+							type="button"
+							variant={interfaceMode === "chat" ? "secondary" : "ghost"}
+							size="sm"
+							className="h-7 px-3 text-xs"
+							onClick={() => setInterfaceMode("chat")}
+						>
+							Chat
+						</Button>
+						<Button
+							type="button"
+							variant={interfaceMode === "coding" ? "secondary" : "ghost"}
+							size="sm"
+							className="h-7 px-3 text-xs"
+							onClick={() => setInterfaceMode("coding")}
+						>
+							Coding
+						</Button>
+					</div>
 				</div>
-			</section>
-			<ChatComposer
-				input={input}
-				canChat={canChat}
-				sending={sending}
-				queuedMessages={queuedMessages}
-				onInputChange={setInput}
-				onSubmit={submitMessage}
-				onStop={stopGeneration}
-				onQueuedMessageChange={updateQueuedMessage}
-				onQueuedMessageCancel={cancelQueuedMessage}
-			/>
+			) : null}
+			{interfaceMode === "coding" && codeWorkspaceArtifact ? (
+				<section className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden bg-background lg:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]">
+					<aside className="flex min-h-0 flex-col border-r border-border/60 bg-muted/10">
+						<div className="border-b border-border/50 px-3 py-2">
+							<p className="text-xs font-medium text-foreground">Chat</p>
+							<p className="text-[11px] text-muted-foreground">
+								Demande des modifications pendant que tu codes.
+							</p>
+						</div>
+						<section
+							ref={scrollContainerRef}
+							className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 [overflow-anchor:none]"
+						>
+							<div ref={scrollContentRef}>
+								<ChatMessageList
+									key={activeConversationId ?? "new-conversation"}
+									messages={messages}
+									sending={sending}
+									loading={loadingMessages}
+									workspaceArtifactDisplay="summary"
+									bottomRef={bottomRef}
+									onEditMessage={editMessage}
+									onDeleteMessage={deleteMessage}
+									onResendMessage={resendMessage}
+									onRegenerateAssistant={resendMessage}
+									pendingApprovals={pendingApprovals}
+									onApproveTool={approveToolInvocation}
+									onRejectTool={rejectToolInvocation}
+									onSuggestionClick={submitSuggestion}
+								/>
+							</div>
+						</section>
+						<ChatComposer
+							input={input}
+							canChat={canChat}
+							sending={sending}
+							queuedMessages={queuedMessages}
+							onInputChange={setInput}
+							onSubmit={submitMessage}
+							onStop={stopGeneration}
+							onQueuedMessageChange={updateQueuedMessage}
+							onQueuedMessageCancel={cancelQueuedMessage}
+							onUploadCodeWorkspace={uploadCodeWorkspace}
+						/>
+					</aside>
+					<div className="min-h-0 overflow-hidden">
+						<CodeWorkspaceArtifactCard
+							artifact={codeWorkspaceArtifact}
+							variant="workbench"
+						/>
+					</div>
+				</section>
+			) : (
+				<section
+					ref={scrollContainerRef}
+					className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [overflow-anchor:none] px-3 py-4 sm:px-4 sm:py-8"
+				>
+					{!loadingMessages && messages.length === 0 ? (
+						<div className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center px-4 py-12 sm:py-16 animate-in-fade">
+							<div className="relative flex w-full flex-col items-center gap-5">
+								<div className="flex max-w-xl flex-col items-center text-center">
+									{selectedAgent ? (
+										<ModelLogo
+											logoUrl={selectedAgent.logoUrl}
+											label={selectedAgent.name}
+											size="lg"
+											imageFit="cover"
+											className="mb-4 rounded-full"
+										/>
+									) : null}
+									<h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+										{canChat
+											? selectedAgent
+												? t("emptyTitleNamed", { name: selectedAgent.name })
+												: t("emptyTitle")
+											: t("finishSetup")}
+									</h2>
+									<p className="mt-2 max-w-sm text-sm text-muted-foreground">
+										{canChat
+											? selectedAgent?.description || t("emptyDescription")
+											: t("emptySetup")}
+									</p>
+								</div>
+
+								{canChat &&
+								(conversations[0] || emptyPromptSuggestions.length > 0) ? (
+									<div className="flex flex-wrap justify-center gap-2">
+										{conversations[0] ? (
+											<Button
+												type="button"
+												variant="outline"
+												onClick={() => selectConversation(conversations[0].id)}
+											>
+												{t("continueLast")}
+											</Button>
+										) : null}
+										{emptyPromptSuggestions.map((suggestion) => (
+											<Button
+												key={suggestion}
+												type="button"
+												variant="outline"
+												onClick={() => submitSuggestion(suggestion)}
+											>
+												{suggestion}
+											</Button>
+										))}
+									</div>
+								) : null}
+							</div>
+						</div>
+					) : null}
+					<div ref={scrollContentRef}>
+						<ChatMessageList
+							key={activeConversationId ?? "new-conversation"}
+							messages={messages}
+							sending={sending}
+							loading={loadingMessages}
+							bottomRef={bottomRef}
+							onEditMessage={editMessage}
+							onDeleteMessage={deleteMessage}
+							onResendMessage={resendMessage}
+							onRegenerateAssistant={resendMessage}
+							pendingApprovals={pendingApprovals}
+							onApproveTool={approveToolInvocation}
+							onRejectTool={rejectToolInvocation}
+							onSuggestionClick={submitSuggestion}
+						/>
+					</div>
+				</section>
+			)}
+			{interfaceMode === "coding" && codeWorkspaceArtifact ? null : (
+				<ChatComposer
+					input={input}
+					canChat={canChat}
+					sending={sending}
+					queuedMessages={queuedMessages}
+					onInputChange={setInput}
+					onSubmit={submitMessage}
+					onStop={stopGeneration}
+					onQueuedMessageChange={updateQueuedMessage}
+					onQueuedMessageCancel={cancelQueuedMessage}
+					onUploadCodeWorkspace={uploadCodeWorkspace}
+				/>
+			)}
 		</ChatLayout>
 	);
 }

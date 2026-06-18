@@ -270,6 +270,7 @@ jobs:
           SEARXNG_SECRET: ${{ secrets.SEARXNG_SECRET }}
           SEARXNG_SETTINGS_REVISION: ${{ github.sha }}
           OBJECT_STORAGE_BUCKET: ${{ vars.OBJECT_STORAGE_BUCKET || 'ai-hub' }}
+          CODE_WORKSPACE_STORAGE_PREFIX: ${{ vars.CODE_WORKSPACE_STORAGE_PREFIX || 'code-workspaces' }}
           ALLOW_PERSONAL_WORKSPACES: ${{ vars.ALLOW_PERSONAL_WORKSPACES || 'true' }}
           WORKSPACE_MONTHLY_TOKEN_LIMIT: ${{ vars.WORKSPACE_MONTHLY_TOKEN_LIMIT }}
           AI_HUB_APP_IMAGE: ${{ needs.build_images.outputs.app_image }}
@@ -360,6 +361,7 @@ jobs:
 
           APP_ENCRYPTION_KEY_ID="${APP_ENCRYPTION_KEY_ID:-default}"
           OBJECT_STORAGE_BUCKET="${OBJECT_STORAGE_BUCKET:-ai-hub}"
+          CODE_WORKSPACE_STORAGE_PREFIX="${CODE_WORKSPACE_STORAGE_PREFIX:-code-workspaces}"
           ALLOW_PERSONAL_WORKSPACES="${ALLOW_PERSONAL_WORKSPACES:-true}"
           WORKSPACE_MONTHLY_TOKEN_LIMIT="${WORKSPACE_MONTHLY_TOKEN_LIMIT:-}"
           if [[ -z "${SEARXNG_SECRET:-}" ]]; then
@@ -536,6 +538,7 @@ jobs:
               --arg object_storage_access_key_id "${OBJECT_STORAGE_ACCESS_KEY_ID}" \
               --arg object_storage_secret_access_key "${OBJECT_STORAGE_SECRET_ACCESS_KEY}" \
               --arg object_storage_bucket "${OBJECT_STORAGE_BUCKET}" \
+              --arg code_workspace_storage_prefix "${CODE_WORKSPACE_STORAGE_PREFIX}" \
               --arg searxng_secret "${SEARXNG_SECRET}" \
               --arg searxng_settings_revision "${SEARXNG_SETTINGS_REVISION:-local}" \
               --arg allow_personal_workspaces "${ALLOW_PERSONAL_WORKSPACES}" \
@@ -557,6 +560,7 @@ jobs:
                 {key: "OBJECT_STORAGE_ACCESS_KEY_ID", value: $object_storage_access_key_id, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "OBJECT_STORAGE_SECRET_ACCESS_KEY", value: $object_storage_secret_access_key, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "OBJECT_STORAGE_BUCKET", value: $object_storage_bucket, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
+                {key: "CODE_WORKSPACE_STORAGE_PREFIX", value: $code_workspace_storage_prefix, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "SEARXNG_SECRET", value: $searxng_secret, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "SEARXNG_SETTINGS_REVISION", value: $searxng_settings_revision, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "ALLOW_PERSONAL_WORKSPACES", value: $allow_personal_workspaces, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},

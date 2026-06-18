@@ -11,6 +11,7 @@ import {
 	type ChatCitation,
 	type ChatMessage,
 	type ChatStreamEvent,
+	type CodeWorkspaceArtifact,
 	type PendingToolApproval,
 } from "@/components/chat/chat-types";
 
@@ -27,6 +28,8 @@ interface UseChatStreamOptions {
 type SubmitOptions = {
 	resendFromMessageId?: string;
 	reuseUserMessage?: boolean;
+	codeWorkspaceArtifact?: CodeWorkspaceArtifact;
+	codeWorkspaceId?: string;
 };
 
 type StoredChatStreamDraft = {
@@ -314,6 +317,17 @@ function applyStreamEvent(
 				parts: [...nextParts, { type: "tool-call", content }],
 			};
 		});
+		return;
+	}
+
+	if (parsed.type === "file") {
+		handlers.updateAssistant((message) => ({
+			...message,
+			parts: [
+				...message.parts,
+				{ type: "file", content: JSON.stringify(parsed.artifact) },
+			],
+		}));
 		return;
 	}
 
@@ -733,7 +747,18 @@ export function useChatStream({
 	async function handleSubmit(content: string, options: SubmitOptions = {}) {
 		if (!content || !agentId || !canChat || sending) return;
 
-		const userMessage = createLocalMessage("user", content);
+		const userMessage = createLocalMessage(
+			"user",
+			content,
+			options.codeWorkspaceArtifact
+				? [
+						{
+							type: "file",
+							content: JSON.stringify(options.codeWorkspaceArtifact),
+						},
+					]
+				: [],
+		);
 		const assistantMessage = createLocalMessage("assistant", "");
 		let activeConversationId = conversationId;
 		let assistantMessageId = assistantMessage.id;
@@ -870,6 +895,8 @@ export function useChatStream({
 					content,
 					conversationId: conversationId ?? undefined,
 					resendFromMessageId: options.resendFromMessageId,
+					codeWorkspaceId:
+						options.codeWorkspaceId ?? options.codeWorkspaceArtifact?.projectId,
 				}),
 			});
 

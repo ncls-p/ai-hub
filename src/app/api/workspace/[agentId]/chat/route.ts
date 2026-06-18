@@ -24,6 +24,11 @@ import {
 } from "@/modules/chat/stream-bus";
 import { generateChatAutomationArtifacts } from "@/modules/chat/automation";
 import { consumeSkipNextChatSuggestions } from "@/modules/chat/suggestion-skip";
+import {
+	codeWorkspaceArtifact,
+	createCodeWorkspaceFromFiles,
+	getCodeWorkspace,
+} from "@/modules/code-workspace/storage";
 import { searchBoundKnowledgeBases } from "@/modules/knowledge/use-cases";
 import {
 	buildSkillsRegistryPrompt,
@@ -32,7 +37,11 @@ import {
 import { executeCustomToolWorkflow } from "@/modules/custom-tools/use-cases";
 import { executeMcpTool } from "@/modules/mcp/executor";
 import { assertWorkspaceWithinTokenQuota } from "@/modules/usage/quota";
-import { getBuiltInTool, requiresApproval } from "@/modules/tool/builtin-tools";
+import {
+	getBuiltInTool,
+	getBuiltInToolByName,
+	requiresApproval,
+} from "@/modules/tool/builtin-tools";
 import {
 	canExecuteRestrictedTool,
 	getCustomBindingContext,
@@ -64,6 +73,7 @@ const chatRequestSchema = z.object({
 	content: z.string().trim().min(1).max(32_000),
 	conversationId: z.uuid().nullable().optional(),
 	resendFromMessageId: z.uuid().nullable().optional(),
+	codeWorkspaceId: z.uuid().optional(),
 });
 
 const defaultMaxToolCalls = 6;
@@ -75,6 +85,49 @@ type ToolApprovalRequiredEvent = {
 	input: unknown;
 };
 
+const codeWorkspaceEditToolNames = [
+	"code_workspace_list_files",
+	"code_workspace_read_file",
+	"code_workspace_write_file",
+	"code_workspace_replace_text",
+	"code_workspace_delete_file",
+];
+
+const codeWorkspaceCreateToolNames = [
+	"code_workspace_create_project",
+	...codeWorkspaceEditToolNames,
+];
+
+function shouldEnableCodeWorkspaceCreation(content: string) {
+	const normalized = content.toLowerCase();
+	const wantsBuild =
+		/(cr[eé]e|g[eé]n[eè]re|fabrique|construis|build|create|make|code|develop|d[eé]veloppe|impl[eé]mente)/i.test(
+			normalized,
+		);
+	const targetIsStaticWeb =
+		/(html|css|javascript|\bjs\b|site web|website|landing page|page web|web app|app web|interface|frontend|maquette|demo|démo|preview|portfolio)/i.test(
+			normalized,
+		);
+	return wantsBuild && targetIsStaticWeb;
+}
+
+function parseCodeWorkspaceFileFences(content: string) {
+	const files: { path: string; content: string }[] = [];
+	const fencePattern =
+		/```[^\n`]*(?:path|file|filename)=(?:"([^"]+)"|'([^']+)'|([^\s`]+))[^\n`]*\n([\s\S]*?)```/g;
+	for (const match of content.matchAll(fencePattern)) {
+		const filePath = match[1] ?? match[2] ?? match[3];
+		const fileContent = match[4] ?? "";
+		if (!filePath) continue;
+		files.push({
+			path: filePath.trim(),
+			content: fileContent.replace(/\n$/, ""),
+		});
+	}
+	if (!files.some((file) => /\.html?$/i.test(file.path))) return null;
+	return files;
+}
+
 async function buildBoundTools(input: {
 	agentVersionId: string;
 	workspaceId: string;
@@ -82,12 +135,33 @@ async function buildBoundTools(input: {
 	messageId: string;
 	userId: string;
 	maxToolCalls: number;
+	autoCodeWorkspaceToolNames?: string[];
 	requireApprovalForAllTools?: boolean;
 	hasSkills?: boolean;
 	emitEvent?: (event: Record<string, unknown>) => void;
 	onApprovalRequired?: (event: ToolApprovalRequiredEvent) => void;
 }) {
 	const bindings = await getToolBindingsForVersion(input.agentVersionId);
+	const autoCodeWorkspaceToolNames = input.autoCodeWorkspaceToolNames ?? [];
+	const boundBuiltinToolIds = new Set(
+		bindings
+			.filter((binding) => binding.toolSource === "builtin")
+			.map((binding) => binding.toolId),
+	);
+	for (const toolName of autoCodeWorkspaceToolNames) {
+		const definition = getBuiltInToolByName(toolName);
+		if (!definition || boundBuiltinToolIds.has(definition.id)) continue;
+		boundBuiltinToolIds.add(definition.id);
+		bindings.push({
+			id: definition.id,
+			agentVersionId: input.agentVersionId,
+			toolSource: "builtin",
+			toolId: definition.id,
+			requireApproval: false,
+			riskLevel: definition.riskLevel,
+			createdAt: new Date(),
+		});
+	}
 	const tools: ToolSet = {};
 	let executedToolCallCount = 0;
 
@@ -434,7 +508,13 @@ async function buildBoundTools(input: {
 				}
 
 				try {
-					const output = await definition.execute(toolInput as never);
+					const output = await definition.execute(toolInput as never, {
+						workspaceId: input.workspaceId,
+						userId: input.userId,
+						conversationId: input.conversationId,
+						messageId: input.messageId,
+						emitEvent: input.emitEvent,
+					});
 					await logToolInvocation({
 						workspaceId: input.workspaceId,
 						conversationId: input.conversationId,
@@ -591,6 +671,43 @@ function htmlArtifactCodeFromToolMetadata(metadata: unknown) {
 	);
 }
 
+function codeWorkspaceContextFromValue(value: unknown) {
+	if (typeof value !== "object" || value === null) return null;
+	const record = value as Record<string, unknown>;
+	if (record.kind !== "code_workspace_artifact") return null;
+	if (typeof record.projectId !== "string") return null;
+	const files = Array.isArray(record.files)
+		? record.files
+				.map((file) => {
+					if (typeof file !== "object" || file === null) return null;
+					const fileRecord = file as Record<string, unknown>;
+					return typeof fileRecord.path === "string"
+						? `- ${fileRecord.path}${fileRecord.binary ? " (asset)" : ""}`
+						: null;
+				})
+				.filter(Boolean)
+				.join("\n")
+		: "";
+	return [
+		`Code workspace ID: ${record.projectId}`,
+		`Title: ${typeof record.title === "string" ? record.title : "Code workspace"}`,
+		`Preview entry: ${typeof record.rootFile === "string" ? record.rootFile : "none"}`,
+		files ? `Files:\n${files}` : null,
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function codeWorkspaceContextFromToolMetadata(metadata: unknown) {
+	if (typeof metadata !== "object" || metadata === null) return null;
+	const record = metadata as Record<string, unknown>;
+	return (
+		codeWorkspaceContextFromValue(record) ??
+		codeWorkspaceContextFromValue(record.input) ??
+		codeWorkspaceContextFromValue(record.output)
+	);
+}
+
 async function loadConversationHistory(
 	conversationId: string,
 	maxMessages?: number,
@@ -668,6 +785,17 @@ async function loadConversationHistory(
 		const textParts: string[] = [];
 		const artifactCodeBlocks = new Set<string>();
 		for (const part of partsByMessageId.get(message.id) ?? []) {
+			if (part.type === "file") {
+				const codeWorkspaceContext = codeWorkspaceContextFromToolMetadata(
+					part.metadataJson,
+				);
+				if (codeWorkspaceContext) {
+					textParts.push(
+						`Uploaded code workspace available in chat:\n${codeWorkspaceContext}`,
+					);
+				}
+			}
+
 			if (part.type === "text" && part.contentEncrypted) {
 				try {
 					textParts.push(await decryptValue(part.contentEncrypted));
@@ -684,6 +812,14 @@ async function loadConversationHistory(
 					part.metadataJson,
 				);
 				if (artifactCode) artifactCodeBlocks.add(artifactCode);
+				const codeWorkspaceContext = codeWorkspaceContextFromToolMetadata(
+					part.metadataJson,
+				);
+				if (codeWorkspaceContext) {
+					artifactCodeBlocks.add(
+						`Previously updated code workspace:\n${codeWorkspaceContext}`,
+					);
+				}
 			}
 		}
 
@@ -730,6 +866,7 @@ export async function POST(
 			content,
 			conversationId: existingConversationId,
 			resendFromMessageId,
+			codeWorkspaceId,
 		} = parsed.data;
 
 		const [agent] = await db
@@ -775,6 +912,23 @@ export async function POST(
 					limit: quota.limit,
 				},
 				{ status: 429 },
+			);
+		}
+
+		let codeWorkspaceAttachment: ReturnType<
+			typeof codeWorkspaceArtifact
+		> | null = null;
+		if (codeWorkspaceId) {
+			const metadata = await getCodeWorkspace(codeWorkspaceId);
+			if (metadata.workspaceId !== agent.workspaceId) {
+				return NextResponse.json(
+					{ error: "Code workspace not found" },
+					{ status: 404 },
+				);
+			}
+			codeWorkspaceAttachment = codeWorkspaceArtifact(
+				metadata,
+				"Uploaded ZIP workspace.",
 			);
 		}
 
@@ -898,6 +1052,14 @@ export async function POST(
 					contentEncrypted: encryptedContent,
 					sortOrder: 0,
 				});
+				if (codeWorkspaceAttachment) {
+					await tx.insert(messageParts).values({
+						messageId: existingUserMessage.id,
+						type: "file",
+						metadataJson: codeWorkspaceAttachment,
+						sortOrder: 1,
+					});
+				}
 			});
 			userMessage = existingUserMessage;
 		} else {
@@ -919,6 +1081,14 @@ export async function POST(
 				contentEncrypted: encryptedContent,
 				sortOrder: 0,
 			});
+			if (codeWorkspaceAttachment) {
+				await db.insert(messageParts).values({
+					messageId: newUserMessage.id,
+					type: "file",
+					metadataJson: codeWorkspaceAttachment,
+					sortOrder: 1,
+				});
+			}
 		}
 		userMessageId = userMessage.id;
 		const shouldRegenerateConversationTitle =
@@ -994,35 +1164,43 @@ export async function POST(
 			0,
 			Math.min(20, version.maxToolCalls ?? defaultMaxToolCalls),
 		);
-		const skillsPrompt =
-			maxToolCalls > 0 ? await buildSkillsRegistryPrompt(version.id) : null;
+		const wantsCodeWorkspaceCreation =
+			!codeWorkspaceAttachment && shouldEnableCodeWorkspaceCreation(content);
+		const shouldUseToolCalling =
+			maxToolCalls > 0 && !wantsCodeWorkspaceCreation;
+		const autoCodeWorkspaceToolNames = codeWorkspaceAttachment
+			? codeWorkspaceEditToolNames
+			: [];
+		const skillsPrompt = shouldUseToolCalling
+			? await buildSkillsRegistryPrompt(version.id)
+			: null;
 		const approvalPolicy = version.approvalPolicyJson as {
 			requireApprovalForAllTools?: boolean;
 		} | null;
-		const tools =
-			maxToolCalls > 0
-				? await buildBoundTools({
-						agentVersionId: version.id,
-						workspaceId: agent.workspaceId,
-						conversationId: conversation.id,
-						messageId: assistantMessage.id,
-						userId: actorUserId,
-						maxToolCalls,
-						hasSkills: Boolean(skillsPrompt),
-						requireApprovalForAllTools: Boolean(
-							approvalPolicy?.requireApprovalForAllTools,
-						),
-						emitEvent: enqueueEvent,
-						onApprovalRequired: (event) => {
-							enqueueEvent({
-								type: "tool_approval_required",
-								invocationId: event.invocationId,
-								toolName: event.toolName,
-								input: event.input,
-							});
-						},
-					})
-				: {};
+		const tools = shouldUseToolCalling
+			? await buildBoundTools({
+					agentVersionId: version.id,
+					workspaceId: agent.workspaceId,
+					conversationId: conversation.id,
+					messageId: assistantMessage.id,
+					userId: actorUserId,
+					maxToolCalls,
+					autoCodeWorkspaceToolNames,
+					hasSkills: Boolean(skillsPrompt),
+					requireApprovalForAllTools: Boolean(
+						approvalPolicy?.requireApprovalForAllTools,
+					),
+					emitEvent: enqueueEvent,
+					onApprovalRequired: (event) => {
+						enqueueEvent({
+							type: "tool_approval_required",
+							invocationId: event.invocationId,
+							toolName: event.toolName,
+							input: event.input,
+						});
+					},
+				})
+			: {};
 		const availableToolNames = Object.keys(tools);
 		const versionToolChoice = version.toolChoice;
 		const configuredToolChoice: "auto" | "required" | "none" | undefined =
@@ -1044,14 +1222,18 @@ export async function POST(
 			"create_customer_account_plan",
 			"create_competitive_battlecard",
 		];
+		const codeWorkspaceToolNames = codeWorkspaceCreateToolNames;
 		const hasBusinessArtifactTools = businessArtifactToolNames.some((name) =>
+			availableToolNames.includes(name),
+		);
+		const hasCodeWorkspaceTools = codeWorkspaceToolNames.some((name) =>
 			availableToolNames.includes(name),
 		);
 		const toolGuidance =
 			availableToolNames.length > 0
 				? [
 						`Available tools are exactly: ${availableToolNames.join(", ")}.`,
-						"Do not call tools that are not in that list.",
+						"Do not call tools that are not in that list. If you decide to call a tool, output only the tool call for that assistant turn: no prose, no markdown, no explanation, and no visible reasoning before or after the tool call.",
 						availableToolNames.includes("web_search")
 							? "For web or current-events searches, use web_search only."
 							: null,
@@ -1063,6 +1245,9 @@ export async function POST(
 							: null,
 						availableToolNames.includes("render_html_artifact")
 							? "When the user asks for a visual design, diagram, UI mockup, chart-like schema, or interactive demo that is not specifically a slide deck, use render_html_artifact with self-contained HTML, CSS, and optional JavaScript so it appears directly in the chat. The user can view and copy the code from the artifact card, so do not duplicate the full code in your final text unless explicitly asked."
+							: null,
+						hasCodeWorkspaceTools
+							? "For static HTML/CSS/JS apps, keep the whole workflow in chat. If the user asks you to build a small website/app/demo from scratch, first use code_workspace_create_project with only short starter files or just file paths such as index.html, styles.css, and script.js, then fill or revise files one at a time with code_workspace_write_file or code_workspace_replace_text. Avoid one huge create_project call containing all final code. If the user uploaded a ZIP/code workspace, use code_workspace_list_files to inspect it, code_workspace_read_file before editing, code_workspace_replace_text for targeted edits, and code_workspace_write_file only when full-file replacement is safer. These tools return a live code workspace artifact with preview and ZIP download; do not paste full files unless asked."
 							: null,
 						`Use at most ${maxToolCalls} tool calls.`,
 						"When that limit is reached, do not call another tool; answer the user from the tool results and context already available. If the information is incomplete, say what is known and what remains uncertain.",
@@ -1086,12 +1271,16 @@ export async function POST(
 			guardrails?.enabled && guardrails.blockedTopics?.length
 				? `Avoid and refuse requests about these blocked topics: ${guardrails.blockedTopics.join(", ")}.`
 				: null;
+		const codeWorkspaceTextProtocolGuidance = wantsCodeWorkspaceCreation
+			? 'The user wants a static HTML/CSS/JS code workspace. Do not call tools for this request. Generate the project files as markdown code fences with a path attribute so the app can turn them into a live workspace automatically. Use exactly this shape for each file: ```html path="index.html"\n...\n```, ```css path="styles.css"\n...\n```, and ```js path="script.js"\n...\n```. Include one HTML entry file. Keep prose short.'
+			: null;
 		const localeCookie = (await cookies()).get("NEXT_LOCALE")?.value ?? "en";
 		const systemPrompt = [
 			version.systemPrompt?.trim() || fallbackSystemPrompt(localeCookie),
 			skillsPrompt,
 			responseFormatGuidance,
 			guardrailGuidance,
+			codeWorkspaceTextProtocolGuidance,
 			toolGuidance,
 			ragContext
 				? `Use the following knowledge base excerpts when relevant:\n\n${ragContext}`
@@ -1108,7 +1297,11 @@ export async function POST(
 					type: "text" | "reasoning" | "suggestions";
 					content: string;
 			  }
-			| { id: string; type: "tool-call" | "tool-result"; metadata: unknown };
+			| {
+					id: string;
+					type: "tool-call" | "tool-result" | "file";
+					metadata: unknown;
+			  };
 		const streamedParts: StreamedAssistantPart[] = [];
 		let nextSortOrder = 0;
 
@@ -1156,7 +1349,7 @@ export async function POST(
 		}
 
 		async function appendStreamedMetadataPart(
-			type: "tool-call" | "tool-result",
+			type: "tool-call" | "tool-result" | "file",
 			metadata: unknown,
 		) {
 			const [inserted] = await db
@@ -1308,6 +1501,19 @@ export async function POST(
 					)
 					.join("\n")
 					.trim();
+				if (wantsCodeWorkspaceCreation) {
+					const generatedFiles = parseCodeWorkspaceFileFences(assistantText);
+					if (generatedFiles) {
+						const artifact = await createCodeWorkspaceFromFiles({
+							workspaceId: agent.workspaceId,
+							userId: actorUserId,
+							title: conversation.title || "Generated code workspace",
+							files: generatedFiles,
+						});
+						await appendStreamedMetadataPart("file", artifact);
+						enqueueEvent({ type: "file", artifact });
+					}
+				}
 				const shouldSkipSuggestions = consumeSkipNextChatSuggestions(
 					conversation.id,
 				);
