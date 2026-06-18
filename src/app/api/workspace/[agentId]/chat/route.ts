@@ -585,12 +585,6 @@ function htmlArtifactCodeFromValue(value: unknown) {
 function htmlArtifactCodeFromToolMetadata(metadata: unknown) {
 	if (typeof metadata !== "object" || metadata === null) return null;
 	const record = metadata as Record<string, unknown>;
-	if (
-		record.toolName !== "render_html_artifact" &&
-		record.toolName !== "create_slide_deck"
-	) {
-		return null;
-	}
 	return (
 		htmlArtifactCodeFromValue(record.input) ??
 		htmlArtifactCodeFromValue(record.output)
@@ -1044,6 +1038,11 @@ export async function POST(
 			"create_action_plan",
 			"create_decision_matrix",
 			"create_email_pack",
+			"create_project_status_report",
+			"create_risk_register",
+			"create_raci_matrix",
+			"create_customer_account_plan",
+			"create_competitive_battlecard",
 		];
 		const hasBusinessArtifactTools = businessArtifactToolNames.some((name) =>
 			availableToolNames.includes(name),
@@ -1060,7 +1059,7 @@ export async function POST(
 							? "When the user asks for slides, a deck, presentation, pitch deck, PDF slides, or follow-up edits to an existing deck, use create_slide_deck. It creates an interactive click-through HTML deck with print-to-PDF styling; explain briefly that PDF export is static because modern PDF viewers do not preserve JavaScript click animations."
 							: null,
 						hasBusinessArtifactTools
-							? "For common business deliverables, prefer the dedicated artifact tools instead of plain prose: create_business_document for briefs/reports/proposals/policies/SOPs, create_spreadsheet for structured tables, create_meeting_brief for agendas/minutes/action items, create_action_plan for phased execution plans, create_decision_matrix for option comparisons, and create_email_pack for professional email drafts."
+							? "For common business deliverables, prefer the dedicated artifact tools instead of plain prose: create_business_document for briefs/reports/proposals/policies/SOPs, create_spreadsheet for structured tables, create_meeting_brief for agendas/minutes/action items, create_action_plan for phased execution plans, create_decision_matrix for option comparisons, create_email_pack for professional email drafts, create_project_status_report for steering updates, create_risk_register for risk tracking, create_raci_matrix for role clarity, create_customer_account_plan for sales/account strategy, and create_competitive_battlecard for competitive sales enablement."
 							: null,
 						availableToolNames.includes("render_html_artifact")
 							? "When the user asks for a visual design, diagram, UI mockup, chart-like schema, or interactive demo that is not specifically a slide deck, use render_html_artifact with self-contained HTML, CSS, and optional JavaScript so it appears directly in the chat. The user can view and copy the code from the artifact card, so do not duplicate the full code in your final text unless explicitly asked."

@@ -8,7 +8,6 @@ import {
 	FolderPlusIcon,
 	MoreHorizontalIcon,
 	MessageSquareIcon,
-	PanelLeftCloseIcon,
 	PanelLeftOpenIcon,
 	PencilIcon,
 	PinIcon,
@@ -16,7 +15,7 @@ import {
 	Trash2Icon,
 	XIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 
 import type {
@@ -61,6 +60,31 @@ import {
 } from "@/lib/workspace-nav";
 import { buildMenuGroups } from "@/modules/navigation/sidebar-config";
 import { cn } from "@/lib/utils";
+
+const WORKSPACE_NAV_OPEN_STORAGE_KEY = "chat-workspace-navigation-open";
+const WORKSPACE_NAV_OPEN_STORAGE_EVENT =
+	"chat-workspace-navigation-open-change";
+const DEFAULT_WORKSPACE_NAV_OPEN = false;
+
+function subscribeWorkspaceNavOpen(callback: () => void) {
+	window.addEventListener("storage", callback);
+	window.addEventListener(WORKSPACE_NAV_OPEN_STORAGE_EVENT, callback);
+	return () => {
+		window.removeEventListener("storage", callback);
+		window.removeEventListener(WORKSPACE_NAV_OPEN_STORAGE_EVENT, callback);
+	};
+}
+
+function getStoredWorkspaceNavOpen() {
+	const stored = window.localStorage.getItem(WORKSPACE_NAV_OPEN_STORAGE_KEY);
+	if (stored === null) return DEFAULT_WORKSPACE_NAV_OPEN;
+	return stored === "true";
+}
+
+function setStoredWorkspaceNavOpen(open: boolean) {
+	window.localStorage.setItem(WORKSPACE_NAV_OPEN_STORAGE_KEY, String(open));
+	window.dispatchEvent(new Event(WORKSPACE_NAV_OPEN_STORAGE_EVENT));
+}
 
 interface ChatSidebarProps {
 	agents: ChatAgent[];
@@ -138,7 +162,12 @@ function ChatNavLink({ item }: { item: NavItem }) {
 
 function ChatAppNavigation({ groups }: { groups: NavGroup[] }) {
 	const tGroups = useTranslations("nav.groups");
-	const [open, setOpen] = useState(false);
+	const [advancedOpen, setAdvancedOpen] = useState(false);
+	const workspaceOpen = useSyncExternalStore(
+		subscribeWorkspaceNavOpen,
+		getStoredWorkspaceNavOpen,
+		() => DEFAULT_WORKSPACE_NAV_OPEN,
+	);
 	const primaryItems = groups
 		.filter((group) => group.labelKey !== "advanced")
 		.flatMap((group) => group.items)
@@ -156,40 +185,58 @@ function ChatAppNavigation({ groups }: { groups: NavGroup[] }) {
 	}
 
 	return (
-		<div className="border-t border-sidebar-border px-3 py-3">
-			<p className="px-2 pb-1 text-[11px] font-medium text-muted-foreground">
-				Workspace
-			</p>
-			<div className="flex flex-col gap-1">
-				{primaryItems.map((item) => (
-					<ChatNavLink key={item.href} item={item} />
-				))}
-			</div>
-			{advancedItems && advancedItems.length > 0 ? (
-				<Collapsible open={open} onOpenChange={setOpen}>
-					<CollapsibleTrigger asChild>
-						<button
-							type="button"
-							className="mt-1 flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-						>
-							<span>{tGroups("advanced")}</span>
-							<ChevronDownIcon
-								className={cn(
-									"size-3.5 transition-transform",
-									open && "rotate-180",
-								)}
-								aria-hidden="true"
-							/>
-						</button>
-					</CollapsibleTrigger>
-					<CollapsibleContent className="mt-1 flex flex-col gap-1">
-						{advancedItems.map((item) => (
-							<ChatNavLink key={item.href} item={item} />
-						))}
-					</CollapsibleContent>
-				</Collapsible>
-			) : null}
-		</div>
+		<Collapsible
+			open={workspaceOpen}
+			onOpenChange={setStoredWorkspaceNavOpen}
+			className="border-t border-sidebar-border px-3 py-3"
+		>
+			<CollapsibleTrigger asChild>
+				<button
+					type="button"
+					className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+				>
+					<span>Workspace</span>
+					<ChevronDownIcon
+						className={cn(
+							"size-3.5 transition-transform",
+							workspaceOpen && "rotate-180",
+						)}
+						aria-hidden="true"
+					/>
+				</button>
+			</CollapsibleTrigger>
+			<CollapsibleContent className="mt-1">
+				<div className="flex flex-col gap-1">
+					{primaryItems.map((item) => (
+						<ChatNavLink key={item.href} item={item} />
+					))}
+				</div>
+				{advancedItems && advancedItems.length > 0 ? (
+					<Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+						<CollapsibleTrigger asChild>
+							<button
+								type="button"
+								className="mt-1 flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+							>
+								<span>{tGroups("advanced")}</span>
+								<ChevronDownIcon
+									className={cn(
+										"size-3.5 transition-transform",
+										advancedOpen && "rotate-180",
+									)}
+									aria-hidden="true"
+								/>
+							</button>
+						</CollapsibleTrigger>
+						<CollapsibleContent className="mt-1 flex flex-col gap-1">
+							{advancedItems.map((item) => (
+								<ChatNavLink key={item.href} item={item} />
+							))}
+						</CollapsibleContent>
+					</Collapsible>
+				) : null}
+			</CollapsibleContent>
+		</Collapsible>
 	);
 }
 
@@ -644,23 +691,6 @@ export function ChatSidebar({
 		>
 			<div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
 				<div className="flex items-center gap-2">
-					{onCollapsedChange ? (
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									type="button"
-									size="icon"
-									variant="ghost"
-									aria-label="Collapse chat sidebar"
-									onClick={() => onCollapsedChange(true)}
-									className="size-7 rounded-md"
-								>
-									<PanelLeftCloseIcon className="size-3.5" aria-hidden="true" />
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent>Collapse sidebar</TooltipContent>
-						</Tooltip>
-					) : null}
 					<div className="flex size-6 items-center justify-center rounded-md border bg-muted text-muted-foreground">
 						<MessageSquareIcon className="size-3" aria-hidden="true" />
 					</div>

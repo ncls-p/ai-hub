@@ -116,6 +116,51 @@ export const BUILTIN_TOOL_SUMMARIES: BuiltInToolSummary[] = [
 		category: "Write",
 	},
 	{
+		id: "00000000-0000-4000-8000-000000000024",
+		name: "create_project_status_report",
+		displayName: "Project status report",
+		description:
+			"Create executive-ready updates with status, metrics, blockers, decisions, and next actions.",
+		riskLevel: "medium",
+		category: "Work",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000025",
+		name: "create_risk_register",
+		displayName: "Risk register",
+		description:
+			"Create a structured risk register with impact, owners, mitigations, and contingencies.",
+		riskLevel: "medium",
+		category: "Work",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000026",
+		name: "create_raci_matrix",
+		displayName: "RACI matrix",
+		description:
+			"Create a responsibility matrix for responsible, accountable, consulted, and informed roles.",
+		riskLevel: "medium",
+		category: "Work",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000027",
+		name: "create_customer_account_plan",
+		displayName: "Customer account plan",
+		description:
+			"Create a strategic account plan with stakeholders, opportunities, risks, and next actions.",
+		riskLevel: "medium",
+		category: "Work",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000028",
+		name: "create_competitive_battlecard",
+		displayName: "Competitive battlecard",
+		description:
+			"Create a sales battlecard with positioning, win themes, landmines, objections, and questions.",
+		riskLevel: "medium",
+		category: "Work",
+	},
+	{
 		id: "00000000-0000-4000-8000-000000000006",
 		name: "random_number",
 		displayName: "Random number",
