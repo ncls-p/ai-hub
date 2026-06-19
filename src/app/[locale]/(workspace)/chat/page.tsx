@@ -895,11 +895,15 @@ export default function ChatPage() {
 		setQueuedMessages([]);
 		setSelectedAgentId(agentId);
 		setActiveVersion(null);
-		setActiveConversationId(null);
-		setMessages([]);
-		setCodeWorkspaceArtifact(null);
-		setInterfaceMode("chat");
-		window.history.replaceState(null, "", `/chat?agentId=${agentId}`);
+		const params = new URLSearchParams({ agentId });
+		if (activeConversationId) {
+			params.set("conversationId", activeConversationId);
+		} else {
+			setMessages([]);
+			setCodeWorkspaceArtifact(null);
+			setInterfaceMode("chat");
+		}
+		window.history.replaceState(null, "", `/chat?${params.toString()}`);
 	}
 
 	function selectConversation(conversationId: string) {
