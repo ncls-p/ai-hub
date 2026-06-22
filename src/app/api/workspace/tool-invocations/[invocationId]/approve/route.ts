@@ -41,9 +41,15 @@ export async function POST(
 			);
 		}
 
+		const approvalPermission =
+			invocation.toolSource === "builtin" &&
+			getBuiltInTool(invocation.toolId)?.name ===
+				"github_publish_code_workspace"
+				? "agents.chat"
+				: "tools.executeRestricted";
 		const permission = await authorization.requirePermission(
 			{ principalType: "user", principalId: session.user.id },
-			"tools.executeRestricted",
+			approvalPermission,
 			"workspace",
 			invocation.workspaceId,
 		);

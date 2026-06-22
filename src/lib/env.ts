@@ -39,6 +39,9 @@ export const baseEnvSchema = z.object({
 	ALLOW_PERSONAL_WORKSPACES: z.string().default("true"),
 	DATABASE_SSL_REJECT_UNAUTHORIZED: z.string().default("true"),
 	WORKSPACE_MONTHLY_TOKEN_LIMIT: z.string().optional(),
+	GITHUB_APP_ID: z.string().optional(),
+	GITHUB_APP_SLUG: z.string().optional(),
+	GITHUB_APP_PRIVATE_KEY: z.string().optional(),
 });
 
 export const productionEnvSchema = baseEnvSchema.extend({
@@ -107,6 +110,9 @@ function readEnv(source: EnvSource): EnvSource {
 			source.DATABASE_SSL_REJECT_UNAUTHORIZED || "true",
 		WORKSPACE_MONTHLY_TOKEN_LIMIT:
 			source.WORKSPACE_MONTHLY_TOKEN_LIMIT || undefined,
+		GITHUB_APP_ID: source.GITHUB_APP_ID || undefined,
+		GITHUB_APP_SLUG: source.GITHUB_APP_SLUG || undefined,
+		GITHUB_APP_PRIVATE_KEY: source.GITHUB_APP_PRIVATE_KEY || undefined,
 	};
 }
 

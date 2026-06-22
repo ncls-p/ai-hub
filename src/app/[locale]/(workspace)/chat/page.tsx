@@ -602,7 +602,7 @@ export default function ChatPage() {
 				setCanRunSetup(
 					Boolean(
 						responseDefaults.canCreateAgent &&
-							responseDefaults.canManageProviders,
+						responseDefaults.canManageProviders,
 					),
 				);
 				setUserDefaultAgentId(responseDefaults.userDefaultAgentId ?? null);
@@ -615,7 +615,7 @@ export default function ChatPage() {
 						data.some((agent) => agent.id === requestedAgentId)
 						? requestedAgentId
 						: defaultAgentId &&
-								data.some((agent) => agent.id === defaultAgentId)
+							  data.some((agent) => agent.id === defaultAgentId)
 							? defaultAgentId
 							: (data[0]?.id ?? null),
 				);
@@ -1522,6 +1522,7 @@ export default function ChatPage() {
 									messages={messages}
 									sending={sending}
 									loading={loadingMessages}
+									workspaceId={workspaceId ?? undefined}
 									workspaceArtifactDisplay="summary"
 									bottomRef={bottomRef}
 									onEditMessage={editMessage}
@@ -1560,6 +1561,7 @@ export default function ChatPage() {
 					<div className="min-h-0 overflow-hidden">
 						<CodeWorkspaceArtifactCard
 							artifact={codeWorkspaceArtifact}
+							workspaceId={workspaceId ?? undefined}
 							variant="workbench"
 						/>
 					</div>
@@ -1629,6 +1631,7 @@ export default function ChatPage() {
 							messages={messages}
 							sending={sending}
 							loading={loadingMessages}
+							workspaceId={workspaceId ?? undefined}
 							bottomRef={bottomRef}
 							onEditMessage={editMessage}
 							onDeleteMessage={deleteMessage}

@@ -756,6 +756,22 @@ export async function getCodeWorkspaceFileBytes(input: {
 	return { metadata, summary, bytes };
 }
 
+export async function getCodeWorkspaceFilesForPublish(input: {
+	projectId: string;
+	workspaceId: string;
+	userId?: string;
+}) {
+	const metadata = await getCodeWorkspace(input.projectId);
+	assertCodeWorkspaceAccess(metadata, input.workspaceId, input.userId);
+	const files = await Promise.all(
+		metadata.files.map(async (file) => ({
+			...file,
+			bytes: await storage.download(fileObjectKey(metadata.id, file.path)),
+		})),
+	);
+	return { metadata, files };
+}
+
 export async function createCodeWorkspaceZip(input: {
 	projectId: string;
 	workspaceId: string;

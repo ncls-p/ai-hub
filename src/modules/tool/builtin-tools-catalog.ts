@@ -101,6 +101,23 @@ export const BUILTIN_TOOL_SUMMARIES: BuiltInToolSummary[] = [
 		category: "Code",
 	},
 	{
+		id: "00000000-0000-4000-8000-000000000035",
+		name: "github_get_publish_status",
+		displayName: "GitHub status",
+		description: "List the current user's connected GitHub repositories.",
+		riskLevel: "low",
+		category: "Code",
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000036",
+		name: "github_publish_code_workspace",
+		displayName: "Publish to GitHub",
+		description:
+			"Publish a code workspace to a user-selected repo and branch via PR or direct push.",
+		riskLevel: "critical",
+		category: "Code",
+	},
+	{
 		id: "00000000-0000-4000-8000-000000000017",
 		name: "create_slide_deck",
 		displayName: "Slide deck",

@@ -94,12 +94,18 @@ type ToolApprovalRequiredEvent = {
 	input: unknown;
 };
 
+const githubPublishToolNames = [
+	"github_get_publish_status",
+	"github_publish_code_workspace",
+];
+
 const codeWorkspaceEditToolNames = [
 	"code_workspace_list_files",
 	"code_workspace_read_file",
 	"code_workspace_write_file",
 	"code_workspace_replace_text",
 	"code_workspace_delete_file",
+	...githubPublishToolNames,
 ];
 
 const codeWorkspaceCreateToolNames = [
@@ -166,7 +172,7 @@ async function buildBoundTools(input: {
 			agentVersionId: input.agentVersionId,
 			toolSource: "builtin",
 			toolId: definition.id,
-			requireApproval: false,
+			requireApproval: requiresApproval(definition.riskLevel),
 			riskLevel: definition.riskLevel,
 			createdAt: new Date(),
 		});
@@ -454,10 +460,17 @@ async function buildBoundTools(input: {
 				const restricted = requiresApproval(definition.riskLevel);
 
 				if (restricted) {
-					const canExecute = await canExecuteRestrictedTool(
-						input.userId,
-						input.workspaceId,
-					);
+					const canExecute =
+						definition.name === "github_publish_code_workspace"
+							? (
+									await authorization.requirePermission(
+										{ principalType: "user", principalId: input.userId },
+										"agents.chat",
+										"workspace",
+										input.workspaceId,
+									)
+								).granted
+							: await canExecuteRestrictedTool(input.userId, input.workspaceId);
 					if (!canExecute) {
 						await logToolInvocation({
 							workspaceId: input.workspaceId,
@@ -1324,7 +1337,7 @@ export async function POST(
 							? "When the user asks for a visual design, diagram, UI mockup, chart-like schema, or interactive demo that is not specifically a slide deck, use render_html_artifact with self-contained HTML, CSS, and optional JavaScript so it appears directly in the chat. The user can view and copy the code from the artifact card, so do not duplicate the full code in your final text unless explicitly asked."
 							: null,
 						hasCodeWorkspaceTools
-							? "For static HTML/CSS/JS apps, keep the whole workflow in chat. If the user asks you to build a small website/app/demo from scratch, first use code_workspace_create_project with only short starter files or just file paths such as index.html, styles.css, and script.js, then fill or revise files one at a time with code_workspace_write_file or code_workspace_replace_text. Avoid one huge create_project call containing all final code. If the user uploaded a ZIP/code workspace, use code_workspace_list_files to inspect it, code_workspace_read_file before editing, code_workspace_replace_text for targeted edits, and code_workspace_write_file only when full-file replacement is safer. These tools return a live code workspace artifact with preview and ZIP download; do not paste full files unless asked."
+							? "For static HTML/CSS/JS apps, keep the whole workflow in chat. If the user asks you to build a small website/app/demo from scratch, first use code_workspace_create_project with only short starter files or just file paths such as index.html, styles.css, and script.js, then fill or revise files one at a time with code_workspace_write_file or code_workspace_replace_text. Avoid one huge create_project call containing all final code. If the user uploaded a ZIP/code workspace, use code_workspace_list_files to inspect it, code_workspace_read_file before editing, code_workspace_replace_text for targeted edits, and code_workspace_write_file only when full-file replacement is safer. These tools return a live code workspace artifact with preview and ZIP download; do not paste full files unless asked. If the user wants to publish to GitHub, use github_get_publish_status to check the current user's connected repositories or get the connect URL. For GitHub publishing, the user must choose the repository, target branch, and mode: pull_request or direct_push. Use github_publish_code_workspace only after the user explicitly confirms those choices; direct_push requires confirmDirectPush=true and can target main only if the user explicitly selected main."
 							: null,
 						`Use at most ${maxToolCalls} tool calls.`,
 						"When that limit is reached, do not call another tool; answer the user from the tool results and context already available. If the information is incomplete, say what is known and what remains uncertain.",

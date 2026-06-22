@@ -11,7 +11,8 @@ const e2eUser = {
 
 function databaseUrl() {
 	return (
-		process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:15432/ai_hub"
+		process.env.DATABASE_URL ??
+		"postgres://postgres:postgres@localhost:15432/ai_hub"
 	);
 }
 
@@ -66,15 +67,17 @@ test.describe("setup wizard", () => {
 			page.getByRole("heading", { name: /Get started/i }),
 		).toBeVisible();
 		await expect(
-			page.getByText("Connect AI", { exact: true }),
+			page.getByText("Connect AI", { exact: true }).first(),
 		).toBeVisible();
 		await expect(page.getByText("Pick a model", { exact: true })).toBeVisible();
 	});
 });
 
-test.describe("team page", () => {
-	test("shows workspace members section", async ({ page }) => {
+test.describe("members page", () => {
+	test("shows platform accounts section", async ({ page }) => {
 		await page.goto("/en/members");
-		await expect(page.getByText(/Workspace members/i)).toBeVisible();
+		await expect(
+			page.getByRole("heading", { name: "Platform accounts" }).first(),
+		).toBeVisible();
 	});
 });

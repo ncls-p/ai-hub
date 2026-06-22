@@ -12,10 +12,12 @@ import {
 	DownloadIcon,
 	FileIcon,
 	FolderIcon,
+	GithubIcon,
 	Maximize2Icon,
 	PencilIcon,
 	RefreshCcwIcon,
 	SaveIcon,
+	UploadCloudIcon,
 	ShieldAlertIcon,
 	Trash2Icon,
 	XCircleIcon,
@@ -165,6 +167,28 @@ function isCodeWorkspaceArtifactOutput(
 		typeof record.title === "string" &&
 		typeof record.version === "number" &&
 		Array.isArray(record.files)
+	);
+}
+
+type GitHubPublishOutput = {
+	kind: "github_publish_result";
+	mode: "pull_request" | "direct_push";
+	repository: string;
+	targetBranch: string;
+	sourceBranch: string | null;
+	commitSha: string;
+	pullRequestUrl: string | null;
+	message: string;
+};
+
+function isGitHubPublishOutput(value: unknown): value is GitHubPublishOutput {
+	if (typeof value !== "object" || value === null) return false;
+	const record = value as Record<string, unknown>;
+	return (
+		record.kind === "github_publish_result" &&
+		typeof record.repository === "string" &&
+		typeof record.targetBranch === "string" &&
+		typeof record.commitSha === "string"
 	);
 }
 
@@ -917,6 +941,37 @@ function CodeWorkspaceArtifactSummary({
 	);
 }
 
+function GitHubPublishResultCard({ result }: { result: GitHubPublishOutput }) {
+	return (
+		<div className="w-fit max-w-full overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
+			<div className="flex items-center gap-2 border-b px-3 py-2">
+				<GithubIcon className="size-4" aria-hidden="true" />
+				<div className="min-w-0">
+					<p className="font-medium text-foreground">{result.message}</p>
+					<p className="truncate text-[11px] text-muted-foreground">
+						{result.repository} ·{" "}
+						{result.mode === "pull_request" ? "PR" : "direct push"} ·{" "}
+						{result.targetBranch}
+					</p>
+				</div>
+			</div>
+			<div className="flex flex-wrap items-center gap-2 px-3 py-2 text-[11px] text-muted-foreground">
+				<span>Commit {result.commitSha.slice(0, 7)}</span>
+				{result.pullRequestUrl ? (
+					<a
+						href={result.pullRequestUrl}
+						target="_blank"
+						rel="noreferrer"
+						className="font-medium text-primary underline underline-offset-2"
+					>
+						Open PR
+					</a>
+				) : null}
+			</div>
+		</div>
+	);
+}
+
 function ChatImageAttachmentCard({
 	attachment,
 }: {
@@ -942,6 +997,407 @@ function ChatImageAttachmentCard({
 				<span className="max-w-56 truncate">{attachment.fileName}</span>
 			</span>
 		</a>
+	);
+}
+
+type GitHubRepositoryOption = {
+	id: string;
+	fullName: string;
+	defaultBranch: string;
+	private: boolean;
+};
+
+type GitHubBranchOption = {
+	name: string;
+	protected: boolean;
+};
+
+type GitHubPublishResult = {
+	kind: "github_publish_result";
+	mode: "pull_request" | "direct_push";
+	repository: string;
+	targetBranch: string;
+	sourceBranch: string | null;
+	commitSha: string;
+	pullRequestUrl: string | null;
+	message: string;
+};
+
+function GitHubPublishDialog({
+	artifact,
+	workspaceId,
+	open,
+	onOpenChange,
+}: {
+	artifact: CodeWorkspaceArtifact;
+	workspaceId?: string;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
+	const [loading, setLoading] = useState(false);
+	const [publishing, setPublishing] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [connectUrl, setConnectUrl] = useState<string | null>(null);
+	const [configured, setConfigured] = useState(true);
+	const [repositories, setRepositories] = useState<GitHubRepositoryOption[]>(
+		[],
+	);
+	const [branches, setBranches] = useState<GitHubBranchOption[]>([]);
+	const [repositoryId, setRepositoryId] = useState("");
+	const [targetBranch, setTargetBranch] = useState("");
+	const [sourceBranch, setSourceBranch] = useState("");
+	const [targetDirectory, setTargetDirectory] = useState("");
+	const [mode, setMode] = useState<"pull_request" | "direct_push">(
+		"pull_request",
+	);
+	const [commitMessage, setCommitMessage] = useState(
+		`Update ${artifact.title}`,
+	);
+	const [confirmDirectPush, setConfirmDirectPush] = useState(false);
+	const [result, setResult] = useState<GitHubPublishResult | null>(null);
+	const selectedRepository = repositories.find(
+		(repo) => repo.id === repositoryId,
+	);
+
+	useEffect(() => {
+		if (!open || !workspaceId) return;
+		const currentWorkspaceId = workspaceId;
+		let cancelled = false;
+		async function loadStatus() {
+			setLoading(true);
+			setError(null);
+			setResult(null);
+			try {
+				const response = await fetch(
+					`/api/workspace/github/status?workspaceId=${encodeURIComponent(currentWorkspaceId)}`,
+				);
+				const data = (await response.json().catch(() => null)) as {
+					configured?: boolean;
+					connectUrl?: string | null;
+					repositories?: GitHubRepositoryOption[];
+					error?: string;
+				} | null;
+				if (!response.ok) throw new Error(data?.error || "GitHub unavailable");
+				if (cancelled) return;
+				setConfigured(Boolean(data?.configured));
+				setConnectUrl(data?.connectUrl ?? null);
+				const nextRepos = data?.repositories ?? [];
+				setRepositories(nextRepos);
+				const nextRepo = nextRepos[0];
+				setRepositoryId((current) => current || nextRepo?.id || "");
+				setTargetBranch(
+					(current) => current || nextRepo?.defaultBranch || "main",
+				);
+			} catch (loadError) {
+				if (!cancelled) {
+					setError(
+						loadError instanceof Error
+							? loadError.message
+							: "Failed to load GitHub status",
+					);
+				}
+			} finally {
+				if (!cancelled) setLoading(false);
+			}
+		}
+		void loadStatus();
+		return () => {
+			cancelled = true;
+		};
+	}, [open, workspaceId]);
+
+	useEffect(() => {
+		if (!open || !workspaceId || !repositoryId) return;
+		const currentWorkspaceId = workspaceId;
+		let cancelled = false;
+		async function loadBranches() {
+			try {
+				const response = await fetch(
+					`/api/workspace/github/branches?workspaceId=${encodeURIComponent(currentWorkspaceId)}&repositoryId=${encodeURIComponent(repositoryId)}`,
+				);
+				const data = (await response.json().catch(() => null)) as {
+					branches?: GitHubBranchOption[];
+					error?: string;
+				} | null;
+				if (!response.ok)
+					throw new Error(data?.error || "Failed to load branches");
+				if (cancelled) return;
+				const nextBranches = data?.branches ?? [];
+				setBranches(nextBranches);
+				const selected = repositories.find((repo) => repo.id === repositoryId);
+				setTargetBranch((current) =>
+					current && nextBranches.some((branch) => branch.name === current)
+						? current
+						: selected?.defaultBranch || nextBranches[0]?.name || "main",
+				);
+			} catch (loadError) {
+				if (!cancelled) {
+					setBranches([]);
+					setError(
+						loadError instanceof Error
+							? loadError.message
+							: "Failed to load branches",
+					);
+				}
+			}
+		}
+		void loadBranches();
+		return () => {
+			cancelled = true;
+		};
+	}, [open, repositories, repositoryId, workspaceId]);
+
+	async function publish() {
+		if (!workspaceId || !repositoryId || !targetBranch.trim()) return;
+		if (mode === "direct_push" && !confirmDirectPush) {
+			setError("Confirm direct push before publishing.");
+			return;
+		}
+		setPublishing(true);
+		setError(null);
+		try {
+			const response = await fetch("/api/workspace/github/publish", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					workspaceId,
+					projectId: artifact.projectId,
+					repositoryId,
+					mode,
+					targetBranch,
+					sourceBranch: sourceBranch.trim() || undefined,
+					targetDirectory: targetDirectory.trim() || undefined,
+					commitMessage: commitMessage.trim(),
+					pullRequestTitle: commitMessage.trim(),
+					confirmDirectPush,
+				}),
+			});
+			const data = (await response.json().catch(() => null)) as {
+				result?: GitHubPublishResult;
+				error?: string;
+			} | null;
+			if (!response.ok || !data?.result) {
+				throw new Error(data?.error || "GitHub publish failed");
+			}
+			setResult(data.result);
+		} catch (publishError) {
+			setError(
+				publishError instanceof Error
+					? publishError.message
+					: "GitHub publish failed",
+			);
+		} finally {
+			setPublishing(false);
+		}
+	}
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+				<DialogTitle>Publish to GitHub</DialogTitle>
+				{!workspaceId ? (
+					<p className="text-sm text-muted-foreground">
+						GitHub publishing needs an active workspace context.
+					</p>
+				) : loading ? (
+					<p className="text-sm text-muted-foreground">Loading GitHub…</p>
+				) : !configured ? (
+					<p className="text-sm text-muted-foreground">
+						GitHub publishing is not configured on this AI Hub instance.
+					</p>
+				) : repositories.length === 0 ? (
+					<div className="space-y-3">
+						<p className="text-sm text-muted-foreground">
+							Connect your GitHub account to publish this code workspace to
+							private or public repositories that you authorize.
+						</p>
+						<Button asChild disabled={!connectUrl}>
+							<a href={connectUrl ?? "#"}>
+								<GithubIcon className="size-4" aria-hidden="true" />
+								Connect GitHub
+							</a>
+						</Button>
+					</div>
+				) : result ? (
+					<div className="space-y-3 text-sm">
+						<p className="font-medium text-foreground">{result.message}</p>
+						<p className="text-muted-foreground">
+							Commit {result.commitSha.slice(0, 7)} on {result.repository}
+							{result.sourceBranch
+								? ` from ${result.sourceBranch} to ${result.targetBranch}`
+								: `:${result.targetBranch}`}
+						</p>
+						{result.pullRequestUrl ? (
+							<Button asChild>
+								<a
+									href={result.pullRequestUrl}
+									target="_blank"
+									rel="noreferrer"
+								>
+									Open pull request
+								</a>
+							</Button>
+						) : null}
+					</div>
+				) : (
+					<div className="space-y-4">
+						<div className="grid gap-1.5">
+							<label className="text-xs font-medium" htmlFor="github-repo">
+								Repository
+							</label>
+							<select
+								id="github-repo"
+								className="h-9 rounded-md border bg-background px-2 text-sm"
+								value={repositoryId}
+								onChange={(event) => {
+									setRepositoryId(event.target.value);
+									const repo = repositories.find(
+										(item) => item.id === event.target.value,
+									);
+									setTargetBranch(repo?.defaultBranch || "main");
+								}}
+							>
+								{repositories.map((repo) => (
+									<option key={repo.id} value={repo.id}>
+										{repo.fullName}
+										{repo.private ? " · private" : ""}
+									</option>
+								))}
+							</select>
+						</div>
+						<div className="grid gap-1.5">
+							<label className="text-xs font-medium" htmlFor="github-mode">
+								Mode
+							</label>
+							<select
+								id="github-mode"
+								className="h-9 rounded-md border bg-background px-2 text-sm"
+								value={mode}
+								onChange={(event) => {
+									setMode(event.target.value as "pull_request" | "direct_push");
+									setConfirmDirectPush(false);
+								}}
+							>
+								<option value="pull_request">Create a pull request</option>
+								<option value="direct_push">Push directly to branch</option>
+							</select>
+						</div>
+						<div className="grid gap-1.5">
+							<label className="text-xs font-medium" htmlFor="github-branch">
+								Target branch
+							</label>
+							<input
+								id="github-branch"
+								list="github-branches"
+								className="h-9 rounded-md border bg-background px-2 text-sm"
+								value={targetBranch}
+								onChange={(event) => setTargetBranch(event.target.value)}
+							/>
+							<datalist id="github-branches">
+								{branches.map((branch) => (
+									<option key={branch.name} value={branch.name} />
+								))}
+							</datalist>
+							{targetBranch === selectedRepository?.defaultBranch ? (
+								<p className="text-[11px] text-muted-foreground">
+									This is the default branch for {selectedRepository.fullName}.
+								</p>
+							) : null}
+						</div>
+						{mode === "pull_request" ? (
+							<div className="grid gap-1.5">
+								<label className="text-xs font-medium" htmlFor="github-source">
+									Source branch (optional)
+								</label>
+								<input
+									id="github-source"
+									className="h-9 rounded-md border bg-background px-2 text-sm"
+									placeholder="ai-hub/update-page"
+									value={sourceBranch}
+									onChange={(event) => setSourceBranch(event.target.value)}
+								/>
+							</div>
+						) : null}
+						<div className="grid gap-1.5">
+							<label className="text-xs font-medium" htmlFor="github-dir">
+								Target directory (optional)
+							</label>
+							<input
+								id="github-dir"
+								className="h-9 rounded-md border bg-background px-2 text-sm"
+								placeholder="public/site"
+								value={targetDirectory}
+								onChange={(event) => setTargetDirectory(event.target.value)}
+							/>
+						</div>
+						<div className="grid gap-1.5">
+							<label className="text-xs font-medium" htmlFor="github-commit">
+								Commit message
+							</label>
+							<input
+								id="github-commit"
+								className="h-9 rounded-md border bg-background px-2 text-sm"
+								value={commitMessage}
+								onChange={(event) => setCommitMessage(event.target.value)}
+							/>
+						</div>
+						<div className="rounded-lg border bg-muted/30 p-3 text-[11px] text-muted-foreground">
+							<p className="mb-1 font-medium text-foreground">
+								Files to publish
+							</p>
+							<p>
+								{artifact.files.length} file
+								{artifact.files.length === 1 ? "" : "s"} from workspace v
+								{artifact.version}. GitHub branch protections still apply.
+							</p>
+						</div>
+						{mode === "direct_push" ? (
+							<label className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs">
+								<input
+									type="checkbox"
+									checked={confirmDirectPush}
+									onChange={(event) =>
+										setConfirmDirectPush(event.target.checked)
+									}
+								/>
+								<span>
+									I confirm direct push to{" "}
+									<strong>{targetBranch || "this branch"}</strong>. No
+									force-push will be used.
+								</span>
+							</label>
+						) : null}
+						{error ? <p className="text-xs text-destructive">{error}</p> : null}
+						<div className="flex justify-end gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => onOpenChange(false)}
+							>
+								Cancel
+							</Button>
+							<Button
+								type="button"
+								disabled={
+									publishing ||
+									!repositoryId ||
+									!targetBranch.trim() ||
+									!commitMessage.trim() ||
+									(mode === "direct_push" && !confirmDirectPush)
+								}
+								onClick={() => void publish()}
+							>
+								<UploadCloudIcon className="size-4" aria-hidden="true" />
+								{publishing ? "Publishing…" : "Publish"}
+							</Button>
+						</div>
+					</div>
+				)}
+				{error && (loading || repositories.length === 0) ? (
+					<p className="mt-3 text-xs text-destructive">{error}</p>
+				) : null}
+			</DialogContent>
+		</Dialog>
 	);
 }
 
@@ -998,9 +1454,9 @@ function stripMetaRefresh(html: string) {
 function isPreviewTokenSegment(value: string | undefined) {
 	return Boolean(
 		value &&
-			/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-				value,
-			),
+		/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+			value,
+		),
 	);
 }
 
@@ -1318,10 +1774,12 @@ function CodeWorkspacePreviewFrame({
 
 export function CodeWorkspaceArtifactCard({
 	artifact,
+	workspaceId,
 	variant = "card",
 	activateOnMount = false,
 }: {
 	artifact: CodeWorkspaceArtifact;
+	workspaceId?: string;
 	variant?: "card" | "workbench";
 	activateOnMount?: boolean;
 }) {
@@ -1339,6 +1797,7 @@ export function CodeWorkspaceArtifactCard({
 	const [fullscreenPane, setFullscreenPane] = useState<
 		"code" | "preview" | null
 	>(null);
+	const [publishOpen, setPublishOpen] = useState(false);
 	const selectedFile = currentArtifact.files.find(
 		(file) => file.path === selectedPath,
 	);
@@ -1505,210 +1964,231 @@ export function CodeWorkspaceArtifactCard({
 	}
 
 	return (
-		<div
-			className={cn(
-				"overflow-hidden rounded-xl border border-primary/20 bg-background text-xs shadow-sm",
-				variant === "workbench" &&
-					"flex h-full min-h-0 flex-col rounded-none border-0 shadow-none",
-			)}
-		>
-			<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 bg-muted/35 px-3 py-2.5">
-				<div className="min-w-0">
-					<p className="truncate font-medium text-foreground">
-						{currentArtifact.title}
-					</p>
-					<p className="text-[11px] text-muted-foreground">
-						Code workspace · v{currentArtifact.version} ·{" "}
-						{currentArtifact.files.length} files
-					</p>
-				</div>
-				<div className="flex items-center gap-1.5">
-					<Button
-						asChild
-						type="button"
-						variant="outline"
-						size="sm"
-						className="h-7 px-2.5 text-[11px]"
-					>
-						<a href={currentArtifact.downloadUrl}>
-							<DownloadIcon className="size-3" aria-hidden="true" />
-							ZIP
-						</a>
-					</Button>
-				</div>
-			</div>
-			{currentArtifact.message ? (
-				<div className="border-b border-border/40 px-3 py-2 text-[11px] text-muted-foreground">
-					{currentArtifact.message}
-				</div>
-			) : null}
+		<>
+			<GitHubPublishDialog
+				artifact={currentArtifact}
+				workspaceId={workspaceId}
+				open={publishOpen}
+				onOpenChange={setPublishOpen}
+			/>
 			<div
 				className={cn(
-					"grid min-h-[520px] grid-cols-1 lg:grid-cols-[13rem_minmax(0,1fr)_minmax(18rem,1fr)]",
-					variant === "workbench" && "min-h-0 flex-1",
+					"overflow-hidden rounded-xl border border-primary/20 bg-background text-xs shadow-sm",
+					variant === "workbench" &&
+						"flex h-full min-h-0 flex-col rounded-none border-0 shadow-none",
 				)}
 			>
-				<div className="border-b border-border/50 bg-muted/20 lg:border-r lg:border-b-0">
-					<div className="border-b border-border/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-						Files
+				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 bg-muted/35 px-3 py-2.5">
+					<div className="min-w-0">
+						<p className="truncate font-medium text-foreground">
+							{currentArtifact.title}
+						</p>
+						<p className="text-[11px] text-muted-foreground">
+							Code workspace · v{currentArtifact.version} ·{" "}
+							{currentArtifact.files.length} files
+						</p>
 					</div>
-					<div className="max-h-64 overflow-auto p-2 lg:max-h-[480px]">
-						<CodeWorkspaceFileTree
-							nodes={fileTree}
-							selectedPath={selectedPath}
-							onSelect={setSelectedPath}
-						/>
-					</div>
-				</div>
-				<div className="flex min-w-0 flex-col border-b border-border/50 lg:border-r lg:border-b-0">
-					<div className="flex min-h-10 items-center justify-between gap-2 border-b border-border/40 px-3 py-2">
-						<div className="min-w-0">
-							<p className="truncate font-medium text-foreground">
-								{selectedPath ?? "No file selected"}
-							</p>
-							<p className="text-[10px] text-muted-foreground">
-								{selectedFile?.binary
-									? "Binary asset"
-									: (selectedFile?.mimeType ?? "Select a file")}
-							</p>
-						</div>
-						<div className="flex shrink-0 items-center gap-1.5">
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								className="h-7 px-2 text-[11px]"
-								disabled={!selectedPath || selectedFile?.binary}
-								onClick={() => setFullscreenPane("code")}
-							>
-								<Maximize2Icon className="size-3" aria-hidden="true" />
-							</Button>
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								className="h-7 px-2 text-[11px]"
-								disabled={!selectedPath || selectedFile?.binary || loadingFile}
-								onClick={() => setFileReloadKey((key) => key + 1)}
-							>
-								<RefreshCcwIcon className="size-3" aria-hidden="true" />
-							</Button>
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								className="h-7 px-2 text-[11px]"
-								disabled={!selectedPath || selectedFile?.binary || savingFile}
-								onClick={() => void saveSelectedFile()}
-							>
-								<SaveIcon className="size-3" aria-hidden="true" />
-								Save
-							</Button>
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								className="h-7 px-2 text-[11px] text-destructive hover:text-destructive"
-								disabled={!selectedPath || savingFile}
-								onClick={() => void deleteSelectedFile()}
-							>
-								<Trash2Icon className="size-3" aria-hidden="true" />
-							</Button>
-						</div>
-					</div>
-					{error ? (
-						<div className="border-b border-destructive/20 bg-destructive/5 px-3 py-2 text-[11px] text-destructive">
-							{error}
-						</div>
-					) : null}
-					{selectedFile?.binary ? (
-						<div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-muted-foreground">
-							Binary assets are served in preview and included in ZIP download.
-						</div>
-					) : (
-						<CodeWorkspaceEditor
-							value={loadingFile ? "Loading file…" : content}
-							filePath={selectedPath}
-							disabled={!selectedPath || loadingFile || savingFile}
-							onChange={setContent}
-						/>
-					)}
-				</div>
-				<div className="flex min-w-0 flex-col bg-white">
-					<div className="flex min-h-10 items-center justify-between gap-2 border-b border-border/40 bg-background px-3 py-2">
-						<div>
-							<p className="font-medium text-foreground">Live preview</p>
-							<p className="text-[10px] text-muted-foreground">
-								{currentArtifact.rootFile ?? "No HTML entry"}
-							</p>
-						</div>
+					<div className="flex items-center gap-1.5">
 						<Button
 							type="button"
-							variant="ghost"
+							variant="outline"
 							size="sm"
-							className="h-7 px-2 text-[11px]"
-							disabled={!currentArtifact.rootFile}
-							onClick={() => setFullscreenPane("preview")}
+							className="h-7 px-2.5 text-[11px]"
+							onClick={() => setPublishOpen(true)}
 						>
-							<Maximize2Icon className="size-3" aria-hidden="true" />
-							Fullscreen
+							<GithubIcon className="size-3" aria-hidden="true" />
+							GitHub
+						</Button>
+						<Button
+							asChild
+							type="button"
+							variant="outline"
+							size="sm"
+							className="h-7 px-2.5 text-[11px]"
+						>
+							<a href={currentArtifact.downloadUrl}>
+								<DownloadIcon className="size-3" aria-hidden="true" />
+								ZIP
+							</a>
 						</Button>
 					</div>
-					<CodeWorkspacePreviewFrame
-						key={`${currentArtifact.projectId}:${currentArtifact.version}:${currentArtifact.rootFile ?? "no-root"}`}
-						artifact={currentArtifact}
-					/>
 				</div>
-			</div>
-			<Dialog
-				open={fullscreenPane !== null}
-				onOpenChange={(open) => !open && setFullscreenPane(null)}
-			>
-				<DialogContent className="!fixed !inset-0 flex !h-dvh !w-full !translate-x-0 !translate-y-0 flex-col overflow-hidden !rounded-none !border-0 bg-background p-0 sm:!max-w-none">
-					<div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-6">
-						<div className="min-w-0">
-							<DialogTitle className="truncate text-base font-semibold">
-								{fullscreenPane === "preview"
-									? "Live preview"
-									: (selectedPath ?? "Code")}
-							</DialogTitle>
-							<p className="mt-0.5 text-xs text-muted-foreground">
-								{currentArtifact.title} · v{currentArtifact.version}
-							</p>
-						</div>
-						{fullscreenPane === "code" ? (
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								disabled={!selectedPath || selectedFile?.binary || savingFile}
-								onClick={() => void saveSelectedFile()}
-							>
-								<SaveIcon className="size-3" aria-hidden="true" />
-								Save
-							</Button>
-						) : null}
+				{currentArtifact.message ? (
+					<div className="border-b border-border/40 px-3 py-2 text-[11px] text-muted-foreground">
+						{currentArtifact.message}
 					</div>
-					{fullscreenPane === "preview" ? (
-						<div className="flex min-h-0 flex-1 bg-white">
-							<CodeWorkspacePreviewFrame
-								key={`fullscreen:${currentArtifact.projectId}:${currentArtifact.version}:${currentArtifact.rootFile ?? "no-root"}`}
-								artifact={currentArtifact}
+				) : null}
+				<div
+					className={cn(
+						"grid min-h-[520px] grid-cols-1 lg:grid-cols-[13rem_minmax(0,1fr)_minmax(18rem,1fr)]",
+						variant === "workbench" && "min-h-0 flex-1",
+					)}
+				>
+					<div className="border-b border-border/50 bg-muted/20 lg:border-r lg:border-b-0">
+						<div className="border-b border-border/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+							Files
+						</div>
+						<div className="max-h-64 overflow-auto p-2 lg:max-h-[480px]">
+							<CodeWorkspaceFileTree
+								nodes={fileTree}
+								selectedPath={selectedPath}
+								onSelect={setSelectedPath}
 							/>
 						</div>
-					) : null}
-					{fullscreenPane === "code" ? (
-						<CodeWorkspaceEditor
-							value={loadingFile ? "Loading file…" : content}
-							filePath={selectedPath}
-							disabled={!selectedPath || loadingFile || savingFile}
-							onChange={setContent}
-							className="min-h-0 flex-1"
+					</div>
+					<div className="flex min-w-0 flex-col border-b border-border/50 lg:border-r lg:border-b-0">
+						<div className="flex min-h-10 items-center justify-between gap-2 border-b border-border/40 px-3 py-2">
+							<div className="min-w-0">
+								<p className="truncate font-medium text-foreground">
+									{selectedPath ?? "No file selected"}
+								</p>
+								<p className="text-[10px] text-muted-foreground">
+									{selectedFile?.binary
+										? "Binary asset"
+										: (selectedFile?.mimeType ?? "Select a file")}
+								</p>
+							</div>
+							<div className="flex shrink-0 items-center gap-1.5">
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="h-7 px-2 text-[11px]"
+									disabled={!selectedPath || selectedFile?.binary}
+									onClick={() => setFullscreenPane("code")}
+								>
+									<Maximize2Icon className="size-3" aria-hidden="true" />
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="h-7 px-2 text-[11px]"
+									disabled={
+										!selectedPath || selectedFile?.binary || loadingFile
+									}
+									onClick={() => setFileReloadKey((key) => key + 1)}
+								>
+									<RefreshCcwIcon className="size-3" aria-hidden="true" />
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="h-7 px-2 text-[11px]"
+									disabled={!selectedPath || selectedFile?.binary || savingFile}
+									onClick={() => void saveSelectedFile()}
+								>
+									<SaveIcon className="size-3" aria-hidden="true" />
+									Save
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="h-7 px-2 text-[11px] text-destructive hover:text-destructive"
+									disabled={!selectedPath || savingFile}
+									onClick={() => void deleteSelectedFile()}
+								>
+									<Trash2Icon className="size-3" aria-hidden="true" />
+								</Button>
+							</div>
+						</div>
+						{error ? (
+							<div className="border-b border-destructive/20 bg-destructive/5 px-3 py-2 text-[11px] text-destructive">
+								{error}
+							</div>
+						) : null}
+						{selectedFile?.binary ? (
+							<div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-muted-foreground">
+								Binary assets are served in preview and included in ZIP
+								download.
+							</div>
+						) : (
+							<CodeWorkspaceEditor
+								value={loadingFile ? "Loading file…" : content}
+								filePath={selectedPath}
+								disabled={!selectedPath || loadingFile || savingFile}
+								onChange={setContent}
+							/>
+						)}
+					</div>
+					<div className="flex min-w-0 flex-col bg-white">
+						<div className="flex min-h-10 items-center justify-between gap-2 border-b border-border/40 bg-background px-3 py-2">
+							<div>
+								<p className="font-medium text-foreground">Live preview</p>
+								<p className="text-[10px] text-muted-foreground">
+									{currentArtifact.rootFile ?? "No HTML entry"}
+								</p>
+							</div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-7 px-2 text-[11px]"
+								disabled={!currentArtifact.rootFile}
+								onClick={() => setFullscreenPane("preview")}
+							>
+								<Maximize2Icon className="size-3" aria-hidden="true" />
+								Fullscreen
+							</Button>
+						</div>
+						<CodeWorkspacePreviewFrame
+							key={`${currentArtifact.projectId}:${currentArtifact.version}:${currentArtifact.rootFile ?? "no-root"}`}
+							artifact={currentArtifact}
 						/>
-					) : null}
-				</DialogContent>
-			</Dialog>
-		</div>
+					</div>
+				</div>
+				<Dialog
+					open={fullscreenPane !== null}
+					onOpenChange={(open) => !open && setFullscreenPane(null)}
+				>
+					<DialogContent className="!fixed !inset-0 flex !h-dvh !w-full !translate-x-0 !translate-y-0 flex-col overflow-hidden !rounded-none !border-0 bg-background p-0 sm:!max-w-none">
+						<div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-6">
+							<div className="min-w-0">
+								<DialogTitle className="truncate text-base font-semibold">
+									{fullscreenPane === "preview"
+										? "Live preview"
+										: (selectedPath ?? "Code")}
+								</DialogTitle>
+								<p className="mt-0.5 text-xs text-muted-foreground">
+									{currentArtifact.title} · v{currentArtifact.version}
+								</p>
+							</div>
+							{fullscreenPane === "code" ? (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={!selectedPath || selectedFile?.binary || savingFile}
+									onClick={() => void saveSelectedFile()}
+								>
+									<SaveIcon className="size-3" aria-hidden="true" />
+									Save
+								</Button>
+							) : null}
+						</div>
+						{fullscreenPane === "preview" ? (
+							<div className="flex min-h-0 flex-1 bg-white">
+								<CodeWorkspacePreviewFrame
+									key={`fullscreen:${currentArtifact.projectId}:${currentArtifact.version}:${currentArtifact.rootFile ?? "no-root"}`}
+									artifact={currentArtifact}
+								/>
+							</div>
+						) : null}
+						{fullscreenPane === "code" ? (
+							<CodeWorkspaceEditor
+								value={loadingFile ? "Loading file…" : content}
+								filePath={selectedPath}
+								disabled={!selectedPath || loadingFile || savingFile}
+								onChange={setContent}
+								className="min-h-0 flex-1"
+							/>
+						) : null}
+					</DialogContent>
+				</Dialog>
+			</div>
+		</>
 	);
 }
 
@@ -1750,6 +2230,7 @@ function formatExpandedToolValue(value: unknown, open: boolean) {
 type ToolPartCardProps = {
 	part: ChatMessagePart;
 	approval?: PendingToolApproval;
+	workspaceId?: string;
 	workspaceArtifactDisplay?: WorkspaceArtifactDisplay;
 	onApprove?: (approval: PendingToolApproval) => void;
 	onReject?: (approval: PendingToolApproval) => void;
@@ -1758,6 +2239,7 @@ type ToolPartCardProps = {
 const ToolPartCard = memo(function ToolPartCard({
 	part,
 	approval,
+	workspaceId,
 	workspaceArtifactDisplay = "full",
 	onApprove,
 	onReject,
@@ -1826,7 +2308,10 @@ const ToolPartCard = memo(function ToolPartCard({
 		return workspaceArtifactDisplay === "summary" ? (
 			<CodeWorkspaceArtifactSummary artifact={fileArtifact} />
 		) : (
-			<CodeWorkspaceArtifactCard artifact={fileArtifact} />
+			<CodeWorkspaceArtifactCard
+				artifact={fileArtifact}
+				workspaceId={workspaceId}
+			/>
 		);
 	}
 	if (imageAttachment) {
@@ -1839,8 +2324,14 @@ const ToolPartCard = memo(function ToolPartCard({
 		return workspaceArtifactDisplay === "summary" ? (
 			<CodeWorkspaceArtifactSummary artifact={parsed.output} />
 		) : (
-			<CodeWorkspaceArtifactCard artifact={parsed.output} />
+			<CodeWorkspaceArtifactCard
+				artifact={parsed.output}
+				workspaceId={workspaceId}
+			/>
 		);
+	}
+	if (isGitHubPublishOutput(parsed.output)) {
+		return <GitHubPublishResultCard result={parsed.output} />;
 	}
 	if (inputArtifact) {
 		return <HtmlArtifactCard artifact={inputArtifact} isLive />;
@@ -1981,6 +2472,7 @@ function areToolPartCardPropsEqual(
 	return (
 		previous.part === next.part &&
 		previous.approval === next.approval &&
+		previous.workspaceId === next.workspaceId &&
 		previous.onApprove === next.onApprove &&
 		previous.onReject === next.onReject
 	);
@@ -2105,6 +2597,7 @@ function ThinkingPart({
 type MessageContentProps = {
 	message: ChatMessage;
 	showSuggestions?: boolean;
+	workspaceId?: string;
 	workspaceArtifactDisplay?: WorkspaceArtifactDisplay;
 	isEditing: boolean;
 	editingContent: string;
@@ -2133,6 +2626,7 @@ const MessageContent = memo(function MessageContent({
 	onRejectTool,
 	onSuggestionClick,
 	showSuggestions = true,
+	workspaceId,
 	workspaceArtifactDisplay = "full",
 }: MessageContentProps) {
 	const content = useMemo(() => textFromMessage(message), [message]);
@@ -2273,7 +2767,11 @@ const MessageContent = memo(function MessageContent({
 						return workspaceArtifactDisplay === "summary" ? (
 							<CodeWorkspaceArtifactSummary key={key} artifact={fileArtifact} />
 						) : (
-							<CodeWorkspaceArtifactCard key={key} artifact={fileArtifact} />
+							<CodeWorkspaceArtifactCard
+								key={key}
+								artifact={fileArtifact}
+								workspaceId={workspaceId}
+							/>
 						);
 					}
 					if (part.type === "tool-call" || part.type === "tool-result") {
@@ -2282,6 +2780,7 @@ const MessageContent = memo(function MessageContent({
 								key={`${message.id}-${part.type}-${partIndex}`}
 								part={part}
 								approval={approvalByPartIndex.get(partIndex)}
+								workspaceId={workspaceId}
 								workspaceArtifactDisplay={workspaceArtifactDisplay}
 								onApprove={onApproveTool}
 								onReject={onRejectTool}
@@ -2321,6 +2820,7 @@ function areMessageContentPropsEqual(
 	return (
 		previous.message === next.message &&
 		previous.showSuggestions === next.showSuggestions &&
+		previous.workspaceId === next.workspaceId &&
 		previous.workspaceArtifactDisplay === next.workspaceArtifactDisplay &&
 		previous.isEditing === next.isEditing &&
 		previous.editingContent === next.editingContent &&
@@ -2334,6 +2834,7 @@ interface ChatMessageListProps {
 	messages: ChatMessage[];
 	sending: boolean;
 	loading?: boolean;
+	workspaceId?: string;
 	workspaceArtifactDisplay?: WorkspaceArtifactDisplay;
 	bottomRef: React.RefObject<HTMLDivElement | null>;
 	onEditMessage?: (
@@ -2353,6 +2854,7 @@ export function ChatMessageList({
 	messages,
 	sending,
 	loading,
+	workspaceId,
 	workspaceArtifactDisplay = "full",
 	bottomRef,
 	onEditMessage,
@@ -2478,6 +2980,7 @@ export function ChatMessageList({
 									editingContent={isEditing ? editingContent : ""}
 									isSaving={savingMessageId === message.id}
 									isAnimating={isAnimating}
+									workspaceId={workspaceId}
 									workspaceArtifactDisplay={workspaceArtifactDisplay}
 									onEditingContentChange={
 										isEditing ? setEditingContent : undefined

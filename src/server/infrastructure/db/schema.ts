@@ -1432,6 +1432,112 @@ export const customToolCredentialRefs = pgTable(
 	}),
 );
 
+export const userGithubConnections = pgTable(
+	"user_github_connections",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		installationId: varchar("installation_id", { length: 64 }).notNull(),
+		accountLogin: varchar("account_login", { length: 255 }).notNull(),
+		accountId: varchar("account_id", { length: 64 }),
+		accountType: varchar("account_type", { length: 32 }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => ({
+		user: index("user_github_connections_user").on(t.userId),
+		userInstallation: uniqueIndex(
+			"user_github_connections_user_installation_unique",
+		).on(t.userId, t.installationId),
+	}),
+);
+
+export const userGithubRepositories = pgTable(
+	"user_github_repositories",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		connectionId: uuid("connection_id")
+			.notNull()
+			.references(() => userGithubConnections.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		githubRepositoryId: varchar("github_repository_id", {
+			length: 64,
+		}).notNull(),
+		owner: varchar("owner", { length: 255 }).notNull(),
+		name: varchar("name", { length: 255 }).notNull(),
+		fullName: varchar("full_name", { length: 512 }).notNull(),
+		private: boolean("private").notNull().default(false),
+		defaultBranch: varchar("default_branch", { length: 255 }).notNull(),
+		permissionsJson: jsonb("permissions_json"),
+		lastSyncedAt: timestamp("last_synced_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => ({
+		user: index("user_github_repositories_user").on(t.userId),
+		connection: index("user_github_repositories_connection").on(t.connectionId),
+		userRepo: uniqueIndex("user_github_repositories_user_repo_unique").on(
+			t.userId,
+			t.owner,
+			t.name,
+		),
+		githubRepo: index("user_github_repositories_github_repo").on(
+			t.githubRepositoryId,
+		),
+	}),
+);
+
+export const githubPublishEvents = pgTable(
+	"github_publish_events",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		workspaceId: uuid("workspace_id")
+			.notNull()
+			.references(() => workspaces.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id),
+		connectionId: uuid("connection_id").references(
+			() => userGithubConnections.id,
+			{ onDelete: "set null" },
+		),
+		repositoryId: uuid("repository_id").references(
+			() => userGithubRepositories.id,
+			{ onDelete: "set null" },
+		),
+		codeWorkspaceId: uuid("code_workspace_id").notNull(),
+		conversationId: uuid("conversation_id").references(() => conversations.id, {
+			onDelete: "set null",
+		}),
+		agentId: uuid("agent_id").references(() => agents.id, {
+			onDelete: "set null",
+		}),
+		mode: varchar("mode", { length: 24 }).notNull(),
+		targetBranch: varchar("target_branch", { length: 255 }).notNull(),
+		sourceBranch: varchar("source_branch", { length: 255 }),
+		commitSha: varchar("commit_sha", { length: 64 }),
+		pullRequestUrl: text("pull_request_url"),
+		status: varchar("status", { length: 24 }).notNull(),
+		metadataJson: jsonb("metadata_json"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => ({
+		workspace: index("github_publish_events_workspace").on(t.workspaceId),
+		user: index("github_publish_events_user").on(t.userId),
+		repository: index("github_publish_events_repository").on(t.repositoryId),
+	}),
+);
+
 // ─── Relations ─────────────────────────────────────────────────────────
 
 export const userRelations = relations(users, ({ many }) => ({

@@ -8,6 +8,10 @@ import {
 	readCodeWorkspaceFile,
 	writeCodeWorkspaceFile,
 } from "@/modules/code-workspace/storage";
+import {
+	getUserGitHubStatus,
+	publishCodeWorkspaceToGitHub,
+} from "@/modules/github/publishing";
 import type { ToolRiskLevel } from "./builtin-tools-catalog";
 import {
 	actionPlanInputSchema,
@@ -128,6 +132,21 @@ const codeWorkspaceReplaceTextInputSchema = z.object({
 	oldText: z.string().min(1).max(200_000),
 	newText: z.string().max(200_000),
 	replaceAll: z.boolean().default(false),
+});
+
+const githubPublishStatusInputSchema = z.object({});
+
+const githubPublishCodeWorkspaceInputSchema = z.object({
+	projectId: z.uuid(),
+	repositoryId: z.uuid(),
+	mode: z.enum(["pull_request", "direct_push"]),
+	targetBranch: z.string().trim().min(1).max(255),
+	sourceBranch: z.string().trim().min(1).max(255).optional(),
+	targetDirectory: z.string().trim().max(260).optional(),
+	commitMessage: z.string().trim().min(1).max(240),
+	pullRequestTitle: z.string().trim().min(1).max(240).optional(),
+	pullRequestBody: z.string().trim().max(4000).optional(),
+	confirmDirectPush: z.boolean().default(false),
 });
 
 const randomNumberInputSchema = z.object({
@@ -827,6 +846,54 @@ export const builtInTools = [
 		},
 	},
 	{
+		id: "00000000-0000-4000-8000-000000000035",
+		name: "github_get_publish_status",
+		displayName: "GitHub status",
+		description:
+			"Check whether the current user connected GitHub and list repositories they can publish to. If not connected, return the chat-safe connect URL.",
+		riskLevel: "low",
+		category: "Code",
+		inputSchema: githubPublishStatusInputSchema,
+		execute: async (_input, context) => {
+			const workspaceContext = requireCodeWorkspaceContext(context);
+			return getUserGitHubStatus({
+				userId: workspaceContext.userId,
+				workspaceId: workspaceContext.workspaceId,
+			});
+		},
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000036",
+		name: "github_publish_code_workspace",
+		displayName: "Publish code to GitHub",
+		description:
+			"Publish a code workspace to one of the current user's GitHub repositories. The user must choose PR vs direct push, repository, and branch; direct push requires explicit confirmation.",
+		riskLevel: "critical",
+		category: "Code",
+		inputSchema: githubPublishCodeWorkspaceInputSchema,
+		execute: async (
+			toolInput: z.infer<typeof githubPublishCodeWorkspaceInputSchema>,
+			context,
+		) => {
+			const workspaceContext = requireCodeWorkspaceContext(context);
+			return publishCodeWorkspaceToGitHub({
+				projectId: toolInput.projectId,
+				repositoryId: toolInput.repositoryId,
+				mode: toolInput.mode,
+				targetBranch: toolInput.targetBranch,
+				sourceBranch: toolInput.sourceBranch,
+				targetDirectory: toolInput.targetDirectory,
+				commitMessage: toolInput.commitMessage,
+				pullRequestTitle: toolInput.pullRequestTitle,
+				pullRequestBody: toolInput.pullRequestBody,
+				confirmDirectPush: toolInput.confirmDirectPush,
+				workspaceId: workspaceContext.workspaceId,
+				userId: workspaceContext.userId,
+				conversationId: workspaceContext.conversationId,
+			});
+		},
+	},
+	{
 		id: "00000000-0000-4000-8000-000000000017",
 		name: "create_slide_deck",
 		displayName: "Slide deck",
@@ -1227,6 +1294,62 @@ const commonSchemas: Record<string, unknown> = {
 			path: { type: "string", description: "Workspace-relative file path." },
 		},
 		required: ["projectId", "path"],
+	},
+	github_get_publish_status: {
+		type: "object",
+		properties: {},
+		required: [],
+	},
+	github_publish_code_workspace: {
+		type: "object",
+		properties: {
+			projectId: {
+				type: "string",
+				format: "uuid",
+				description: "Code workspace id to publish.",
+			},
+			repositoryId: {
+				type: "string",
+				format: "uuid",
+				description:
+					"User-scoped GitHub repository id returned by github_get_publish_status.",
+			},
+			mode: {
+				type: "string",
+				enum: ["pull_request", "direct_push"],
+				description:
+					"Use pull_request unless the user explicitly asks for direct push.",
+			},
+			targetBranch: {
+				type: "string",
+				description:
+					"Target branch chosen by the user, including main if requested.",
+			},
+			sourceBranch: {
+				type: "string",
+				description: "Optional new branch name for pull_request mode.",
+			},
+			targetDirectory: {
+				type: "string",
+				description: "Optional repository subdirectory to write files into.",
+			},
+			commitMessage: { type: "string" },
+			pullRequestTitle: { type: "string" },
+			pullRequestBody: { type: "string" },
+			confirmDirectPush: {
+				type: "boolean",
+				description:
+					"Must be true only after the user explicitly confirmed direct push.",
+				default: false,
+			},
+		},
+		required: [
+			"projectId",
+			"repositoryId",
+			"mode",
+			"targetBranch",
+			"commitMessage",
+		],
 	},
 	create_slide_deck: {
 		type: "object",
