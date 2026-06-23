@@ -1,4 +1,9 @@
-import { createHmac, createSign, randomUUID } from "node:crypto";
+import {
+	createHmac,
+	createPrivateKey,
+	createSign,
+	randomUUID,
+} from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -97,17 +102,63 @@ export function getGitHubAppPublicConfig() {
 	};
 }
 
+export function normalizeGitHubPrivateKey(rawValue: string) {
+	let privateKey = rawValue.trim();
+	if (
+		(privateKey.startsWith('"') && privateKey.endsWith('"')) ||
+		(privateKey.startsWith("'") && privateKey.endsWith("'")) ||
+		(privateKey.startsWith("`") && privateKey.endsWith("`"))
+	) {
+		privateKey = privateKey.slice(1, -1).trim();
+	}
+	privateKey = privateKey
+		.replace(/\\r\\n/g, "\n")
+		.replace(/\\n/g, "\n")
+		.replace(/\\r/g, "\n")
+		.replace(/\r\n/g, "\n")
+		.replace(/\r/g, "\n")
+		.trim();
+
+	if (!privateKey.includes("-----BEGIN")) {
+		const compact = privateKey.replace(/\s+/g, "");
+		if (/^[A-Za-z0-9+/=]+$/.test(compact)) {
+			const decoded = Buffer.from(compact, "base64").toString("utf8").trim();
+			if (decoded.includes("-----BEGIN")) privateKey = decoded;
+		}
+	}
+
+	const pemMatch = privateKey.match(
+		/-----BEGIN ([^-]+)-----\s*([A-Za-z0-9+/=\s]+)\s*-----END \1-----/,
+	);
+	if (pemMatch) {
+		const label = pemMatch[1];
+		const body = pemMatch[2].replace(/\s+/g, "");
+		const wrappedBody = body.match(/.{1,64}/g)?.join("\n") ?? body;
+		privateKey = `-----BEGIN ${label}-----\n${wrappedBody}\n-----END ${label}-----\n`;
+	}
+
+	return privateKey;
+}
+
 function requireGitHubAppConfig() {
 	if (!githubAppConfigured()) {
 		throw new Error(
 			"GitHub publishing is not configured. Set GITHUB_APP_ID, GITHUB_APP_SLUG, and GITHUB_APP_PRIVATE_KEY.",
 		);
 	}
-	return {
-		appId: env.GITHUB_APP_ID!,
-		appSlug: env.GITHUB_APP_SLUG!,
-		privateKey: env.GITHUB_APP_PRIVATE_KEY!.replace(/\\n/g, "\n"),
-	};
+	try {
+		return {
+			appId: env.GITHUB_APP_ID!,
+			appSlug: env.GITHUB_APP_SLUG!,
+			privateKey: createPrivateKey(
+				normalizeGitHubPrivateKey(env.GITHUB_APP_PRIVATE_KEY!),
+			),
+		};
+	} catch {
+		throw new Error(
+			"Invalid GITHUB_APP_PRIVATE_KEY. Paste the full GitHub App PEM private key, using escaped \\n newlines in env managers and no literal wrapping quotes.",
+		);
+	}
 }
 
 function base64Url(value: Buffer | string) {
