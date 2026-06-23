@@ -85,10 +85,10 @@ function StatCard({
 	accent: string;
 }) {
 	return (
-		<div className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition-colors hover:border-primary/35">
+		<div className="group relative overflow-hidden rounded-2xl border border-transparent bg-card p-4 shadow-[var(--surface-shadow)] transition-[background-color,box-shadow] duration-150 ease-out hover:shadow-[var(--surface-shadow-hover)]">
 			<div
 				className={cn(
-					"absolute left-0 top-0 h-full w-1 opacity-60 transition-opacity duration-300 group-hover:opacity-100",
+					"absolute top-0 left-0 h-full w-1 opacity-70 transition-opacity duration-150 ease-out group-hover:opacity-100",
 					accent,
 				)}
 			/>
@@ -97,13 +97,13 @@ function StatCard({
 					<span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
 						{label}
 					</span>
-					<span className="text-2xl font-bold tracking-tight text-foreground">
+					<span className="text-2xl font-bold tabular-nums tracking-tight text-foreground">
 						{value}
 					</span>
 				</div>
 				<div
 					className={cn(
-						"flex size-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110",
+						"flex size-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-150 ease-out group-hover:scale-[1.03]",
 						color,
 					)}
 				>
@@ -126,11 +126,8 @@ function QuotaHero({
 	const isWarning = ratio >= 0.8;
 
 	return (
-		<section className="overflow-hidden rounded-2xl border bg-card p-0 animate-in-fade">
+		<section className="overflow-hidden rounded-2xl border border-transparent bg-card p-0 shadow-[var(--surface-shadow)] animate-in-fade">
 			<div className="relative border-b px-5 py-6 sm:px-6 sm:py-7">
-				<div className="pointer-events-none absolute -right-8 -top-8 size-40 rounded-full bg-primary/10 blur-3xl" />
-				<div className="pointer-events-none absolute -bottom-10 left-1/3 size-32 rounded-full bg-chart-2/15 blur-3xl" />
-
 				<div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
 					<div className="flex flex-col gap-2">
 						<div className="flex items-center gap-2 text-primary">
@@ -139,7 +136,7 @@ function QuotaHero({
 								{t("monthlyTokens")}
 							</span>
 						</div>
-						<p className="text-3xl font-bold tracking-tight sm:text-4xl">
+						<p className="text-3xl font-bold tabular-nums tracking-tight sm:text-4xl">
 							{formatCount(quota.used)}
 							<span className="text-lg font-medium text-muted-foreground">
 								{" "}
@@ -172,7 +169,7 @@ function QuotaHero({
 				<div className="h-2.5 overflow-hidden rounded-full bg-muted/80">
 					<div
 						className={cn(
-							"h-full rounded-full transition-all duration-500",
+							"h-full rounded-full transition-[width,background-color] duration-500 ease-out",
 							isWarning ? "bg-warning" : "bg-primary",
 						)}
 						style={{ width: `${percent}%` }}
@@ -212,7 +209,7 @@ function UsageFilters({
 	const hasFilters = Boolean(operationFilter.trim() || fromDate || toDate);
 
 	return (
-		<section className="rounded-2xl border bg-card p-4 sm:p-5 animate-in-fade stagger-2">
+		<section className="rounded-2xl border border-transparent bg-card p-4 shadow-[var(--surface-shadow)] sm:p-5 animate-in-fade stagger-2">
 			<div className="mb-4 flex items-center gap-2 text-sm font-medium text-foreground">
 				<FilterIcon
 					className="size-4 text-muted-foreground"
@@ -300,7 +297,7 @@ function TokenChart({
 	);
 
 	return (
-		<section className="flex h-full flex-col rounded-2xl border bg-card p-5 animate-in-fade stagger-3">
+		<section className="flex h-full flex-col rounded-2xl border border-transparent bg-card p-5 shadow-[var(--surface-shadow)] animate-in-fade stagger-3">
 			<div className="mb-5 flex flex-col gap-1">
 				<div className="flex items-center gap-2">
 					<BarChart3Icon className="size-4 text-primary" aria-hidden="true" />
@@ -345,7 +342,7 @@ function TokenChart({
 									title={`${event.operation}: ${formatCount(input)} in / ${formatCount(output)} out`}
 								>
 									<div
-										className="flex w-full min-h-[6px] flex-col justify-end overflow-hidden rounded-t-md border border-border/40 bg-muted/30 transition-colors group-hover:border-primary/30"
+										className="flex min-h-[6px] w-full flex-col justify-end overflow-hidden rounded-t-md border border-border/40 bg-muted/30 transition-[border-color,height] duration-150 ease-out group-hover:border-primary/30"
 										style={{ height: `${height}%` }}
 									>
 										{output > 0 ? (
@@ -385,7 +382,7 @@ function UsageEventRow({
 	const createdAt = new Date(event.createdAt);
 
 	return (
-		<article className="group flex flex-col gap-3 rounded-xl border border-border/60 bg-background/80 px-4 py-3 transition-colors hover:border-primary/25 hover:bg-muted/20 sm:flex-row sm:items-center sm:justify-between">
+		<article className="group flex flex-col gap-3 rounded-xl border border-transparent bg-background/80 px-4 py-3 shadow-[var(--surface-shadow)] transition-[background-color,box-shadow] duration-150 ease-out hover:bg-muted/20 hover:shadow-[var(--surface-shadow-hover)] sm:flex-row sm:items-center sm:justify-between">
 			<div className="flex min-w-0 flex-1 flex-col gap-2">
 				<div className="flex flex-wrap items-center gap-2">
 					<Badge variant="outline" className="rounded-md font-mono text-[11px]">
@@ -406,7 +403,7 @@ function UsageEventRow({
 						</Badge>
 					) : null}
 					<time
-						className="text-xs text-muted-foreground"
+						className="text-xs tabular-nums text-muted-foreground"
 						dateTime={event.createdAt}
 						title={createdAt.toLocaleString()}
 					>
@@ -414,21 +411,21 @@ function UsageEventRow({
 					</time>
 				</div>
 				<div className="flex items-center gap-3 text-sm">
-					<span className="inline-flex items-center gap-1 text-muted-foreground">
+					<span className="inline-flex items-center gap-1 tabular-nums text-muted-foreground">
 						<ArrowDownToLineIcon
 							className="size-3.5 text-chart-1"
 							aria-hidden="true"
 						/>
 						{formatCount(input)}
 					</span>
-					<span className="inline-flex items-center gap-1 text-muted-foreground">
+					<span className="inline-flex items-center gap-1 tabular-nums text-muted-foreground">
 						<ArrowUpFromLineIcon
 							className="size-3.5 text-chart-2"
 							aria-hidden="true"
 						/>
 						{formatCount(output)}
 					</span>
-					<span className="inline-flex items-center gap-1 text-muted-foreground">
+					<span className="inline-flex items-center gap-1 tabular-nums text-muted-foreground">
 						<ZapIcon className="size-3.5" aria-hidden="true" />
 						{formatLatency(event.latencyMs)}
 					</span>
@@ -438,7 +435,7 @@ function UsageEventRow({
 			<div className="flex w-full flex-col gap-1 sm:w-36 sm:shrink-0">
 				<div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
 					<span>{t("tokens")}</span>
-					<span className="font-medium text-foreground">
+					<span className="font-medium tabular-nums text-foreground">
 						{formatCount(total)}
 					</span>
 				</div>
@@ -469,7 +466,7 @@ function UsageEventList({
 	t: ReturnType<typeof useTranslations<"admin.usage">>;
 }) {
 	return (
-		<section className="flex h-full flex-col rounded-2xl border bg-card p-5 animate-in-fade stagger-4">
+		<section className="flex h-full flex-col rounded-2xl border border-transparent bg-card p-5 shadow-[var(--surface-shadow)] animate-in-fade stagger-4">
 			<div className="mb-5 flex flex-col gap-1">
 				<div className="flex items-center gap-2">
 					<ActivityIcon className="size-4 text-primary" aria-hidden="true" />

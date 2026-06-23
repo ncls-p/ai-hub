@@ -47,7 +47,7 @@ export function SignOutButton({
 			variant="ghost"
 			size={iconOnly ? "icon" : "sm"}
 			className={cn(
-				"group justify-start rounded-xl transition-all duration-200 hover:bg-destructive/10 hover:text-destructive",
+				"group justify-start rounded-xl transition-[background-color,color,scale] duration-150 ease-out hover:bg-destructive/10 hover:text-destructive",
 				className,
 			)}
 			onClick={signOut}

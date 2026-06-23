@@ -125,7 +125,7 @@ function SkillDetailDialog({ skill }: { skill: AgentSkill }) {
 								<button
 									key={file.path}
 									type="button"
-									className={`max-w-56 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+									className={`max-w-56 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-[background-color,border-color,color,scale] duration-150 ease-out active:scale-[0.96] ${
 										i === activeFile
 											? "border-primary/40 bg-primary/10 text-foreground"
 											: "border-border/70 bg-background text-muted-foreground"
@@ -151,7 +151,7 @@ function SkillDetailDialog({ skill }: { skill: AgentSkill }) {
 									<button
 										key={file.path}
 										type="button"
-										className={`w-full rounded-lg px-2.5 py-2 text-left text-xs leading-snug transition-colors ${
+										className={`w-full rounded-lg px-2.5 py-2 text-left text-xs leading-snug transition-[background-color,box-shadow,color,scale] duration-150 ease-out active:scale-[0.96] ${
 											i === activeFile
 												? "bg-background font-medium shadow-sm ring-1 ring-border/70"
 												: "text-muted-foreground hover:bg-background/70 hover:text-foreground"
@@ -393,7 +393,7 @@ function SkillEditorDialog({
 											<button
 												key={i}
 												type="button"
-												className={`max-w-56 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+												className={`max-w-56 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-[background-color,border-color,color,scale] duration-150 ease-out active:scale-[0.96] ${
 													i === activeFile
 														? "border-primary/40 bg-primary/10 text-foreground"
 														: "border-border/70 bg-background text-muted-foreground"
@@ -431,7 +431,7 @@ function SkillEditorDialog({
 												<button
 													key={i}
 													type="button"
-													className={`w-full rounded-lg px-2.5 py-2 text-left text-xs leading-snug transition-colors ${
+													className={`w-full rounded-lg px-2.5 py-2 text-left text-xs leading-snug transition-[background-color,box-shadow,color,scale] duration-150 ease-out active:scale-[0.96] ${
 														i === activeFile
 															? "bg-background font-medium shadow-sm ring-1 ring-border/70"
 															: "text-muted-foreground hover:bg-background/70 hover:text-foreground"

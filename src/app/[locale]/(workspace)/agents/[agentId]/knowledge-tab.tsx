@@ -110,7 +110,7 @@ export function KnowledgeTab({
 							<label
 								key={kb.id}
 								className={cn(
-									"ui-list-row flex cursor-pointer items-center justify-between rounded-xl border p-4 transition-all hover:border-primary/25 hover:bg-card/65 hover:shadow-sm",
+									"ui-list-row flex cursor-pointer items-center justify-between rounded-xl border p-4 transition-[background-color,border-color,box-shadow] duration-150 ease-out hover:border-primary/25 hover:bg-card/65 hover:shadow-[var(--surface-shadow-hover)]",
 									selectedKnowledgeIds.includes(kb.id)
 										? "border-primary/30 bg-primary/5"
 										: "border-border/60",

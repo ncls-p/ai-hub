@@ -12,7 +12,7 @@ function Card({
 			data-slot="card"
 			data-size={size}
 			className={cn(
-				"group/card flex flex-col gap-4 rounded-2xl border bg-card py-4 text-sm text-card-foreground shadow-[var(--surface-shadow)] transition-colors duration-150 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-2xl *:[img:last-child]:rounded-b-2xl",
+				"group/card flex flex-col gap-4 rounded-2xl border border-transparent bg-card py-4 text-sm text-card-foreground shadow-[var(--surface-shadow)] transition-[background-color,box-shadow] duration-150 ease-out hover:shadow-[var(--surface-shadow-hover)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-2xl *:[img:last-child]:rounded-b-2xl",
 				className,
 			)}
 			{...props}
@@ -38,7 +38,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
 		<div
 			data-slot="card-title"
 			className={cn(
-				"font-heading text-base leading-tight font-semibold group-data-[size=sm]/card:text-sm",
+				"font-heading text-balance text-base leading-tight font-semibold group-data-[size=sm]/card:text-sm",
 				className,
 			)}
 			{...props}
@@ -50,7 +50,10 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			data-slot="card-description"
-			className={cn("text-sm leading-6 text-muted-foreground", className)}
+			className={cn(
+				"text-pretty text-sm leading-6 text-muted-foreground",
+				className,
+			)}
 			{...props}
 		/>
 	);

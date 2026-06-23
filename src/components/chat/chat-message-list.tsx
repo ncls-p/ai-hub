@@ -2967,7 +2967,7 @@ export function ChatMessageList({
 							{/* Message bubble */}
 							<div
 								className={cn(
-									"transition-all duration-200",
+									"transition-[background-color,box-shadow,color] duration-150 ease-out",
 									message.role === "user"
 										? "msg-bubble--user"
 										: "msg-bubble--assistant",

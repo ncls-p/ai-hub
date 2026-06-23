@@ -201,7 +201,7 @@ export function ToolApprovalBanner({
 							size="sm"
 							variant="outline"
 							onClick={onReject}
-							className="h-9 gap-1.5 border-destructive/20 bg-destructive/5 px-4 text-xs font-medium text-destructive/80 transition-all duration-200 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive/40 active:scale-95"
+							className="h-9 gap-1.5 border-destructive/20 bg-destructive/5 px-4 text-xs font-medium text-destructive/80 transition-[background-color,border-color,color,box-shadow,scale] duration-150 ease-out hover:border-destructive/40 hover:bg-destructive hover:text-destructive-foreground active:scale-[0.96]"
 						>
 							<XCircle className="size-3.5" aria-hidden="true" />
 							Reject

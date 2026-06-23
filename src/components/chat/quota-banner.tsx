@@ -74,7 +74,7 @@ export function QuotaBanner({ used, limit }: { used: number; limit: number }) {
 						<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
 							<div
 								className={cn(
-									"h-full rounded-full transition-all duration-500",
+									"h-full rounded-full transition-[width,background-color] duration-500 ease-out",
 									barColor,
 								)}
 								style={{ width: `${percent}%` }}

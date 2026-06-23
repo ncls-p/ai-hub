@@ -190,7 +190,7 @@ function SetupStepper({ currentStep }: { currentStep: StepId }) {
 						<div key={item.id} className="flex items-center gap-0">
 							<div
 								className={cn(
-									"flex items-center gap-2.5 rounded-full border px-4 py-2 text-sm transition-all duration-200",
+									"flex items-center gap-2.5 rounded-full border px-4 py-2 text-sm transition-[background-color,border-color,box-shadow,color] duration-150 ease-out",
 									isComplete
 										? "border-primary/30 bg-primary/8 text-primary"
 										: isActive
@@ -774,7 +774,7 @@ export function SetupWizard({
 												<div
 													key={model.modelId}
 													className={cn(
-														"flex items-start justify-between gap-3 px-4 py-3 transition-all duration-200 hover:bg-muted/30",
+														"flex items-start justify-between gap-3 px-4 py-3 transition-[background-color] duration-150 ease-out hover:bg-muted/30",
 														isSelected && "bg-primary/5",
 													)}
 												>

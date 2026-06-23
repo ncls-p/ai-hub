@@ -45,7 +45,7 @@ export function ListRowButton({
 			type={type}
 			data-slot="list-row-button"
 			className={cn(
-				"ui-list-row flex w-full items-center gap-3 p-3 text-left text-sm transition-colors duration-150",
+				"ui-list-row flex w-full items-center gap-3 p-3 text-left text-sm active:not-disabled:scale-[0.96]",
 				selected && "border-input bg-muted",
 				className,
 			)}

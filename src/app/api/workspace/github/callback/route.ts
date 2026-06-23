@@ -9,7 +9,10 @@ import {
 import { authorization } from "@/server/domain/services/authorization";
 
 function publicOrigin(req: NextRequest) {
-	const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+	const forwardedHost = req.headers
+		.get("x-forwarded-host")
+		?.split(",")[0]
+		?.trim();
 	const forwardedProto =
 		req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? "https";
 	if (forwardedHost && forwardedHost !== "0.0.0.0") {

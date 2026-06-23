@@ -656,7 +656,7 @@ export function ChatSidebar({
 							variant="ghost"
 							aria-label="Expand chat sidebar"
 							onClick={() => onCollapsedChange?.(false)}
-							className="size-9 rounded-lg transition-all duration-200 hover:bg-primary/10"
+							className="size-9 rounded-lg transition-[background-color,scale] duration-150 ease-out hover:bg-primary/10"
 						>
 							<PanelLeftOpenIcon className="size-4" aria-hidden="true" />
 						</Button>

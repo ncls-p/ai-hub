@@ -473,7 +473,7 @@ export function ChatLayout({
 			<div
 				className={cn(
 					"hidden ease-[cubic-bezier(0.4,0,0.2,1)] md:block",
-					!resizingSidebar && "transition-all duration-300",
+					!resizingSidebar && "transition-[opacity,width] duration-300",
 				)}
 				style={{
 					width: sidebarOpen ? `${sidebarWidth}px` : 0,

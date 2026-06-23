@@ -239,7 +239,7 @@ function InvocationActions({
 				variant="outline"
 				onClick={() => onReject(invocationId)}
 				disabled={isBusy}
-				className="min-w-[80px] transition-all duration-200 hover:bg-destructive/8 hover:text-destructive hover:border-destructive/30"
+				className="min-w-[80px] transition-[background-color,border-color,color,box-shadow,scale] duration-150 ease-out hover:border-destructive/30 hover:bg-destructive/8 hover:text-destructive"
 			>
 				{busyAction === "reject" ? (
 					<Loader2 className="animate-spin" aria-hidden="true" />
@@ -286,7 +286,7 @@ function InvocationRow({
 	return (
 		<div
 			className={cn(
-				"group relative flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/60 p-4 transition-all duration-200 hover:border-border/80 hover:bg-background sm:flex-row sm:items-center sm:justify-between",
+				"group relative flex flex-col gap-3 rounded-2xl border border-transparent bg-background/60 p-4 shadow-[var(--surface-shadow)] transition-[background-color,box-shadow] duration-150 ease-out hover:bg-background hover:shadow-[var(--surface-shadow-hover)] sm:flex-row sm:items-center sm:justify-between",
 				invocation.status === "awaiting_approval" ||
 					invocation.status === "pending_approval"
 					? "border-warning/25 bg-warning/[0.03]"

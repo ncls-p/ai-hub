@@ -38,7 +38,7 @@ export default function GlobalError({
 							type="button"
 							onClick={() => retry?.()}
 							disabled={!retry}
-							className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35 disabled:pointer-events-none disabled:opacity-50"
+							className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-[background-color,border-color,box-shadow,scale] duration-150 ease-out hover:bg-primary/90 active:not-disabled:scale-[0.96] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35 disabled:pointer-events-none disabled:opacity-50"
 						>
 							Try again
 						</button>

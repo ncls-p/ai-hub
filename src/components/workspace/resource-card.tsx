@@ -31,7 +31,7 @@ export function ResourceCard({
 	return (
 		<Card
 			className={cn(
-				"flex flex-col transition-colors hover:border-input",
+				"flex flex-col transition-[box-shadow] hover:shadow-[var(--surface-shadow-hover)]",
 				className,
 			)}
 		>
@@ -43,7 +43,9 @@ export function ResourceCard({
 					) : null}
 				</div>
 				{description ? (
-					<p className="text-sm text-muted-foreground">{description}</p>
+					<p className="text-pretty text-sm text-muted-foreground">
+						{description}
+					</p>
 				) : null}
 			</CardHeader>
 			{children ? <CardContent className="pt-0">{children}</CardContent> : null}

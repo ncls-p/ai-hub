@@ -49,7 +49,7 @@ export function LocaleSwitcher({
 			role="group"
 			aria-label={t("language")}
 			className={cn(
-				"relative z-30 flex h-8 w-full min-w-0 overflow-hidden rounded-lg border border-input bg-background",
+				"relative z-30 flex h-8 w-full min-w-0 overflow-hidden rounded-lg border border-input bg-background shadow-[var(--surface-shadow)]",
 				className,
 			)}
 		>
@@ -61,7 +61,7 @@ export function LocaleSwitcher({
 					aria-label={code === "fr" ? t("french") : t("english")}
 					title={code === "fr" ? t("french") : t("english")}
 					className={cn(
-						"flex flex-1 items-center justify-center text-xs font-semibold uppercase transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+						"flex flex-1 items-center justify-center text-xs font-semibold uppercase transition-[background-color,color,scale] duration-150 ease-out outline-none active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
 						locale === code
 							? "bg-primary text-primary-foreground"
 							: "text-muted-foreground hover:bg-muted/60 hover:text-foreground",

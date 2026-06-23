@@ -53,7 +53,7 @@ export function CitationBlock({ citations, className }: CitationBlockProps) {
 					return (
 						<li
 							key={citation.chunkId}
-							className="group/card rounded-lg border border-transparent bg-background/50 p-3 transition-all duration-200 hover:border-border/50 hover:bg-background/80 hover:shadow-sm"
+							className="group/card rounded-lg border border-transparent bg-background/50 p-3 shadow-[var(--surface-shadow)] transition-[background-color,box-shadow] duration-150 ease-out hover:bg-background/80 hover:shadow-[var(--surface-shadow-hover)]"
 							style={{ animationDelay: `${index * 0.05}s` }}
 						>
 							{/* Title row */}
