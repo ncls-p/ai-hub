@@ -28,4 +28,17 @@ describe("GitHub publishing", () => {
 		expect(normalized).toContain("-----BEGIN RSA PRIVATE KEY-----");
 		expect(() => createPrivateKey(normalized)).not.toThrow();
 	});
+
+	it("normalizes copied env assignment lines and trailing shell prompts", () => {
+		const pem = privateKeyPem();
+		const normalizedPem = normalizeGitHubPrivateKey(
+			`GITHUB_APP_PRIVATE_KEY=${pem.replace(/\n/g, "\\n")}%`,
+		);
+		const normalizedBase64 = normalizeGitHubPrivateKey(
+			`export GITHUB_APP_PRIVATE_KEY=${Buffer.from(pem, "utf8").toString("base64")}%`,
+		);
+
+		expect(() => createPrivateKey(normalizedPem)).not.toThrow();
+		expect(() => createPrivateKey(normalizedBase64)).not.toThrow();
+	});
 });

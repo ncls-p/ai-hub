@@ -104,6 +104,9 @@ export function getGitHubAppPublicConfig() {
 
 export function normalizeGitHubPrivateKey(rawValue: string) {
 	let privateKey = rawValue.trim();
+	privateKey = privateKey.replace(/^export\s+GITHUB_APP_PRIVATE_KEY\s*=\s*/i, "");
+	privateKey = privateKey.replace(/^GITHUB_APP_PRIVATE_KEY\s*=\s*/i, "");
+	privateKey = privateKey.replace(/%$/, "").trim();
 	if (
 		(privateKey.startsWith('"') && privateKey.endsWith('"')) ||
 		(privateKey.startsWith("'") && privateKey.endsWith("'")) ||
