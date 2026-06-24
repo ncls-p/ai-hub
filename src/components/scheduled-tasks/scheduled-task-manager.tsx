@@ -35,13 +35,16 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchJson } from "@/lib/api-client";
 
-export type ScheduledTask = {
+const DAILY_FREQUENCY = "daily";
+type ScheduleFrequency = typeof DAILY_FREQUENCY | "interval";
+
+type ScheduledTask = {
 	id: string;
 	title: string;
 	prompt: string;
 	agentId: string;
 	conversationId: string | null;
-	frequency: "daily" | "interval";
+	frequency: ScheduleFrequency;
 	timezone: string;
 	timeOfDay: string | null;
 	intervalMinutes: number | null;
@@ -92,7 +95,8 @@ export function ScheduledTaskManager({
 	const [saving, setSaving] = useState(false);
 	const [title, setTitle] = useState(t("defaults.title"));
 	const [prompt, setPrompt] = useState(defaultPrompt);
-	const [frequency, setFrequency] = useState<"daily" | "interval">("daily");
+	const [frequency, setFrequency] =
+		useState<ScheduleFrequency>(DAILY_FREQUENCY);
 	const [timeOfDay, setTimeOfDay] = useState("08:00");
 	const [intervalMinutes, setIntervalMinutes] = useState("1440");
 	const [agentId, setAgentId] = useState(agents[0]?.id ?? "");
@@ -154,7 +158,7 @@ export function ScheduledTaskManager({
 						prompt: prompt.trim(),
 						frequency,
 						timezone: localTimeZone(),
-						timeOfDay: frequency === "daily" ? timeOfDay : null,
+						timeOfDay: frequency === DAILY_FREQUENCY ? timeOfDay : null,
 						intervalMinutes:
 							frequency === "interval" ? Number(intervalMinutes) : null,
 					}),
@@ -209,7 +213,7 @@ export function ScheduledTaskManager({
 	}
 
 	function formatFrequency(task: ScheduledTask) {
-		if (task.frequency === "daily") {
+		if (task.frequency === DAILY_FREQUENCY) {
 			return t("dailyAt", { time: task.timeOfDay ?? "—" });
 		}
 		return t("intervalEvery", { minutes: task.intervalMinutes ?? 0 });
@@ -266,14 +270,14 @@ export function ScheduledTaskManager({
 								<Select
 									value={frequency}
 									onValueChange={(value) =>
-										setFrequency(value as "daily" | "interval")
+										setFrequency(value as ScheduleFrequency)
 									}
 								>
 									<SelectTrigger>
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="daily">
+										<SelectItem value={DAILY_FREQUENCY}>
 											{t("frequency.daily")}
 										</SelectItem>
 										<SelectItem value="interval">
@@ -284,17 +288,19 @@ export function ScheduledTaskManager({
 							</div>
 							<div className="grid gap-2">
 								<Label htmlFor="scheduled-task-schedule">
-									{frequency === "daily"
+									{frequency === DAILY_FREQUENCY
 										? t("fields.time")
 										: t("fields.minutes")}
 								</Label>
 								<Input
 									id="scheduled-task-schedule"
-									type={frequency === "daily" ? "time" : "number"}
-									min={frequency === "daily" ? undefined : 5}
-									value={frequency === "daily" ? timeOfDay : intervalMinutes}
+									type={frequency === DAILY_FREQUENCY ? "time" : "number"}
+									min={frequency === DAILY_FREQUENCY ? undefined : 5}
+									value={
+										frequency === DAILY_FREQUENCY ? timeOfDay : intervalMinutes
+									}
 									onChange={(event) =>
-										frequency === "daily"
+										frequency === DAILY_FREQUENCY
 											? setTimeOfDay(event.target.value)
 											: setIntervalMinutes(event.target.value)
 									}

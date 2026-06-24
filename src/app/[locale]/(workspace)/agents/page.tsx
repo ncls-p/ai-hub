@@ -253,12 +253,13 @@ export default function AgentsPage() {
 			setUserDefaultAgentId(data.userDefaultAgentId ?? null);
 		} catch (err) {
 			if (err instanceof Error && err.name !== "AbortError") {
-				console.error("Failed to load agents", err);
+				toast.error(tList("errors.loadFailed"));
 			}
+			return;
 		} finally {
 			setLoading(false);
 		}
-	}, [workspaceId]);
+	}, [tList, workspaceId]);
 
 	useEffect(() => {
 		if (!workspaceId) return;
@@ -286,8 +287,9 @@ export default function AgentsPage() {
 				}
 			} catch (err) {
 				if (err instanceof Error && err.name !== "AbortError") {
-					console.error("Failed to load agents", err);
+					toast.error(tList("errors.loadFailed"));
 				}
+				return;
 			} finally {
 				if (!cancelled) setLoading(false);
 			}
@@ -298,7 +300,7 @@ export default function AgentsPage() {
 			cancelled = true;
 			controller.abort();
 		};
-	}, [workspaceId]);
+	}, [tList, workspaceId]);
 
 	function applyTemplate(template: (typeof AGENT_TEMPLATES)[number]) {
 		const name = tList(template.nameKey);

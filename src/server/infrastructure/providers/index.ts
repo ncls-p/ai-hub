@@ -4,23 +4,20 @@ import { dragonflyAdapter } from "./dragonfly-adapter";
 import { vercelAiGatewayAdapter } from "./vercel-ai-gateway-adapter";
 
 const ADAPTERS: Record<ProviderKind, ProviderAdapter> = {
-    "openai-compatible": openaiCompatibleAdapter,
-    dragonfly: dragonflyAdapter,
-    "vercel-ai-gateway": vercelAiGatewayAdapter,
-    native: openaiCompatibleAdapter, // fallback
+  "openai-compatible": openaiCompatibleAdapter,
+  dragonfly: dragonflyAdapter,
+  "vercel-ai-gateway": vercelAiGatewayAdapter,
+  native: openaiCompatibleAdapter, // fallback
 };
 
 export function getAdapter(kind: ProviderKind): ProviderAdapter {
-    return ADAPTERS[kind] ?? openaiCompatibleAdapter;
+  return ADAPTERS[kind] ?? openaiCompatibleAdapter;
 }
 
-export { openaiCompatibleAdapter, dragonflyAdapter, vercelAiGatewayAdapter };
 export type {
-    ProviderAdapter,
-    ProviderKind,
-    ProviderAuthType,
-    ProviderRuntimeConfig,
-    ProviderHealth,
-    ModelDescriptor,
-    ModelCapability,
+  ProviderAdapter,
+  ProviderKind,
+  ProviderRuntimeConfig,
+  ProviderHealth,
+  ModelDescriptor,
 } from "./adapter";
