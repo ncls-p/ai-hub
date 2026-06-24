@@ -54,6 +54,80 @@ WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+FROM node:22-bookworm-slim AS sandbox-runner
+
+WORKDIR /opt/sandbox
+
+ENV NODE_ENV=production \
+    SANDBOX_RUNNER_SOCKET=/run/sandbox/sandbox.sock \
+    SANDBOX_RUN_ROOT=/sandbox-runs \
+    SANDBOX_RUN_UID=10001 \
+    SANDBOX_RUN_GID=10001 \
+    SANDBOX_SOCKET_GID=1001 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    NEXT_TELEMETRY_DISABLED=1
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    coreutils \
+    procps \
+    python3 \
+    python3-pip \
+    util-linux \
+  && rm -rf /var/lib/apt/lists/* \
+  && groupadd --system --gid 10001 sandbox \
+  && useradd --system --uid 10001 --gid sandbox --home-dir /nonexistent --shell /usr/sbin/nologin sandbox
+
+RUN python3 -m pip install --break-system-packages --no-cache-dir --prefer-binary \
+    beautifulsoup4 \
+    duckdb \
+    lxml \
+    matplotlib \
+    networkx \
+    numpy \
+    openpyxl \
+    pandas \
+    pdfplumber \
+    pillow \
+    plotly \
+    polars \
+    python-docx \
+    python-pptx \
+    pyyaml \
+    requests \
+    scikit-learn \
+    scipy \
+    seaborn \
+    statsmodels \
+    sympy
+
+RUN npm init -y \
+  && npm install --omit=dev \
+    axios \
+    cheerio \
+    csv-parse \
+    d3 \
+    date-fns \
+    dayjs \
+    js-yaml \
+    lodash \
+    marked \
+    mathjs \
+    papaparse \
+    xml2js \
+    zod \
+  && npm cache clean --force
+
+COPY scripts/sandbox-runner.mjs /opt/sandbox/sandbox-runner.mjs
+
+EXPOSE 3002
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "const http=require('http');const req=http.request({socketPath:process.env.SANDBOX_RUNNER_SOCKET||'/run/sandbox/sandbox.sock',path:'/health'},res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));req.end();"
+
+CMD ["node", "/opt/sandbox/sandbox-runner.mjs"]
+
 FROM base AS deps
 COPY package.json package-lock.json ./
 RUN npm ci

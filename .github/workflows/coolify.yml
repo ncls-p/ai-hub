@@ -112,6 +112,7 @@ jobs:
       garage_image: ${{ steps.images.outputs.garage_image }}
       garage_init_image: ${{ steps.images.outputs.garage_init_image }}
       searxng_image: ${{ steps.images.outputs.searxng_image }}
+      sandbox_runner_image: ${{ steps.images.outputs.sandbox_runner_image }}
 
     steps:
       - name: Checkout repository
@@ -141,6 +142,7 @@ jobs:
           garage_image="ghcr.io/${owner_lc}/ai-hub-garage:${tag}"
           garage_init_image="ghcr.io/${owner_lc}/ai-hub-garage-init:${tag}"
           searxng_image="ghcr.io/${owner_lc}/ai-hub-searxng:${tag}"
+          sandbox_runner_image="ghcr.io/${owner_lc}/ai-hub-sandbox-runner:${tag}"
           {
             echo "app_image=${app_image}"
             echo "worker_image=${worker_image}"
@@ -148,6 +150,7 @@ jobs:
             echo "garage_image=${garage_image}"
             echo "garage_init_image=${garage_init_image}"
             echo "searxng_image=${searxng_image}"
+            echo "sandbox_runner_image=${sandbox_runner_image}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Build and push app image
@@ -216,6 +219,17 @@ jobs:
             --push \
             .
 
+      - name: Build and push sandbox runner image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --target sandbox-runner \
+            --tag "${{ steps.images.outputs.sandbox_runner_image }}" \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            --push \
+            .
+
       - name: Verify pushed SearXNG image config
         run: |
           docker pull "${{ steps.images.outputs.searxng_image }}"
@@ -279,6 +293,7 @@ jobs:
           AI_HUB_GARAGE_IMAGE: ${{ needs.build_images.outputs.garage_image }}
           AI_HUB_GARAGE_INIT_IMAGE: ${{ needs.build_images.outputs.garage_init_image }}
           AI_HUB_SEARXNG_IMAGE: ${{ needs.build_images.outputs.searxng_image }}
+          AI_HUB_SANDBOX_RUNNER_IMAGE: ${{ needs.build_images.outputs.sandbox_runner_image }}
         shell: bash
         run: |
           set -euo pipefail
@@ -299,6 +314,7 @@ jobs:
             AI_HUB_GARAGE_IMAGE
             AI_HUB_GARAGE_INIT_IMAGE
             AI_HUB_SEARXNG_IMAGE
+            AI_HUB_SANDBOX_RUNNER_IMAGE
           )
           for key in "${required[@]}"; do
             if [[ -z "${!key:-}" ]]; then
@@ -485,6 +501,7 @@ jobs:
               "${AI_HUB_GARAGE_IMAGE:?set AI_HUB_GARAGE_IMAGE}": os.environ["AI_HUB_GARAGE_IMAGE"],
               "${AI_HUB_GARAGE_INIT_IMAGE:?set AI_HUB_GARAGE_INIT_IMAGE}": os.environ["AI_HUB_GARAGE_INIT_IMAGE"],
               "${AI_HUB_SEARXNG_IMAGE:?set AI_HUB_SEARXNG_IMAGE}": os.environ["AI_HUB_SEARXNG_IMAGE"],
+              "${AI_HUB_SANDBOX_RUNNER_IMAGE:?set AI_HUB_SANDBOX_RUNNER_IMAGE}": os.environ["AI_HUB_SANDBOX_RUNNER_IMAGE"],
           }
           missing = [needle for needle in replacements if needle not in compose]
           if missing:
@@ -528,6 +545,7 @@ jobs:
               --arg ai_hub_garage_image "${AI_HUB_GARAGE_IMAGE}" \
               --arg ai_hub_garage_init_image "${AI_HUB_GARAGE_INIT_IMAGE}" \
               --arg ai_hub_searxng_image "${AI_HUB_SEARXNG_IMAGE}" \
+              --arg ai_hub_sandbox_runner_image "${AI_HUB_SANDBOX_RUNNER_IMAGE}" \
               --arg postgres_password "${POSTGRES_PASSWORD}" \
               --arg better_auth_secret "${BETTER_AUTH_SECRET}" \
               --arg better_auth_url "${BETTER_AUTH_URL}" \
@@ -550,6 +568,7 @@ jobs:
                 {key: "AI_HUB_GARAGE_IMAGE", value: $ai_hub_garage_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "AI_HUB_GARAGE_INIT_IMAGE", value: $ai_hub_garage_init_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "AI_HUB_SEARXNG_IMAGE", value: $ai_hub_searxng_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
+                {key: "AI_HUB_SANDBOX_RUNNER_IMAGE", value: $ai_hub_sandbox_runner_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "POSTGRES_PASSWORD", value: $postgres_password, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "BETTER_AUTH_SECRET", value: $better_auth_secret, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
                 {key: "BETTER_AUTH_URL", value: $better_auth_url, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
@@ -605,7 +624,7 @@ jobs:
           echo "Using SearXNG image ${AI_HUB_SEARXNG_IMAGE}"
           api GET "/deploy?uuid=${SERVICE_UUID}&force=true" >/dev/null
 
-          long_running='["app", "worker", "garage", "dragonflydb", "searxng"]'
+          long_running='["app", "worker", "garage", "dragonflydb", "searxng", "sandbox-runner"]'
           success=false
           for attempt in $(seq 1 60); do
             STATUS_JSON="$(api GET "/services/${SERVICE_UUID}")"

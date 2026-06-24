@@ -70,6 +70,7 @@ const TOOL_ICONS: Record<string, IconComponent> = {
 	http_fetch: GlobeIcon,
 	web_search: SearchIcon,
 	render_html_artifact: Code2Icon,
+	run_code_sandbox: BracesIcon,
 	code_workspace_create_project: Code2Icon,
 	code_workspace_list_files: Code2Icon,
 	code_workspace_read_file: Code2Icon,
