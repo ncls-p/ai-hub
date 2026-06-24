@@ -398,6 +398,11 @@ async function insertMessage(input: {
 		sortOrder: 0,
 	});
 
+	await db
+		.update(conversations)
+		.set({ updatedAt: new Date(), sidebarOrder: null })
+		.where(eq(conversations.id, input.conversationId));
+
 	return message;
 }
 
@@ -459,6 +464,7 @@ export async function runScheduledTask(
 		.set({
 			agentId: agent.id,
 			agentVersionId: version.id,
+			sidebarOrder: null,
 			updatedAt: new Date(),
 		})
 		.where(eq(conversations.id, conversationId));

@@ -69,7 +69,9 @@ test.describe("setup wizard", () => {
 		await expect(
 			page.getByText("Connect AI", { exact: true }).first(),
 		).toBeVisible();
-		await expect(page.getByText("Pick a model", { exact: true })).toBeVisible();
+		await expect(
+			page.getByText("Pick a model", { exact: true }).first(),
+		).toBeVisible();
 	});
 });
 

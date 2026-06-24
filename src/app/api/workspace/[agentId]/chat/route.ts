@@ -1180,6 +1180,10 @@ export async function POST(
 			}
 		}
 		userMessageId = userMessage.id;
+		await db
+			.update(conversations)
+			.set({ updatedAt: new Date(), sidebarOrder: null })
+			.where(eq(conversations.id, conversation.id));
 		const shouldRegenerateConversationTitle =
 			createdConversation ||
 			(resendFromMessageId
@@ -1649,6 +1653,7 @@ export async function POST(
 						agentId,
 						agentVersionId: version.id,
 						title: generatedTitle,
+						sidebarOrder: null,
 						updatedAt: new Date(),
 					})
 					.where(eq(conversations.id, conversation.id));
