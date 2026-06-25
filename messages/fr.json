@@ -223,6 +223,39 @@
       "builtinTools": "Outils intégrés",
       "builtinToolsHint": "Outils fournis par la plateforme.",
       "noBuiltinTools": "Aucun outil intégré disponible.",
+      "toolPackagesHint": "Activez un package complet pour aller vite, ou dépliez-le pour choisir les outils un par un.",
+      "toolPackageCount": "{enabled}/{total} actifs",
+      "customizePackage": "Détails",
+      "toolPackages": {
+        "essentials": {
+          "title": "Utilitaires du quotidien",
+          "description": "Calculs, dates, identifiants et petits outils sûrs pour la plupart des assistants."
+        },
+        "research": {
+          "title": "Recherche web",
+          "description": "Chercher sur le web ou lire une page quand l’assistant a besoin d’informations externes récentes."
+        },
+        "workspace": {
+          "title": "Espace de code",
+          "description": "Exécuter du code, inspecter des fichiers, modifier un workspace live et publier sur GitHub."
+        },
+        "business": {
+          "title": "Documents métier",
+          "description": "Créer documents, plans, e-mails, rapports, registres de risques et briefs de compte."
+        },
+        "data": {
+          "title": "Données et texte",
+          "description": "Formater du JSON, hasher ou encoder du texte, convertir des unités, slugifier et créer des tables Markdown."
+        },
+        "visuals": {
+          "title": "Sorties visuelles",
+          "description": "Produire des aperçus HTML, des présentations et des conversions de couleurs."
+        },
+        "other": {
+          "title": "Autres outils",
+          "description": "Nouveaux outils pas encore rangés dans un package."
+        }
+      },
       "mcpTools": "Intégrations MCP",
       "mcpToolsHint": "Outils externes via serveurs MCP.",
       "noMcpServers": "Aucun serveur MCP connecté.",

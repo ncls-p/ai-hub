@@ -223,6 +223,39 @@
       "builtinTools": "Built-in tools",
       "builtinToolsHint": "Platform tools this assistant can call.",
       "noBuiltinTools": "No built-in tools available.",
+      "toolPackagesHint": "Enable a whole package for the simple path, or expand it to choose tools one by one.",
+      "toolPackageCount": "{enabled}/{total} enabled",
+      "customizePackage": "Details",
+      "toolPackages": {
+        "essentials": {
+          "title": "Everyday utilities",
+          "description": "Quick calculations, dates, IDs, and small helpers that are safe for most assistants."
+        },
+        "research": {
+          "title": "Web research",
+          "description": "Search the web or fetch a page when the assistant needs current external information."
+        },
+        "workspace": {
+          "title": "Code workspace",
+          "description": "Run code, inspect uploaded files, edit live workspaces, and publish to GitHub."
+        },
+        "business": {
+          "title": "Business documents",
+          "description": "Create operational documents, plans, emails, reports, risk registers, and account briefs."
+        },
+        "data": {
+          "title": "Data and text",
+          "description": "Format JSON, hash or encode text, convert units, slugify copy, and create Markdown tables."
+        },
+        "visuals": {
+          "title": "Visual outputs",
+          "description": "Render HTML previews, slide decks, and color conversions for polished deliverables."
+        },
+        "other": {
+          "title": "Other tools",
+          "description": "New tools that are not assigned to a package yet."
+        }
+      },
       "mcpTools": "MCP integrations",
       "mcpToolsHint": "External tools connected via MCP servers.",
       "noMcpServers": "No MCP server connected yet.",
