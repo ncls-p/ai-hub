@@ -30,7 +30,11 @@ import {
 	XCircleIcon,
 	XIcon,
 } from "lucide-react";
-import { Streamdown, type LinkSafetyConfig, type LinkSafetyModalProps } from "streamdown";
+import {
+	Streamdown,
+	type LinkSafetyConfig,
+	type LinkSafetyModalProps,
+} from "streamdown";
 import { code } from "@streamdown/code";
 
 import { CitationBlock } from "@/components/chat/citation-block";
@@ -112,7 +116,10 @@ function ExternalLinkSafetyModal({
 				className="w-full max-w-md rounded-2xl border bg-card p-5 text-sm shadow-2xl"
 				onClick={(event) => event.stopPropagation()}
 			>
-				<h2 id="external-link-title" className="text-base font-semibold text-foreground">
+				<h2
+					id="external-link-title"
+					className="text-base font-semibold text-foreground"
+				>
 					Open external link?
 				</h2>
 				<p className="mt-2 text-muted-foreground">
