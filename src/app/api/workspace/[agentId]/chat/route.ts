@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { cookies } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { fallbackSystemPrompt } from "@/lib/copy-defaults";
 import { z } from "zod";
 import { decryptValue, encryptValue } from "@/lib/crypto";
@@ -1551,6 +1551,21 @@ export async function POST(
 			streamedParts.push({ id: inserted.id, type, metadata });
 		}
 
+		const postCompletionAutomationRef: {
+			current: (() => Promise<void>) | null;
+		} = { current: null };
+		after(async () => {
+			const job = postCompletionAutomationRef.current;
+			if (!job) return;
+			try {
+				await job();
+			} catch (error) {
+				logHandledWarning("Failed to run chat post-processing", {
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		});
+
 		const streamAbortController = new AbortController();
 		registerChatStreamAbortController(
 			assistantMessage.id,
@@ -1709,42 +1724,44 @@ export async function POST(
 						enqueueEvent({ type: "file", artifact });
 					}
 				}
-				const shouldSkipSuggestions = consumeSkipNextChatSuggestions(
-					conversation.id,
-				);
-				const artifacts = assistantText
-					? await generateChatAutomationArtifacts({
-							userMessage: content,
-							assistantText,
-							fallbackTitle: conversation.title,
-							generateSuggestions: !shouldSkipSuggestions,
-						})
-					: { title: conversation.title, suggestions: [] };
-				const generatedTitle = shouldRegenerateConversationTitle
-					? artifacts.title
-					: conversation.title;
-				if (
-					shouldRegenerateConversationTitle &&
-					generatedTitle.trim() &&
-					generatedTitle.trim() !== conversation.title.trim()
-				) {
-					enqueueEvent({ type: "conversation_title", title: generatedTitle });
-				}
-				if (artifacts.suggestions.length > 0) {
-					await appendStreamedSuggestionsPart(artifacts.suggestions);
-					enqueueEvent({
-						type: "suggestions",
-						suggestions: artifacts.suggestions,
-					});
-				}
+				postCompletionAutomationRef.current = async () => {
+					const shouldSkipSuggestions = consumeSkipNextChatSuggestions(
+						conversation.id,
+					);
+					const artifacts = assistantText
+						? await generateChatAutomationArtifacts({
+								userMessage: content,
+								assistantText,
+								fallbackTitle: conversation.title,
+								generateSuggestions: !shouldSkipSuggestions,
+							})
+						: { title: conversation.title, suggestions: [] };
+					const generatedTitle = shouldRegenerateConversationTitle
+						? artifacts.title
+						: conversation.title;
+					if (artifacts.suggestions.length > 0) {
+						await appendStreamedSuggestionsPart(artifacts.suggestions);
+					}
+					if (
+						shouldRegenerateConversationTitle &&
+						generatedTitle.trim() &&
+						generatedTitle.trim() !== conversation.title.trim()
+					) {
+						await db
+							.update(conversations)
+							.set({ title: generatedTitle, updatedAt: new Date() })
+							.where(eq(conversations.id, conversation.id));
+					}
+				};
 
+				const completedAt = new Date();
 				await db
 					.update(messages)
 					.set({
 						status: "completed",
 						tokenInput: totalUsage.inputTokens,
 						tokenOutput: totalUsage.outputTokens,
-						completedAt: new Date(),
+						completedAt,
 					})
 					.where(eq(messages.id, assistantMessage.id));
 
@@ -1753,9 +1770,8 @@ export async function POST(
 					.set({
 						agentId,
 						agentVersionId: version.id,
-						title: generatedTitle,
 						sidebarOrder: null,
-						updatedAt: new Date(),
+						updatedAt: completedAt,
 					})
 					.where(eq(conversations.id, conversation.id));
 
