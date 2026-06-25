@@ -36,6 +36,7 @@ import {
 	type LinkSafetyModalProps,
 } from "streamdown";
 import { code } from "@streamdown/code";
+import { createMathPlugin } from "@streamdown/math";
 
 import { CitationBlock } from "@/components/chat/citation-block";
 import {
@@ -84,7 +85,8 @@ const OUTLINE_VARIANT = "outline";
 const GHOST_VARIANT = "ghost";
 const COMPACT_ICON_CLASS = "size-3";
 
-const STREAMDOWN_PLUGINS = { code };
+const streamdownMath = createMathPlugin({ singleDollarTextMath: true });
+const STREAMDOWN_PLUGINS = { code, math: streamdownMath };
 
 function isTrustedInternalLink(url: string) {
 	if (typeof window === "undefined") return false;
