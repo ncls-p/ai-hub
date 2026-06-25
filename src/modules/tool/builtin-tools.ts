@@ -98,15 +98,31 @@ const htmlArtifactInputSchema = z.object({
 	height: z.number().int().min(160).max(900).default(420),
 });
 
+function runtimeLimitedString(
+	maxChars: number,
+	label: string,
+	options: { min?: number; trim?: boolean } = {},
+) {
+	let schema = options.trim ? z.string().trim() : z.string();
+	if (options.min !== undefined) schema = schema.min(options.min);
+	return schema.superRefine((value, ctx) => {
+		if (value.length <= maxChars) return;
+		ctx.addIssue({
+			code: "custom",
+			message: `${label} must be at most ${maxChars.toLocaleString()} characters.`,
+		});
+	});
+}
+
 const codeSandboxInputSchema = z.object({
 	language: z.enum(["python", "node", "bash"]),
-	code: z.string().trim().min(1).max(100_000),
-	stdin: z.string().max(100_000).optional(),
+	code: runtimeLimitedString(100_000, "Code", { min: 1, trim: true }),
+	stdin: runtimeLimitedString(100_000, "Standard input").optional(),
 	files: z
 		.array(
 			z.object({
 				path: z.string().trim().min(1).max(260),
-				content: z.string().max(200_000),
+				content: runtimeLimitedString(200_000, "Input file content"),
 			}),
 		)
 		.max(25)
@@ -131,7 +147,7 @@ const codeWorkspaceCreateInputSchema = z.object({
 		.array(
 			z.object({
 				path: z.string().trim().min(1).max(260),
-				content: z.string().max(1_000_000).optional(),
+				content: runtimeLimitedString(1_000_000, "File content").optional(),
 			}),
 		)
 		.min(1)
@@ -150,14 +166,14 @@ const codeWorkspaceReadFileInputSchema = z.object({
 const codeWorkspaceWriteFileInputSchema = z.object({
 	projectId: z.uuid(),
 	path: z.string().trim().min(1).max(260),
-	content: z.string().max(1_000_000),
+	content: runtimeLimitedString(1_000_000, "File content"),
 });
 
 const codeWorkspaceReplaceTextInputSchema = z.object({
 	projectId: z.uuid(),
 	path: z.string().trim().min(1).max(260),
-	oldText: z.string().min(1).max(200_000),
-	newText: z.string().max(200_000),
+	oldText: runtimeLimitedString(200_000, "Text to replace", { min: 1 }),
+	newText: runtimeLimitedString(200_000, "Replacement text"),
 	replaceAll: z.boolean().default(false),
 });
 
@@ -197,21 +213,21 @@ const dateMathInputSchema = z.object({
 
 const jsonToolInputSchema = z.object({
 	action: z.enum(["validate", "format", "minify", "inspect"]).default("format"),
-	json: z.string().min(1).max(100_000),
+	json: runtimeLimitedString(100_000, "JSON", { min: 1 }),
 });
 
 const textStatsInputSchema = z.object({
-	text: z.string().max(100_000),
+	text: runtimeLimitedString(100_000, "Text"),
 	wordsPerMinute: z.number().int().min(80).max(500).default(200),
 });
 
 const base64ToolInputSchema = z.object({
 	action: z.enum(["encode", "decode"]),
-	value: z.string().max(100_000),
+	value: runtimeLimitedString(100_000, "Value"),
 });
 
 const hashTextInputSchema = z.object({
-	text: z.string().max(100_000),
+	text: runtimeLimitedString(100_000, "Text"),
 	algorithm: z.enum(["sha256", "sha1", "md5"]).default("sha256"),
 });
 
