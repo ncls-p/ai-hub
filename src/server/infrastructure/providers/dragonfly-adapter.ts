@@ -1,5 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModelV2 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type {
 	ProviderAdapter,
 	ProviderRuntimeConfig,
@@ -359,7 +359,7 @@ export const dragonflyAdapter: ProviderAdapter = {
 	createChatModel(
 		config: ProviderRuntimeConfig,
 		modelId: string,
-	): LanguageModelV2 {
+	): LanguageModelV4 {
 		const provider = createOpenAICompatible({
 			name: "dragonfly",
 			apiKey: getBearerApiKey(config),

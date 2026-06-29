@@ -8,7 +8,10 @@ let completeChatStream: (messageId: string) => void;
 let hasActiveChatStream: (messageId: string) => boolean;
 let subscribeToChatStream: (
 	messageId: string,
-	subscriber: { enqueue: (e: Record<string, unknown>) => void; close: () => void },
+	subscriber: {
+		enqueue: (e: Record<string, unknown>) => void;
+		close: () => void;
+	},
 	options?: { replay?: boolean },
 ) => () => void;
 let abortChatStream: (messageId: string) => boolean;
@@ -16,6 +19,10 @@ let registerChatStreamAbortController: (
 	messageId: string,
 	controller: AbortController,
 ) => void;
+let createChatUIMessageStreamResponse: (
+	messageId: string,
+	headers?: Record<string, string>,
+) => Response;
 
 beforeEach(async () => {
 	vi.resetModules();
@@ -26,6 +33,7 @@ beforeEach(async () => {
 		subscribeToChatStream,
 		abortChatStream,
 		registerChatStreamAbortController,
+		createChatUIMessageStreamResponse,
 	} = await import("@/modules/chat/stream-bus"));
 });
 
@@ -56,14 +64,19 @@ describe("stream-bus", () => {
 	describe("subscribeToChatStream", () => {
 		it("replays past events to new subscriber", () => {
 			const id = crypto.randomUUID();
-			const events = [{ type: "text", content: "a" }, { type: "text", content: "b" }];
+			const events = [
+				{ type: "text", content: "a" },
+				{ type: "text", content: "b" },
+			];
 			for (const e of events) publishChatStreamEvent(id, e);
 
 			const received: Record<string, unknown>[] = [];
 			const closed = { value: false };
 			subscribeToChatStream(id, {
 				enqueue: (e) => received.push(e),
-				close: () => { closed.value = true; },
+				close: () => {
+					closed.value = true;
+				},
 			});
 
 			expect(received).toEqual(events);
@@ -91,7 +104,9 @@ describe("stream-bus", () => {
 			const closed = { value: false };
 			subscribeToChatStream(id, {
 				enqueue: () => {},
-				close: () => { closed.value = true; },
+				close: () => {
+					closed.value = true;
+				},
 			});
 
 			expect(closed.value).toBe(true);
@@ -115,7 +130,9 @@ describe("stream-bus", () => {
 			const closed = { value: false };
 			subscribeToChatStream(id, {
 				enqueue: () => {},
-				close: () => { closed.value = true; },
+				close: () => {
+					closed.value = true;
+				},
 			});
 
 			completeChatStream(id);
@@ -167,6 +184,54 @@ describe("stream-bus", () => {
 			abortChatStream(id);
 
 			expect(controller.signal.aborted).toBe(true);
+		});
+	});
+
+	describe("AI SDK UI stream response", () => {
+		async function readResponseText(response: Response) {
+			const reader = response.body?.getReader();
+			expect(reader).toBeDefined();
+			const decoder = new TextDecoder();
+			let text = "";
+			while (reader) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				text += decoder.decode(value, { stream: true });
+			}
+			return text + decoder.decode();
+		}
+
+		it("maps bus events to AI SDK UIMessage stream chunks", async () => {
+			const id = crypto.randomUUID();
+			const response = createChatUIMessageStreamResponse(id, {
+				"X-Conversation-Id": "conversation-id",
+				"X-Message-Id": id,
+				"X-User-Message-Id": "user-message-id",
+			});
+
+			publishChatStreamEvent(id, { type: "text", delta: "Hello" });
+			publishChatStreamEvent(id, {
+				type: "tool_call",
+				toolCallId: "call-1",
+				toolName: "lookup",
+				input: { q: "x" },
+			});
+			publishChatStreamEvent(id, {
+				type: "tool_result",
+				toolCallId: "call-1",
+				toolName: "lookup",
+				output: { ok: true },
+			});
+			publishChatStreamEvent(id, { type: "done" });
+			completeChatStream(id);
+
+			const text = await readResponseText(response);
+			expect(text).toContain('"type":"start"');
+			expect(text).toContain('"conversationId":"conversation-id"');
+			expect(text).toContain('"type":"text-delta"');
+			expect(text).toContain('"type":"tool-input-available"');
+			expect(text).toContain('"type":"tool-output-available"');
+			expect(text).toContain('"type":"finish"');
 		});
 	});
 

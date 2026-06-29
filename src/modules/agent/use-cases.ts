@@ -28,6 +28,7 @@ import {
 	cloneSkillBindings,
 	replaceSkillBindingsForVersion,
 } from "@/modules/skills/use-cases";
+import type { AiHubToolApprovalPolicy } from "@/modules/tool/approval-policy";
 import {
 	cloneToolBindings,
 	insertToolBindingsForVersion,
@@ -101,9 +102,7 @@ interface AgentGuardrails {
 	blockedTopics?: string[];
 }
 
-interface AgentApprovalPolicy {
-	requireApprovalForAllTools?: boolean;
-}
+type AgentApprovalPolicy = AiHubToolApprovalPolicy;
 
 export interface UpdateAgentInput {
 	agentId: string;

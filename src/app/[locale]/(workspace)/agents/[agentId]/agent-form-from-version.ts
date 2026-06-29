@@ -22,7 +22,7 @@ export type AgentVersionPayload = {
 	responseFormatJson: { type?: "text" | "json_object" } | null;
 	memoryPolicyJson: { enabled?: boolean; maxMessages?: number } | null;
 	guardrailsJson: { enabled?: boolean; blockedTopics?: string[] } | null;
-	approvalPolicyJson: { requireApprovalForAllTools?: boolean } | null;
+	approvalPolicyJson: AgentForm["approvalPolicy"] | null;
 };
 
 function coerceNumericField(
@@ -62,6 +62,7 @@ function buildPolicySettings(activeVersion: AgentVersionPayload | null) {
 			blockedTopics: activeVersion?.guardrailsJson?.blockedTopics ?? [],
 		},
 		approvalPolicy: {
+			...activeVersion?.approvalPolicyJson,
 			requireApprovalForAllTools:
 				activeVersion?.approvalPolicyJson?.requireApprovalForAllTools ?? false,
 		},

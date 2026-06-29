@@ -1,6 +1,6 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { logger } from "@/lib/logger";
-import type { LanguageModelV2 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type {
 	ProviderAdapter,
 	ProviderRuntimeConfig,
@@ -117,7 +117,7 @@ export const vercelAiGatewayAdapter: ProviderAdapter = {
 	createChatModel(
 		config: ProviderRuntimeConfig,
 		modelId: string,
-	): LanguageModelV2 {
+	): LanguageModelV4 {
 		const headers: Record<string, string> = { ...config.headers };
 
 		if (config.authType === "gateway" && config.apiKey) {

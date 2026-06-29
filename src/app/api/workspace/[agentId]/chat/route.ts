@@ -19,6 +19,7 @@ import { isAdminRole } from "@/modules/admin/use-cases";
 import {
 	completeChatStream,
 	createChatStreamResponse,
+	createChatUIMessageStreamResponse,
 	publishChatStreamEvent,
 	registerChatStreamAbortController,
 } from "@/modules/chat/stream-bus";
@@ -59,7 +60,12 @@ import {
 	getToolBindingsForVersion,
 	logToolInvocation,
 } from "@/modules/tool/use-cases";
+import {
+	decideToolApproval,
+	type AiHubToolApprovalPolicy,
+} from "@/modules/tool/approval-policy";
 import { waitForApproval } from "@/modules/tool/invocation-state";
+import { evaluateOpaToolApprovalPolicy } from "@/modules/tool/opa-approval-policy";
 import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
 import {
@@ -69,15 +75,19 @@ import {
 	messages,
 	toolInvocations,
 } from "@/server/infrastructure/db/schema";
+import { registerAiSdkDevTools } from "@/server/infrastructure/ai-sdk/devtools";
 import { getAdapter } from "@/server/infrastructure/providers";
 import {
 	extractReasoningMiddleware,
 	jsonSchema,
-	streamText,
+	ToolLoopAgent,
 	wrapLanguageModel,
 	type ModelMessage,
+	type ToolApprovalConfiguration,
 	type ToolSet,
 } from "ai";
+
+registerAiSdkDevTools();
 
 const chatRequestSchema = z.object({
 	content: z.string().trim().min(1).max(32_000),
@@ -95,6 +105,15 @@ type ToolApprovalRequiredEvent = {
 	invocationId: string;
 	toolName: string;
 	input: unknown;
+};
+
+type BoundToolApprovalMetadata = {
+	toolSource: "builtin" | "custom" | "mcp";
+	toolName: string;
+	riskLevel?: string | null;
+	bindingRequiresApproval?: boolean;
+	serverRequiresApproval?: boolean;
+	toolRequiresApproval?: boolean;
 };
 
 const githubPublishToolNames = [
@@ -172,7 +191,7 @@ async function buildBoundTools(input: {
 	userId: string;
 	maxToolCalls: number;
 	autoCodeWorkspaceToolNames?: string[];
-	requireApprovalForAllTools?: boolean;
+	approvalPolicy?: AiHubToolApprovalPolicy | null;
 	hasSkills?: boolean;
 	emitEvent?: (event: Record<string, unknown>) => void;
 	onApprovalRequired?: (event: ToolApprovalRequiredEvent) => void;
@@ -199,7 +218,15 @@ async function buildBoundTools(input: {
 		});
 	}
 	const tools: ToolSet = {};
+	const toolApprovalMetadata = new Map<string, BoundToolApprovalMetadata>();
 	let executedToolCallCount = 0;
+
+	function registerToolApprovalMetadata(
+		toolKey: string,
+		metadata: BoundToolApprovalMetadata,
+	) {
+		toolApprovalMetadata.set(toolKey, metadata);
+	}
 
 	function reserveToolCall() {
 		if (executedToolCallCount >= input.maxToolCalls) return false;
@@ -215,7 +242,104 @@ async function buildBoundTools(input: {
 		};
 	}
 
+	async function gateToolExecution(inputArgs: {
+		startedAt: number;
+		toolSource: "builtin" | "custom" | "mcp";
+		toolId: string;
+		toolName: string;
+		riskLevel?: string | null;
+		toolInput: unknown;
+		bindingRequiresApproval?: boolean;
+		serverRequiresApproval?: boolean;
+		toolRequiresApproval?: boolean;
+	}): Promise<{ status: "continue" } | { status: "return"; output: unknown }> {
+		const decision =
+			(await evaluateOpaToolApprovalPolicy({
+				toolName: inputArgs.toolName,
+				toolSource: inputArgs.toolSource,
+				riskLevel: inputArgs.riskLevel,
+				toolInput: inputArgs.toolInput,
+				workspaceId: input.workspaceId,
+				conversationId: input.conversationId,
+				messageId: input.messageId,
+				userId: input.userId,
+				agentVersionId: input.agentVersionId,
+			})) ??
+			decideToolApproval({
+				policy: input.approvalPolicy,
+				toolName: inputArgs.toolName,
+				toolSource: inputArgs.toolSource,
+				riskLevel: inputArgs.riskLevel,
+				bindingRequiresApproval: inputArgs.bindingRequiresApproval,
+				serverRequiresApproval: inputArgs.serverRequiresApproval,
+				toolRequiresApproval: inputArgs.toolRequiresApproval,
+			});
+
+		if (decision.status === "allow") return { status: "continue" };
+
+		if (decision.status === "deny") {
+			await logToolInvocation({
+				workspaceId: input.workspaceId,
+				conversationId: input.conversationId,
+				messageId: input.messageId,
+				toolSource: inputArgs.toolSource,
+				toolId: inputArgs.toolId,
+				toolName: inputArgs.toolName,
+				riskLevel: inputArgs.riskLevel,
+				input: inputArgs.toolInput,
+				status: "denied",
+				latencyMs: Date.now() - inputArgs.startedAt,
+				errorMessage: decision.reason ?? "Tool denied by approval policy",
+			});
+			return {
+				status: "return",
+				output: {
+					denied: true,
+					message: decision.reason ?? "Tool denied by approval policy.",
+				},
+			};
+		}
+
+		const invocation = await logToolInvocation({
+			workspaceId: input.workspaceId,
+			conversationId: input.conversationId,
+			messageId: input.messageId,
+			toolSource: inputArgs.toolSource,
+			toolId: inputArgs.toolId,
+			toolName: inputArgs.toolName,
+			riskLevel: inputArgs.riskLevel,
+			input: inputArgs.toolInput,
+			status: "awaiting_approval",
+			latencyMs: Date.now() - inputArgs.startedAt,
+		});
+
+		input.onApprovalRequired?.({
+			invocationId: invocation.id,
+			toolName: inputArgs.toolName,
+			input: inputArgs.toolInput,
+		});
+
+		const approvalResult = await waitForApproval(invocation.id);
+		if (approvalResult.status === "success") {
+			return { status: "return", output: approvalResult.output };
+		}
+
+		return {
+			status: "return",
+			output: {
+				denied: true,
+				invocationId: invocation.id,
+				message: approvalResult.error ?? "Tool invocation was not approved.",
+			},
+		};
+	}
+
 	if (input.hasSkills) {
+		registerToolApprovalMetadata("load_skill", {
+			toolSource: "builtin",
+			toolName: "load_skill",
+			riskLevel: "low",
+		});
 		tools.load_skill = {
 			description:
 				"Load the full Markdown instructions for an enabled agent skill by exact skill name. Use this when a listed skill is relevant before applying its workflow.",
@@ -264,6 +388,12 @@ async function buildBoundTools(input: {
 				string,
 				unknown
 			> | null) ?? { type: "object", properties: {} };
+			registerToolApprovalMetadata(toolKey, {
+				toolSource: "custom",
+				toolName: customTool.name,
+				riskLevel: binding.riskLevel,
+				bindingRequiresApproval: binding.requireApproval,
+			});
 
 			tools[toolKey] = {
 				description:
@@ -288,6 +418,17 @@ async function buildBoundTools(input: {
 						});
 						return toolLimitReachedResult();
 					}
+					const gate = await gateToolExecution({
+						startedAt,
+						toolSource: "custom",
+						toolId: customTool.id,
+						toolName: customTool.name,
+						riskLevel: binding.riskLevel,
+						toolInput,
+						bindingRequiresApproval: binding.requireApproval,
+					});
+					if (gate.status === "return") return gate.output;
+
 					try {
 						const output = await executeCustomToolWorkflow({
 							workspaceId: input.workspaceId,
@@ -338,11 +479,6 @@ async function buildBoundTools(input: {
 			);
 			if (!mcpContext) continue;
 			const mcpTool = mcpContext.tool;
-			const requiresMcpApproval =
-				input.requireApprovalForAllTools ||
-				mcpContext.server.requireApproval ||
-				mcpTool.requireApproval ||
-				binding.requireApproval;
 
 			const sanitizedName = mcpTool.name
 				.replace(/[^a-zA-Z0-9_]/g, "_")
@@ -355,6 +491,14 @@ async function buildBoundTools(input: {
 				type: "object",
 				properties: {},
 			};
+			registerToolApprovalMetadata(toolKey, {
+				toolSource: "mcp",
+				toolName: mcpTool.name,
+				riskLevel: binding.riskLevel,
+				bindingRequiresApproval: binding.requireApproval,
+				serverRequiresApproval: mcpContext.server.requireApproval,
+				toolRequiresApproval: mcpTool.requireApproval,
+			});
 
 			tools[toolKey] = {
 				description:
@@ -379,36 +523,18 @@ async function buildBoundTools(input: {
 						});
 						return toolLimitReachedResult();
 					}
-					if (requiresMcpApproval) {
-						const invocation = await logToolInvocation({
-							workspaceId: input.workspaceId,
-							conversationId: input.conversationId,
-							messageId: input.messageId,
-							toolSource: "mcp",
-							toolId: mcpTool.id,
-							toolName: mcpTool.name,
-							riskLevel: binding.riskLevel,
-							input: toolInput,
-							status: "awaiting_approval",
-							latencyMs: Date.now() - startedAt,
-						});
-
-						input.onApprovalRequired?.({
-							invocationId: invocation.id,
-							toolName: mcpTool.name,
-							input: toolInput,
-						});
-
-						const approvalResult = await waitForApproval(invocation.id);
-						if (approvalResult.status !== "success") {
-							return {
-								denied: true,
-								message:
-									approvalResult.error ?? "Tool invocation was not approved.",
-							};
-						}
-						return approvalResult.output;
-					}
+					const gate = await gateToolExecution({
+						startedAt,
+						toolSource: "mcp",
+						toolId: mcpTool.id,
+						toolName: mcpTool.name,
+						riskLevel: binding.riskLevel,
+						toolInput,
+						bindingRequiresApproval: binding.requireApproval,
+						serverRequiresApproval: mcpContext.server.requireApproval,
+						toolRequiresApproval: mcpTool.requireApproval,
+					});
+					if (gate.status === "return") return gate.output;
 
 					try {
 						const output = await executeMcpTool({
@@ -456,6 +582,12 @@ async function buildBoundTools(input: {
 		if (binding.toolSource !== "builtin") continue;
 		const definition = getBuiltInTool(binding.toolId);
 		if (!definition) continue;
+		registerToolApprovalMetadata(definition.name, {
+			toolSource: "builtin",
+			toolName: definition.name,
+			riskLevel: definition.riskLevel,
+			bindingRequiresApproval: binding.requireApproval,
+		});
 
 		tools[definition.name] = {
 			description: `${definition.description} Risk level: ${definition.riskLevel}.`,
@@ -514,41 +646,16 @@ async function buildBoundTools(input: {
 					}
 				}
 
-				if (input.requireApprovalForAllTools || binding.requireApproval) {
-					const invocation = await logToolInvocation({
-						workspaceId: input.workspaceId,
-						conversationId: input.conversationId,
-						messageId: input.messageId,
-						toolSource: "builtin",
-						toolId: definition.id,
-						toolName: definition.name,
-						riskLevel: definition.riskLevel,
-						input: toolInput,
-						status: "awaiting_approval",
-						latencyMs: Date.now() - startedAt,
-					});
-
-					input.onApprovalRequired?.({
-						invocationId: invocation.id,
-						toolName: definition.name,
-						input: toolInput,
-					});
-
-					// Block until approval is granted or denied
-					const approvalResult = await waitForApproval(invocation.id);
-
-					if (approvalResult.status === "success") {
-						return approvalResult.output;
-					}
-
-					// Rejected or failed
-					return {
-						denied: true,
-						invocationId: invocation.id,
-						message:
-							approvalResult.error ?? "Tool invocation was not approved.",
-					};
-				}
+				const gate = await gateToolExecution({
+					startedAt,
+					toolSource: "builtin",
+					toolId: definition.id,
+					toolName: definition.name,
+					riskLevel: definition.riskLevel,
+					toolInput,
+					bindingRequiresApproval: binding.requireApproval,
+				});
+				if (gate.status === "return") return gate.output;
 
 				try {
 					const output = await definition.execute(toolInput as never, {
@@ -593,7 +700,35 @@ async function buildBoundTools(input: {
 		};
 	}
 
-	return tools;
+	const toolApproval: ToolApprovalConfiguration<
+		ToolSet,
+		Record<string, unknown>
+	> = async ({ toolCall }) => {
+		const metadata = toolApprovalMetadata.get(toolCall.toolName);
+		if (!metadata) return undefined;
+		const decision =
+			(await evaluateOpaToolApprovalPolicy({
+				toolName: metadata.toolName,
+				toolSource: metadata.toolSource,
+				riskLevel: metadata.riskLevel,
+				toolInput: toolCall.input,
+				workspaceId: input.workspaceId,
+				conversationId: input.conversationId,
+				messageId: input.messageId,
+				userId: input.userId,
+				agentVersionId: input.agentVersionId,
+			})) ??
+			decideToolApproval({
+				policy: input.approvalPolicy,
+				...metadata,
+			});
+		// Keep human approvals in AI Hub's existing DB-audited, streaming approval
+		// flow. Native AI SDK approval is used here for hard policy denials so the
+		// model receives a standard denied tool output before execution can start.
+		return decision.status === "deny" ? decision.aiSdkStatus : undefined;
+	};
+
+	return { tools, toolApproval };
 }
 
 async function findUserMessageForResend(input: {
@@ -1016,6 +1151,10 @@ export async function POST(
 			attachmentIds = [],
 			imageAttachmentIds = [],
 		} = parsed.data;
+		const streamProtocol =
+			req.headers.get("X-AI-Hub-Stream-Protocol") ??
+			req.nextUrl.searchParams.get("streamProtocol");
+		const useAiSdkUIStream = streamProtocol === "ai-sdk-ui";
 
 		const [agent] = await db
 			.select()
@@ -1356,10 +1495,9 @@ export async function POST(
 		const skillsPrompt = shouldUseToolCalling
 			? await buildSkillsRegistryPrompt(version.id)
 			: null;
-		const approvalPolicy = version.approvalPolicyJson as {
-			requireApprovalForAllTools?: boolean;
-		} | null;
-		const tools = shouldUseToolCalling
+		const approvalPolicy =
+			(version.approvalPolicyJson as AiHubToolApprovalPolicy | null) ?? null;
+		const boundToolConfig = shouldUseToolCalling
 			? await buildBoundTools({
 					agentVersionId: version.id,
 					workspaceId: agent.workspaceId,
@@ -1369,9 +1507,7 @@ export async function POST(
 					maxToolCalls,
 					autoCodeWorkspaceToolNames,
 					hasSkills: Boolean(skillsPrompt),
-					requireApprovalForAllTools: Boolean(
-						approvalPolicy?.requireApprovalForAllTools,
-					),
+					approvalPolicy,
 					emitEvent: enqueueEvent,
 					onApprovalRequired: (event) => {
 						enqueueEvent({
@@ -1382,7 +1518,8 @@ export async function POST(
 						});
 					},
 				})
-			: {};
+			: { tools: {}, toolApproval: undefined };
+		const tools: ToolSet = boundToolConfig.tools;
 		const availableToolNames = Object.keys(tools);
 		const versionToolChoice = version.toolChoice;
 		const configuredToolChoice: "auto" | "required" | "none" | undefined =
@@ -1580,11 +1717,10 @@ export async function POST(
 			maxRetries?: number;
 			stopSequences?: string[];
 		} | null;
-		const result = streamText({
+		const runtimeAgent = new ToolLoopAgent({
+			id: version.id,
 			model,
-			system: systemPrompt,
-			abortSignal: streamAbortController.signal,
-			messages: history,
+			instructions: systemPrompt,
 			temperature: version.temperature
 				? Number.parseFloat(version.temperature)
 				: undefined,
@@ -1600,6 +1736,27 @@ export async function POST(
 			maxOutputTokens: version.maxOutputTokens ?? defaultMaxOutputTokens,
 			tools,
 			toolChoice: configuredToolChoice,
+			toolApproval: boundToolConfig.toolApproval,
+			toolOrder: availableToolNames,
+			runtimeContext: {
+				workspaceId: agent.workspaceId,
+				userId: actorUserId,
+				agentId,
+				agentVersionId: version.id,
+				conversationId: conversation.id,
+			},
+			telemetry: {
+				functionId: "ai-hub.chat",
+				recordInputs: process.env.AI_SDK_TELEMETRY_RECORD_INPUTS === "true",
+				recordOutputs: process.env.AI_SDK_TELEMETRY_RECORD_OUTPUTS === "true",
+				includeRuntimeContext: {
+					workspaceId: true,
+					userId: true,
+					agentId: true,
+					agentVersionId: true,
+					conversationId: true,
+				},
+			},
 			stopWhen: availableToolNames.length > 0 ? () => false : undefined,
 			prepareStep:
 				availableToolNames.length > 0
@@ -1614,34 +1771,19 @@ export async function POST(
 							return {
 								activeTools: [],
 								toolChoice: "none",
-								system: `${systemPrompt}\n\n${toolLimitFinalAnswerPrompt}`,
+								instructions: `${systemPrompt}\n\n${toolLimitFinalAnswerPrompt}`,
 							};
 						}
 					: undefined,
-			async onError({ error }) {
-				logHandledError("Chat stream failed", {}, error as Error);
-				await db
-					.update(messages)
-					.set({ status: "failed", completedAt: new Date() })
-					.where(eq(messages.id, assistantMessage.id));
-
-				await recordUsageEvent({
-					workspaceId: agent.workspaceId,
-					userId: actorUserId,
-					providerId: providerConfig.providerId,
-					modelId: providerConfig.modelRecordId,
-					agentId,
-					conversationId: conversation.id,
-					operation: "chat",
-					latencyMs: Date.now() - startedAt,
-					status: "failed",
-				});
-			},
+		});
+		const result = await runtimeAgent.stream({
+			abortSignal: streamAbortController.signal,
+			messages: history,
 		});
 
 		void (async () => {
 			try {
-				for await (const part of result.fullStream) {
+				for await (const part of result.stream) {
 					if (part.type === "text-delta") {
 						await appendStreamedTextPart("text", part.text);
 						enqueueEvent({ type: "text", delta: part.text });
@@ -1704,7 +1846,7 @@ export async function POST(
 					}
 				}
 
-				const totalUsage = await result.totalUsage;
+				const totalUsage = await result.usage;
 				const assistantText = streamedParts
 					.flatMap((part) =>
 						part.type === "text" && "content" in part ? [part.content] : [],
@@ -1797,10 +1939,22 @@ export async function POST(
 						.where(eq(messages.id, assistantMessage.id));
 					enqueueEvent({ type: "done", stopped: true });
 				} else {
+					logHandledError("Chat stream failed", {}, error as Error);
 					await db
 						.update(messages)
 						.set({ status: "failed", completedAt: new Date() })
 						.where(eq(messages.id, assistantMessage.id));
+					await recordUsageEvent({
+						workspaceId: agent.workspaceId,
+						userId: actorUserId,
+						providerId: providerConfig.providerId,
+						modelId: providerConfig.modelRecordId,
+						agentId,
+						conversationId: conversation.id,
+						operation: "chat",
+						latencyMs: Date.now() - startedAt,
+						status: "failed",
+					});
 					enqueueEvent({
 						type: "error",
 						error: error instanceof Error ? error.message : String(error),
@@ -1811,11 +1965,15 @@ export async function POST(
 			}
 		})();
 
-		return createChatStreamResponse(assistantMessage.id, {
+		const streamHeaders = {
 			"X-Conversation-Id": conversation.id,
 			"X-Message-Id": assistantMessage.id,
 			"X-User-Message-Id": userMessage.id,
-		});
+		};
+
+		return useAiSdkUIStream
+			? createChatUIMessageStreamResponse(assistantMessage.id, streamHeaders)
+			: createChatStreamResponse(assistantMessage.id, streamHeaders);
 	} catch (error) {
 		logHandledError("Chat request failed", {}, error as Error);
 

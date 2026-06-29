@@ -15,6 +15,7 @@ import {
 	type CodeWorkspaceArtifact,
 	type PendingToolApproval,
 } from "@/components/chat/chat-types";
+import { streamAiSdkUIChat } from "@/hooks/ai-sdk-ui-chat-transport";
 
 interface UseChatStreamOptions {
 	agentId: string | null;
@@ -897,64 +898,7 @@ export function useChatStream({
 		activeConversationIdRef.current = activeConversationId;
 
 		try {
-			const res = await fetch(`/api/workspace/${agentId}/chat`, {
-				method: "POST",
-				signal: controller.signal,
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					content,
-					conversationId: conversationId ?? undefined,
-					resendFromMessageId: options.resendFromMessageId,
-					codeWorkspaceId:
-						options.codeWorkspaceId ?? options.codeWorkspaceArtifact?.projectId,
-					attachmentIds: options.attachments?.map(
-						(attachment) => attachment.id,
-					),
-				}),
-			});
-
-			if (!res.ok || !res.body) {
-				const error = await res.json().catch(() => null);
-				throw new Error(error?.error || "Chat request failed");
-			}
-
-			const headerConversationId = res.headers.get("X-Conversation-Id");
-			const headerAssistantMessageId = res.headers.get("X-Message-Id");
-			const headerUserMessageId = res.headers.get("X-User-Message-Id");
-			if (headerConversationId) {
-				activeConversationId = headerConversationId;
-				activeConversationIdRef.current = headerConversationId;
-			}
-			if (headerAssistantMessageId) {
-				assistantMessageId = headerAssistantMessageId;
-				assistantDraft = { ...assistantDraft, id: headerAssistantMessageId };
-				setMessages((current) =>
-					current.map((message) =>
-						message.id === assistantMessage.id ? assistantDraft : message,
-					),
-				);
-				persistDraft({ immediate: true });
-			}
-			if (headerUserMessageId) {
-				setMessages((current) =>
-					current.map((message) =>
-						message.id === userMessage.id
-							? { ...message, id: headerUserMessageId! }
-							: message,
-					),
-				);
-			}
-			if (headerConversationId && !conversationId) {
-				onConversationCreated(headerConversationId, content);
-			}
-
-			const reader = res.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = "";
-
-			function handleStreamEvent(eventText: string) {
-				const parsed = parseStreamEventText(eventText);
-				if (!parsed) return;
+			function handleStreamEvent(parsed: ChatStreamEvent) {
 				applyStreamEvent(parsed, {
 					updateAssistant: updateAssistantDraft,
 					addPendingApproval,
@@ -969,20 +913,53 @@ export function useChatStream({
 				});
 			}
 
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-
-				buffer += decoder.decode(value, { stream: true });
-				const events = buffer.split("\n\n");
-				buffer = events.pop() ?? "";
-				for (const streamEvent of events) {
-					handleStreamEvent(streamEvent);
-				}
-			}
-
-			buffer += decoder.decode();
-			if (buffer.trim()) handleStreamEvent(buffer);
+			await streamAiSdkUIChat({
+				api: `/api/workspace/${agentId}/chat`,
+				chatId: activeConversationId ?? userMessage.id,
+				content,
+				localUserMessageId: userMessage.id,
+				resendFromMessageId: options.resendFromMessageId,
+				body: {
+					content,
+					conversationId: conversationId ?? undefined,
+					resendFromMessageId: options.resendFromMessageId,
+					codeWorkspaceId:
+						options.codeWorkspaceId ?? options.codeWorkspaceArtifact?.projectId,
+					attachmentIds: options.attachments?.map(
+						(attachment) => attachment.id,
+					),
+				},
+				abortSignal: controller.signal,
+				onStart: (metadata) => {
+					if (metadata.conversationId) {
+						activeConversationId = metadata.conversationId;
+						activeConversationIdRef.current = metadata.conversationId;
+					}
+					if (metadata.messageId) {
+						assistantMessageId = metadata.messageId;
+						assistantDraft = { ...assistantDraft, id: metadata.messageId };
+						setMessages((current) =>
+							current.map((message) =>
+								message.id === assistantMessage.id ? assistantDraft : message,
+							),
+						);
+						persistDraft({ immediate: true });
+					}
+					if (metadata.userMessageId) {
+						setMessages((current) =>
+							current.map((message) =>
+								message.id === userMessage.id
+									? { ...message, id: metadata.userMessageId! }
+									: message,
+							),
+						);
+					}
+					if (metadata.conversationId && !conversationId) {
+						onConversationCreated(metadata.conversationId, content);
+					}
+				},
+				onEvent: handleStreamEvent,
+			});
 
 			updateAssistantDraft((message) => ({ ...message, status: "completed" }));
 			flushAssistantRender();

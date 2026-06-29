@@ -23,6 +23,16 @@ import { Textarea } from "@/components/ui/textarea";
 import type { AgentForm } from "./types";
 import { defaultGenParams } from "./types";
 
+const approvalRiskLevels = ["low", "medium", "high", "critical"] as const;
+const approvalSources = ["builtin", "custom", "mcp"] as const;
+
+function parseTextList(value: string) {
+	return value
+		.split(/\n|,/)
+		.map((item) => item.trim())
+		.filter(Boolean);
+}
+
 export function ModelAdvancedFields({
 	form,
 	setFormAction: setForm,
@@ -33,6 +43,16 @@ export function ModelAdvancedFields({
 	onResetAction?: () => void;
 }) {
 	const t = useTranslations("agents.model");
+
+	function updateApprovalPolicy(patch: Partial<AgentForm["approvalPolicy"]>) {
+		setForm((prev) => ({
+			...prev,
+			approvalPolicy: {
+				...prev.approvalPolicy,
+				...patch,
+			},
+		}));
+	}
 
 	function resetGenParams() {
 		setForm((prev) => ({
@@ -170,6 +190,163 @@ export function ModelAdvancedFields({
 								<SelectItem value="json_object">JSON</SelectItem>
 							</SelectContent>
 						</Select>
+					</FieldContent>
+				</Field>
+				<Field>
+					<FieldLabel htmlFor="agent-approval-mode">
+						Tool approval policy
+					</FieldLabel>
+					<FieldContent>
+						<Select
+							value={
+								form.approvalPolicy.requireApprovalForAllTools
+									? "all"
+									: (form.approvalPolicy.defaultDecision ?? "allow")
+							}
+							onValueChange={(value) => {
+								if (value === "all") {
+									updateApprovalPolicy({
+										requireApprovalForAllTools: true,
+										defaultDecision: "allow",
+									});
+									return;
+								}
+								updateApprovalPolicy({
+									requireApprovalForAllTools: false,
+									defaultDecision: value as NonNullable<
+										AgentForm["approvalPolicy"]["defaultDecision"]
+									>,
+								});
+							}}
+						>
+							<SelectTrigger id="agent-approval-mode" className="w-full">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="allow">Allow unless risky</SelectItem>
+								<SelectItem value="require_approval">
+									Require by default
+								</SelectItem>
+								<SelectItem value="deny">Deny by default</SelectItem>
+								<SelectItem value="all">Approve every tool</SelectItem>
+							</SelectContent>
+						</Select>
+					</FieldContent>
+				</Field>
+				<Field>
+					<FieldLabel htmlFor="agent-approval-risk-levels">
+						Approval risk levels
+					</FieldLabel>
+					<FieldContent>
+						<Select
+							value={
+								(
+									form.approvalPolicy.requireApprovalRiskLevels ?? [
+										"high",
+										"critical",
+									]
+								).join(",") || "none"
+							}
+							onValueChange={(value) =>
+								updateApprovalPolicy({
+									requireApprovalRiskLevels:
+										value === "none"
+											? []
+											: (value
+													.split(",")
+													.filter(
+														Boolean,
+													) as AgentForm["approvalPolicy"]["requireApprovalRiskLevels"]),
+								})
+							}
+						>
+							<SelectTrigger id="agent-approval-risk-levels" className="w-full">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="high,critical">High + critical</SelectItem>
+								<SelectItem value="medium,high,critical">
+									Medium and above
+								</SelectItem>
+								<SelectItem value={approvalRiskLevels.join(",")}>
+									All risks
+								</SelectItem>
+								<SelectItem value="none">None</SelectItem>
+							</SelectContent>
+						</Select>
+					</FieldContent>
+				</Field>
+				<Field>
+					<FieldLabel htmlFor="agent-approval-sources">
+						Approval sources
+					</FieldLabel>
+					<FieldContent>
+						<Select
+							value={
+								(form.approvalPolicy.requireApprovalSources ?? []).join(",") ||
+								"none"
+							}
+							onValueChange={(value) =>
+								updateApprovalPolicy({
+									requireApprovalSources:
+										value === "none"
+											? []
+											: (value
+													.split(",")
+													.filter(
+														Boolean,
+													) as AgentForm["approvalPolicy"]["requireApprovalSources"]),
+								})
+							}
+						>
+							<SelectTrigger id="agent-approval-sources" className="w-full">
+								<SelectValue placeholder="No source override" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="none">No source override</SelectItem>
+								<SelectItem value="custom,mcp">Custom + MCP</SelectItem>
+								<SelectItem value="mcp">MCP only</SelectItem>
+								<SelectItem value={approvalSources.join(",")}>
+									All sources
+								</SelectItem>
+							</SelectContent>
+						</Select>
+					</FieldContent>
+				</Field>
+				<Field className="sm:col-span-2">
+					<FieldLabel htmlFor="agent-approval-tool-names">
+						Tools that always need approval
+					</FieldLabel>
+					<FieldContent>
+						<Textarea
+							id="agent-approval-tool-names"
+							placeholder="One tool name per line"
+							value={(form.approvalPolicy.requireApprovalToolNames ?? []).join(
+								"\n",
+							)}
+							onChange={(e) =>
+								updateApprovalPolicy({
+									requireApprovalToolNames: parseTextList(e.target.value),
+								})
+							}
+						/>
+					</FieldContent>
+				</Field>
+				<Field className="sm:col-span-2">
+					<FieldLabel htmlFor="agent-denied-tool-names">
+						Denied tool names
+					</FieldLabel>
+					<FieldContent>
+						<Textarea
+							id="agent-denied-tool-names"
+							placeholder="One tool name per line"
+							value={(form.approvalPolicy.denyToolNames ?? []).join("\n")}
+							onChange={(e) =>
+								updateApprovalPolicy({
+									denyToolNames: parseTextList(e.target.value),
+								})
+							}
+						/>
 					</FieldContent>
 				</Field>
 				<Field>

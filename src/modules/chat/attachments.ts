@@ -39,7 +39,7 @@ type ChatAttachmentMetadataFields = {
 	createdAt: string;
 };
 
-export type ChatImageAttachmentMetadata = ChatImageAttachment &
+type ChatImageAttachmentMetadata = ChatImageAttachment &
 	ChatAttachmentMetadataFields;
 export type ChatFileAttachmentMetadata = ChatFileAttachment &
 	ChatAttachmentMetadataFields;
@@ -70,11 +70,10 @@ type ExtractedText = {
 
 const chatAttachmentStoragePrefix =
 	process.env.CHAT_ATTACHMENT_STORAGE_PREFIX ?? "chat-attachments";
-export const maxChatImageBytes = 8 * 1024 * 1024;
+const maxChatImageBytes = 8 * 1024 * 1024;
 export const maxChatAttachmentBytes = 25 * 1024 * 1024;
 export const maxChatAttachments = 8;
-export const maxChatImageAttachments = 4;
-export const maxExtractedChatAttachmentTextChars = 120_000;
+const maxExtractedChatAttachmentTextChars = 120_000;
 
 const maxOfficeXmlBytes = 8 * 1024 * 1024;
 const maxPdfInflatedBytes = 12 * 1024 * 1024;
@@ -885,10 +884,6 @@ export function isChatFileAttachment(
 	);
 }
 
-export function isChatAttachment(value: unknown): value is ChatAttachment {
-	return isChatImageAttachment(value) || isChatFileAttachment(value);
-}
-
 function assertChatAttachmentAccess(
 	metadata: ChatAttachmentMetadata,
 	workspaceId: string,
@@ -1088,7 +1083,7 @@ export function publicChatAttachment(
 	};
 }
 
-export function publicChatImageAttachment(
+function publicChatImageAttachment(
 	metadata: ChatAttachmentMetadata,
 ): ChatImageAttachment {
 	if (metadata.kind !== "chat_image") {
@@ -1113,14 +1108,6 @@ export async function getChatAttachment(
 	return JSON.parse(
 		Buffer.from(bytes).toString("utf8"),
 	) as ChatAttachmentMetadata;
-}
-
-export async function getChatImageAttachment(attachmentId: string) {
-	const metadata = await getChatAttachment(attachmentId);
-	if (metadata.kind !== "chat_image") {
-		throw new Error("Attachment is not an image.");
-	}
-	return metadata;
 }
 
 export async function getChatAttachmentBytes(input: {
