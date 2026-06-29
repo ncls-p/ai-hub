@@ -1289,7 +1289,7 @@ export async function getConversationMessages(conversationId: string) {
 			parts: await Promise.all(
 				(partsByMessageId.get(msg.id) ?? []).map(renderMessagePart),
 			),
-			createdAt: msg.createdAt,
+			createdAt: msg.createdAt.toISOString(),
 		})),
 	);
 }

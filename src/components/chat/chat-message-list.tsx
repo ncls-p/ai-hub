@@ -1,19 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {
-	memo,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
 	BrainIcon,
 	CheckCircle2Icon,
 	CheckIcon,
 	ChevronDownIcon,
+	CircleDotDashedIcon,
 	ClockIcon,
 	CopyIcon,
 	DownloadIcon,
@@ -63,7 +58,25 @@ export {
 	CODE_WORKSPACE_ARTIFACT_EVENT,
 	CodeWorkspaceArtifactCard,
 } from "@/components/chat/code-workspace-artifact-card";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
+import {
+	Message as MessagePrimitive,
+	MessageContent as MessagePrimitiveContent,
+	MessageFooter,
+} from "@/components/ui/message";
+import {
+	MessageScroller,
+	MessageScrollerButton,
+	MessageScrollerContent,
+	MessageScrollerItem,
+	MessageScrollerProvider,
+	MessageScrollerViewport,
+	useMessageScroller,
+	useMessageScrollerScrollable,
+	useMessageScrollerVisibility,
+} from "@/components/ui/message-scroller";
 import { markdownToHtml } from "@/lib/markdown-to-html";
 import { copyRichHtml } from "@/lib/rich-clipboard";
 import {
@@ -945,7 +958,6 @@ function HtmlArtifactCard({
 	);
 }
 
-
 function SandboxOutputFileCard({ file }: { file: CodeSandboxFileOutput }) {
 	const omittedLabel =
 		file.contentOmitted === "too_large"
@@ -1820,6 +1832,7 @@ interface ChatMessageListProps {
 	loading?: boolean;
 	workspaceId?: string;
 	workspaceArtifactDisplay?: WorkspaceArtifactDisplay;
+	conversationId?: string | null;
 	bottomRef: React.RefObject<HTMLDivElement | null>;
 	onEditMessage?: (
 		message: ChatMessage,
@@ -1834,12 +1847,99 @@ interface ChatMessageListProps {
 	onSuggestionClick?: (suggestion: string) => void;
 }
 
+function chatAnchorStorageKey(conversationId: string) {
+	return `ai-hub-chat-anchor:${conversationId}`;
+}
+
+function SavedMessageAnchorRestorer({
+	conversationId,
+}: {
+	conversationId?: string | null;
+}) {
+	const { scrollToMessage } = useMessageScroller();
+	const restoredConversationIdRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		if (
+			!conversationId ||
+			restoredConversationIdRef.current === conversationId
+		) {
+			return;
+		}
+		restoredConversationIdRef.current = conversationId;
+		const hashMessageId = window.location.hash.startsWith("#message-")
+			? window.location.hash.slice("#message-".length)
+			: null;
+		const savedMessageId =
+			hashMessageId ??
+			window.localStorage.getItem(chatAnchorStorageKey(conversationId));
+		if (!savedMessageId) return;
+		const frame = window.requestAnimationFrame(() => {
+			scrollToMessage(savedMessageId, {
+				align: "start",
+				behavior: "auto",
+				scrollMargin: 24,
+			});
+		});
+		return () => window.cancelAnimationFrame(frame);
+	}, [conversationId, scrollToMessage]);
+
+	return null;
+}
+
+function MessageVisibilityPersistence({
+	conversationId,
+}: {
+	conversationId?: string | null;
+}) {
+	const { currentAnchorId } = useMessageScrollerVisibility();
+
+	useEffect(() => {
+		if (!conversationId || !currentAnchorId) return;
+		window.localStorage.setItem(
+			chatAnchorStorageKey(conversationId),
+			currentAnchorId,
+		);
+	}, [conversationId, currentAnchorId]);
+
+	return null;
+}
+
+function ChatScrollControls({ sending }: { sending: boolean }) {
+	const scrollable = useMessageScrollerScrollable();
+
+	return (
+		<>
+			{sending && scrollable.end ? (
+				<div className="pointer-events-none absolute inset-x-3 bottom-16 z-10 flex justify-center">
+					<Marker className="w-fit rounded-full border bg-background/95 px-3 py-1.5 shadow-sm backdrop-blur">
+						<MarkerIcon>
+							<CircleDotDashedIcon data-icon="inline-start" />
+						</MarkerIcon>
+						<MarkerContent>Response is still streaming below</MarkerContent>
+					</Marker>
+				</div>
+			) : null}
+			<MessageScrollerButton
+				direction="end"
+				variant="secondary"
+				size="sm"
+				className="z-20 rounded-full px-3 shadow-sm"
+			>
+				<ChevronDownIcon data-icon="inline-start" />
+				Jump to latest
+			</MessageScrollerButton>
+		</>
+	);
+}
+
 export function ChatMessageList({
 	messages,
 	sending,
 	loading,
 	workspaceId,
 	workspaceArtifactDisplay = "full",
+	conversationId,
 	bottomRef,
 	onEditMessage,
 	onDeleteMessage,
@@ -1891,161 +1991,207 @@ export function ChatMessageList({
 
 	const { lastAssistantMessageId, precedingUserByMessageId } = messageListMeta;
 
+	const viewportClassName =
+		workspaceArtifactDisplay === "summary"
+			? "px-2 py-3"
+			: "px-3 py-4 sm:px-4 sm:py-8";
+
 	return (
-		<div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
-			{hiddenMessageCount > 0 ? (
-				<div className="flex justify-center">
-					<Button
-						type={BUTTON_TYPE}
-						variant={OUTLINE_VARIANT}
-						size="sm"
-						className="rounded-full text-xs text-muted-foreground"
-						onClick={() =>
-							setVisibleMessageCount((count) => count + LOAD_MORE_MESSAGES)
-						}
-					>
-						{`Show ${Math.min(LOAD_MORE_MESSAGES, hiddenMessageCount)} older messages`}
-					</Button>
-				</div>
-			) : null}
-			{visibleMessages.map((message) => {
-				const content = textFromMessage(message);
-				const isAssistant = message.role === "assistant";
-				const isUser = message.role === "user";
-				const hasFilePart = message.parts.some((part) => part.type === "file");
-				const canEdit = Boolean(onEditMessage) && (isUser || isAssistant);
-				const canDelete = Boolean(onDeleteMessage);
-				const canRegenerate =
-					Boolean(onRegenerateAssistant) &&
-					isAssistant &&
-					message.status !== "streaming";
-				const precedingUserMsg =
-					precedingUserByMessageId.get(message.id) ?? null;
-				const isEditing = editingMessageId === message.id;
-				const isLast = message.id === lastMessageId;
-				const isAnimating = sending && isLast && message.status === "streaming";
-				const messagePendingApprovals =
-					message.status === "streaming"
-						? pendingApprovals
-						: EMPTY_PENDING_APPROVALS;
+		<MessageScrollerProvider
+			autoScroll
+			defaultScrollPosition="last-anchor"
+			scrollMargin={24}
+			scrollPreviousItemPeek={96}
+		>
+			<SavedMessageAnchorRestorer conversationId={conversationId} />
+			<MessageVisibilityPersistence conversationId={conversationId} />
+			<MessageScroller className="min-h-0 flex-1">
+				<MessageScrollerViewport
+					preserveScrollOnPrepend
+					className={viewportClassName}
+					aria-label="Chat transcript"
+				>
+					<MessageScrollerContent className="mx-auto w-full max-w-4xl gap-5 pb-24">
+						{hiddenMessageCount > 0 ? (
+							<MessageScrollerItem className="flex justify-center">
+								<Marker variant="separator" className="max-w-lg">
+									<MarkerContent>
+										<Button
+											type={BUTTON_TYPE}
+											variant={OUTLINE_VARIANT}
+											size="sm"
+											className="rounded-full text-xs text-muted-foreground"
+											onClick={() =>
+												setVisibleMessageCount(
+													(count) => count + LOAD_MORE_MESSAGES,
+												)
+											}
+										>
+											{`Show ${Math.min(
+												LOAD_MORE_MESSAGES,
+												hiddenMessageCount,
+											)} older messages`}
+										</Button>
+									</MarkerContent>
+								</Marker>
+							</MessageScrollerItem>
+						) : null}
+						{visibleMessages.map((message) => {
+							const content = textFromMessage(message);
+							const isAssistant = message.role === "assistant";
+							const isUser = message.role === "user";
+							const hasFilePart = message.parts.some(
+								(part) => part.type === "file",
+							);
+							const canEdit = Boolean(onEditMessage) && (isUser || isAssistant);
+							const canDelete = Boolean(onDeleteMessage);
+							const canRegenerate =
+								Boolean(onRegenerateAssistant) &&
+								isAssistant &&
+								message.status !== "streaming";
+							const precedingUserMsg =
+								precedingUserByMessageId.get(message.id) ?? null;
+							const isEditing = editingMessageId === message.id;
+							const isLast = message.id === lastMessageId;
+							const isAnimating =
+								sending && isLast && message.status === "streaming";
+							const messagePendingApprovals =
+								message.status === "streaming"
+									? pendingApprovals
+									: EMPTY_PENDING_APPROVALS;
+							const align = isUser ? "end" : "start";
 
-				return (
-					<article
-						key={message.id}
-						className={cn(
-							"group/message flex gap-3 animate-in-up [contain-intrinsic-size:auto_160px] [content-visibility:auto]",
-							message.role === "user" ? "justify-end" : "justify-start",
-						)}
-						style={{ animationDelay: isLast ? "0s" : undefined }}
-					>
-						<div
-							className={cn(
-								"flex flex-col transition-opacity duration-150",
-								isUser && !hasFilePart
-									? "max-w-[82%]"
-									: "max-w-[min(100%,48rem)]",
-								isLast && isAnimating && "animate-in-fade",
-							)}
-						>
-							{/* Message bubble */}
-							<div
-								className={cn(
-									"transition-[background-color,box-shadow,color] duration-150 ease-out",
-									message.role === "user"
-										? "msg-bubble--user"
-										: "msg-bubble--assistant",
-									isEditing && "ring-2 ring-primary/25",
-								)}
-							>
-								<MessageContent
-									message={message}
-									showSuggestions={message.id === lastAssistantMessageId}
-									isEditing={isEditing}
-									editingContent={isEditing ? editingContent : ""}
-									isSaving={savingMessageId === message.id}
-									isAnimating={isAnimating}
-									workspaceId={workspaceId}
-									workspaceArtifactDisplay={workspaceArtifactDisplay}
-									onEditingContentChange={
-										isEditing ? setEditingContent : undefined
-									}
-									onCancelEdit={
-										isEditing
-											? () => {
-													setEditingMessageId(null);
-													setEditingContent("");
-												}
-											: undefined
-									}
-									onSaveEdit={
-										isEditing
-											? async () => {
-													setSavingMessageId(message.id);
-													try {
-														await onEditMessage?.(
-															message,
-															editingContent.trim(),
-														);
-														setEditingMessageId(null);
-														setEditingContent("");
-													} finally {
-														setSavingMessageId(null);
-													}
-												}
-											: undefined
-									}
-									pendingApprovals={messagePendingApprovals}
-									onApproveTool={onApproveTool}
-									onRejectTool={onRejectTool}
-									onSuggestionClick={onSuggestionClick}
-								/>
-							</div>
-
-							{/* Timestamp + status */}
-							{message.createdAt && (
-								<div
-									className={cn(
-										"mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground/50",
-										isUser ? "justify-end" : "justify-start",
-									)}
+							return (
+								<MessageScrollerItem
+									key={message.id}
+									messageId={message.id}
+									scrollAnchor={isUser}
+									id={`message-${message.id}`}
+									className="scroll-mt-6 animate-in-up"
+									style={{ animationDelay: isLast ? "0s" : undefined }}
 								>
-									<span>
-										{new Date(message.createdAt).toLocaleTimeString([], {
-											hour: "2-digit",
-											minute: "2-digit",
-										})}
-									</span>
-									{message.status === "streaming" ? <StreamingStatus /> : null}
-								</div>
-							)}
+									<MessagePrimitive align={align}>
+										<MessagePrimitiveContent
+											className={cn(
+												"transition-opacity duration-150",
+												isUser && !hasFilePart
+													? "max-w-[82%]"
+													: "max-w-[min(100%,48rem)]",
+												isLast && isAnimating && "animate-in-fade",
+											)}
+										>
+											<Bubble
+												align={align}
+												variant={isUser ? "muted" : "ghost"}
+												className={cn(isEditing && "ring-2 ring-primary/25")}
+											>
+												<BubbleContent
+													className={cn(
+														"transition-[background-color,box-shadow,color] duration-150 ease-out",
+														isUser
+															? "msg-bubble--user"
+															: "msg-bubble--assistant",
+													)}
+												>
+													<MessageContent
+														message={message}
+														showSuggestions={
+															message.id === lastAssistantMessageId
+														}
+														isEditing={isEditing}
+														editingContent={isEditing ? editingContent : ""}
+														isSaving={savingMessageId === message.id}
+														isAnimating={isAnimating}
+														workspaceId={workspaceId}
+														workspaceArtifactDisplay={workspaceArtifactDisplay}
+														onEditingContentChange={
+															isEditing ? setEditingContent : undefined
+														}
+														onCancelEdit={
+															isEditing
+																? () => {
+																		setEditingMessageId(null);
+																		setEditingContent("");
+																	}
+																: undefined
+														}
+														onSaveEdit={
+															isEditing
+																? async () => {
+																		setSavingMessageId(message.id);
+																		try {
+																			await onEditMessage?.(
+																				message,
+																				editingContent.trim(),
+																			);
+																			setEditingMessageId(null);
+																			setEditingContent("");
+																		} finally {
+																			setSavingMessageId(null);
+																		}
+																	}
+																: undefined
+														}
+														pendingApprovals={messagePendingApprovals}
+														onApproveTool={onApproveTool}
+														onRejectTool={onRejectTool}
+														onSuggestionClick={onSuggestionClick}
+													/>
+												</BubbleContent>
+											</Bubble>
 
-							{/* Quick action bar */}
-							<MessageActionBar
-								message={message}
-								sending={sending}
-								canEdit={canEdit}
-								canDelete={canDelete}
-								canRegenerate={canRegenerate}
-								onCopy={async () => {
-									await copyRichHtml(markdownToHtml(content));
-								}}
-								onEdit={() => {
-									setEditingMessageId(message.id);
-									setEditingContent(content);
-								}}
-								onDelete={() => void onDeleteMessage?.(message)}
-								onRegenerate={() => {
-									if (precedingUserMsg) {
-										void onResendMessage?.(precedingUserMsg);
-									}
-								}}
-							/>
-						</div>
-					</article>
-				);
-			})}
-			<div ref={bottomRef} />
-		</div>
+											{message.createdAt ? (
+												<MessageFooter className="mt-1.5 gap-2 text-[11px] text-muted-foreground/60">
+													<a
+														href={`#message-${message.id}`}
+														className="rounded-sm underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+														aria-label="Copy or open direct link to this message"
+													>
+														{new Date(message.createdAt).toLocaleTimeString(
+															[],
+															{
+																hour: "2-digit",
+																minute: "2-digit",
+															},
+														)}
+													</a>
+													{message.status === "streaming" ? (
+														<StreamingStatus />
+													) : null}
+												</MessageFooter>
+											) : null}
+
+											<MessageActionBar
+												message={message}
+												sending={sending}
+												canEdit={canEdit}
+												canDelete={canDelete}
+												canRegenerate={canRegenerate}
+												onCopy={async () => {
+													await copyRichHtml(markdownToHtml(content));
+												}}
+												onEdit={() => {
+													setEditingMessageId(message.id);
+													setEditingContent(content);
+												}}
+												onDelete={() => void onDeleteMessage?.(message)}
+												onRegenerate={() => {
+													if (precedingUserMsg) {
+														void onResendMessage?.(precedingUserMsg);
+													}
+												}}
+											/>
+										</MessagePrimitiveContent>
+									</MessagePrimitive>
+								</MessageScrollerItem>
+							);
+						})}
+						<div ref={bottomRef} aria-hidden="true" />
+					</MessageScrollerContent>
+				</MessageScrollerViewport>
+				<ChatScrollControls sending={sending} />
+			</MessageScroller>
+		</MessageScrollerProvider>
 	);
 }
 

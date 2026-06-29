@@ -17,6 +17,16 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import {
+	Attachment,
+	AttachmentAction,
+	AttachmentActions,
+	AttachmentContent,
+	AttachmentDescription,
+	AttachmentGroup,
+	AttachmentMedia,
+	AttachmentTitle,
+} from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -169,64 +179,68 @@ function AttachmentPreview({
 
 	if (attachment.kind === "chat_image") {
 		return (
-			<div
-				className="group relative h-20 w-20 overflow-hidden rounded-xl border bg-card bg-cover bg-center"
-				style={{
-					backgroundImage: `url("${attachment.url.replace(/"/g, '\\"')}")`,
-				}}
-			>
-				<span className="sr-only">{attachment.fileName}</span>
-				<Button
-					type="button"
-					variant="secondary"
-					size="icon"
-					className="absolute right-1 top-1 size-6 rounded-full opacity-90"
-					aria-label={`Remove ${attachment.fileName}`}
-					onClick={() => onRemove?.(attachment.id)}
-				>
-					<XIcon className="size-3" aria-hidden="true" />
-				</Button>
-			</div>
+			<Attachment orientation="vertical" className="w-24">
+				<AttachmentMedia
+					variant="image"
+					role="img"
+					aria-label={attachment.fileName}
+					style={{
+						backgroundImage: `url("${attachment.url.replace(/"/g, '\\"')}")`,
+						backgroundSize: "cover",
+						backgroundPosition: "center",
+					}}
+				/>
+				<AttachmentContent>
+					<AttachmentTitle>{attachment.fileName}</AttachmentTitle>
+					<AttachmentDescription>
+						{attachmentSubtitle(attachment)}
+					</AttachmentDescription>
+				</AttachmentContent>
+				<AttachmentActions>
+					<AttachmentAction
+						type="button"
+						variant="secondary"
+						aria-label={`Remove ${attachment.fileName}`}
+						onClick={() => onRemove?.(attachment.id)}
+					>
+						<XIcon aria-hidden="true" />
+					</AttachmentAction>
+				</AttachmentActions>
+			</Attachment>
 		);
 	}
 
 	return (
 		<>
-			<div className="group relative flex min-h-16 w-64 max-w-full items-center gap-2 rounded-xl border bg-card p-2 pr-16 text-xs">
-				<span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-					<FileIcon className="size-4" aria-hidden="true" />
-				</span>
-				<span className="min-w-0 flex-1">
-					<span className="block truncate font-medium text-foreground">
-						{attachment.fileName}
-					</span>
-					<span className="block truncate text-[11px] text-muted-foreground">
+			<Attachment className="w-72 max-w-full">
+				<AttachmentMedia>
+					<FileIcon aria-hidden="true" />
+				</AttachmentMedia>
+				<AttachmentContent>
+					<AttachmentTitle>{attachment.fileName}</AttachmentTitle>
+					<AttachmentDescription>
 						{attachmentSubtitle(attachment)}
-					</span>
-				</span>
-				{canPreview ? (
-					<Button
+					</AttachmentDescription>
+				</AttachmentContent>
+				<AttachmentActions>
+					{canPreview ? (
+						<AttachmentAction
+							type="button"
+							aria-label={`View extracted text for ${attachment.fileName}`}
+							onClick={openPreview}
+						>
+							<Maximize2Icon aria-hidden="true" />
+						</AttachmentAction>
+					) : null}
+					<AttachmentAction
 						type="button"
-						variant="ghost"
-						size="icon"
-						className="absolute right-8 top-1 size-6 rounded-full text-muted-foreground hover:text-foreground"
-						aria-label={`View extracted text for ${attachment.fileName}`}
-						onClick={openPreview}
+						aria-label={`Remove ${attachment.fileName}`}
+						onClick={() => onRemove?.(attachment.id)}
 					>
-						<Maximize2Icon className="size-3" aria-hidden="true" />
-					</Button>
-				) : null}
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon"
-					className="absolute right-1 top-1 size-6 rounded-full text-muted-foreground hover:text-foreground"
-					aria-label={`Remove ${attachment.fileName}`}
-					onClick={() => onRemove?.(attachment.id)}
-				>
-					<XIcon className="size-3" aria-hidden="true" />
-				</Button>
-			</div>
+						<XIcon aria-hidden="true" />
+					</AttachmentAction>
+				</AttachmentActions>
+			</Attachment>
 			<Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
 				<DialogContent className="flex max-h-[85dvh] max-w-3xl flex-col overflow-hidden">
 					<div className="flex min-w-0 items-start justify-between gap-3 border-b pb-3">
@@ -413,7 +427,7 @@ export function ChatComposer({
 			) : null}
 			<div className="relative mx-auto w-full min-w-0 max-w-4xl">
 				{attachments.length > 0 ? (
-					<div className="mb-2 flex flex-wrap gap-2">
+					<AttachmentGroup className="mb-2">
 						{attachments.map((attachment) => (
 							<AttachmentPreview
 								key={attachment.id}
@@ -421,7 +435,7 @@ export function ChatComposer({
 								onRemove={onRemoveAttachment}
 							/>
 						))}
-					</div>
+					</AttachmentGroup>
 				) : null}
 				<div className={cn("composer-box rounded-xl sm:rounded-2xl")}>
 					<div className="flex items-end gap-1.5 p-1.5 sm:gap-2 sm:p-2">

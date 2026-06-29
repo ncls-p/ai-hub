@@ -1533,11 +1533,8 @@ export default function ChatPage() {
 								Demande des modifications pendant que tu codes.
 							</p>
 						</div>
-						<section
-							ref={scrollContainerRef}
-							className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 [overflow-anchor:none]"
-						>
-							<div ref={scrollContentRef}>
+						<section className="min-h-0 flex-1 overflow-hidden">
+							<div className="size-full min-h-0">
 								<ChatMessageList
 									key={activeConversationId ?? "new-conversation"}
 									messages={messages}
@@ -1545,6 +1542,7 @@ export default function ChatPage() {
 									loading={loadingMessages}
 									workspaceId={workspaceId ?? undefined}
 									workspaceArtifactDisplay="summary"
+									conversationId={activeConversationId}
 									bottomRef={bottomRef}
 									onEditMessage={editMessage}
 									onDeleteMessage={deleteMessage}
@@ -1588,10 +1586,7 @@ export default function ChatPage() {
 					</div>
 				</section>
 			) : (
-				<section
-					ref={scrollContainerRef}
-					className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [overflow-anchor:none] px-3 py-4 sm:px-4 sm:py-8"
-				>
+				<section className="min-h-0 flex-1 overflow-hidden">
 					{!loadingMessages && messages.length === 0 ? (
 						<div className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center px-4 py-12 sm:py-16 animate-in-fade">
 							<div className="relative flex w-full flex-col items-center gap-5">
@@ -1646,13 +1641,14 @@ export default function ChatPage() {
 							</div>
 						</div>
 					) : null}
-					<div ref={scrollContentRef}>
+					<div className="size-full min-h-0">
 						<ChatMessageList
 							key={activeConversationId ?? "new-conversation"}
 							messages={messages}
 							sending={sending}
 							loading={loadingMessages}
 							workspaceId={workspaceId ?? undefined}
+							conversationId={activeConversationId}
 							bottomRef={bottomRef}
 							onEditMessage={editMessage}
 							onDeleteMessage={deleteMessage}

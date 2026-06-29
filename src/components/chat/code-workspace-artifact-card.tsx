@@ -18,6 +18,15 @@ import type {
 	ChatImageAttachment,
 	CodeWorkspaceArtifact,
 } from "@/components/chat/chat-types";
+import {
+	Attachment,
+	AttachmentAction,
+	AttachmentActions,
+	AttachmentContent,
+	AttachmentDescription,
+	AttachmentMedia,
+	AttachmentTitle,
+} from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -391,7 +400,11 @@ type GitHubPublishOutput = {
 	message: string;
 };
 
-export function GitHubPublishResultCard({ result }: { result: GitHubPublishOutput }) {
+export function GitHubPublishResultCard({
+	result,
+}: {
+	result: GitHubPublishOutput;
+}) {
 	return (
 		<div className="w-fit max-w-full overflow-hidden rounded-xl border bg-card text-xs shadow-sm">
 			<div className="flex items-center gap-2 border-b px-3 py-2">
@@ -428,25 +441,28 @@ export function ChatImageAttachmentCard({
 	attachment: ChatImageAttachment;
 }) {
 	return (
-		<a
-			href={attachment.url}
-			target="_blank"
-			rel="noreferrer"
-			className="group block w-fit overflow-hidden rounded-xl border bg-card text-xs shadow-sm transition-colors hover:border-primary/30"
-		>
-			<span
-				role="img"
-				aria-label={attachment.fileName}
-				className="block h-64 w-[min(24rem,80vw)] bg-contain bg-center bg-no-repeat"
-				style={{
-					backgroundImage: `url("${attachment.url.replace(/"/g, '\\"')}")`,
-				}}
-			/>
-			<span className="flex items-center gap-2 border-t px-2 py-1.5 text-[11px] text-muted-foreground">
-				<FileIcon className={COMPACT_ICON_CLASS} aria-hidden="true" />
-				<span className="max-w-56 truncate">{attachment.fileName}</span>
-			</span>
-		</a>
+		<Attachment orientation="vertical" className="w-[min(24rem,80vw)]">
+			<AttachmentMedia variant="image" className="aspect-auto h-64">
+				<a
+					href={attachment.url}
+					target="_blank"
+					rel="noreferrer"
+					role="img"
+					aria-label={attachment.fileName}
+					className="block h-64 w-full bg-contain bg-center bg-no-repeat"
+					style={{
+						backgroundImage: `url("${attachment.url.replace(/"/g, '\\"')}")`,
+					}}
+				/>
+			</AttachmentMedia>
+			<AttachmentContent>
+				<AttachmentTitle>{attachment.fileName}</AttachmentTitle>
+				<AttachmentDescription>
+					{attachment.mimeType.replace("image/", "").toUpperCase()} ·{" "}
+					{formatBytes(attachment.size)}
+				</AttachmentDescription>
+			</AttachmentContent>
+		</Attachment>
 	);
 }
 
@@ -506,47 +522,39 @@ export function ChatFileAttachmentCard({
 
 	return (
 		<>
-			<div className="group flex w-fit max-w-[min(28rem,84vw)] items-center gap-3 rounded-xl border bg-card p-3 text-xs shadow-sm transition-colors hover:border-primary/30">
-				<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-					<FileIcon className="size-4" aria-hidden="true" />
-				</span>
-				<span className="min-w-0 flex-1">
-					<span className="block truncate font-medium text-foreground">
-						{attachment.fileName}
-					</span>
-					<span className="block truncate text-[11px] text-muted-foreground">
+			<Attachment className="max-w-[min(28rem,84vw)]">
+				<AttachmentMedia>
+					<FileIcon aria-hidden="true" />
+				</AttachmentMedia>
+				<AttachmentContent>
+					<AttachmentTitle>{attachment.fileName}</AttachmentTitle>
+					<AttachmentDescription>
 						{readLabel} · {formatBytes(attachment.size)}
 						{attachment.extractedTextChars > 0
 							? ` · ${attachment.extractedTextChars.toLocaleString()} chars`
 							: ""}
-					</span>
-				</span>
-				<div className="flex shrink-0 items-center gap-1">
+					</AttachmentDescription>
+				</AttachmentContent>
+				<AttachmentActions>
 					{canPreview ? (
-						<Button
+						<AttachmentAction
 							type="button"
 							variant="outline"
 							size="sm"
-							className="h-8 gap-1.5 px-2 text-xs"
 							onClick={openPreview}
 						>
-							<Maximize2Icon className="size-3" aria-hidden="true" />
+							<Maximize2Icon data-icon="inline-start" aria-hidden="true" />
 							View
-						</Button>
+						</AttachmentAction>
 					) : null}
-					<Button
-						asChild
-						variant="ghost"
-						size="sm"
-						className="h-8 gap-1.5 px-2 text-xs"
-					>
+					<AttachmentAction asChild variant="ghost" size="sm">
 						<a href={attachment.url} target="_blank" rel="noreferrer">
-							<DownloadIcon className="size-3" aria-hidden="true" />
+							<DownloadIcon data-icon="inline-start" aria-hidden="true" />
 							Download
 						</a>
-					</Button>
-				</div>
-			</div>
+					</AttachmentAction>
+				</AttachmentActions>
+			</Attachment>
 			<Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
 				<DialogContent className="flex max-h-[85dvh] max-w-3xl flex-col overflow-hidden">
 					<div className="flex min-w-0 items-start justify-between gap-3 border-b pb-3">
@@ -603,8 +611,6 @@ export function ChatFileAttachmentCard({
 		</>
 	);
 }
-
-
 
 export function CodeWorkspaceArtifactCard({
 	artifact,
@@ -1040,4 +1046,3 @@ export function CodeWorkspaceArtifactCard({
 		</>
 	);
 }
-

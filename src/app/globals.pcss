@@ -1,6 +1,7 @@
 @source "../../node_modules/streamdown/dist/*.js";
 @source "../../node_modules/@streamdown/code/dist/*.js";
 @source "../../node_modules/@streamdown/math/dist/*.js";
+@source "../../node_modules/@shadcn/react/dist/**/*.js";
 @source "../../node_modules/@tiptap/*";
 
 @custom-variant dark (&:is(.dark *));
@@ -171,6 +172,79 @@
   --surface-shadow-hover: 0 0 0 1px rgba(255, 255, 255, 0.13);
   --floating-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.1), 0 18px 52px rgba(0, 0, 0, 0.42);
+}
+
+@layer utilities {
+  .wrap-break-word {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .contain-content {
+    contain: content;
+  }
+
+  .scrollbar-gutter-stable {
+    scrollbar-gutter: stable;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scroll-fade-b {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      black 1.5rem,
+      black calc(100% - 2.5rem),
+      transparent 100%
+    );
+  }
+
+  .scroll-fade-x {
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black 1rem,
+      black calc(100% - 1rem),
+      transparent 100%
+    );
+  }
+
+  .shimmer {
+    background:
+      linear-gradient(
+        110deg,
+        var(--muted-foreground) 0%,
+        color-mix(in oklch, var(--foreground) 45%, transparent) 35%,
+        var(--muted-foreground) 70%
+      );
+    background-size: 220% 100%;
+    background-clip: text;
+    color: transparent;
+    animation: ai-hub-shimmer 1.8s linear infinite;
+  }
+
+  @keyframes ai-hub-shimmer {
+    to {
+      background-position-x: -220%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer {
+      animation: none;
+    }
+  }
 }
 
 @layer base {
