@@ -15,7 +15,6 @@ import {
 	recordUsageEvent,
 	resolveProviderForVersion,
 } from "@/modules/agent/use-cases";
-import { isAdminRole } from "@/modules/admin/use-cases";
 import {
 	completeChatStream,
 	createChatStreamResponse,
@@ -1249,10 +1248,7 @@ export async function POST(
 		if (!agent) {
 			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 		}
-		if (
-			!isAdminRole(auth.type === "user" ? auth.role : null) &&
-			!canUseAgent(agent, actorUserId)
-		) {
+		if (!canUseAgent(agent, actorUserId)) {
 			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 		}
 		if (auth.type === "api_key" && auth.workspaceId !== agent.workspaceId) {

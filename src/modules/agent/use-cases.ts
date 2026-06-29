@@ -399,9 +399,11 @@ export async function getVisibleAgentById(
 	userId: string,
 	canAdminCurate: boolean,
 ) {
+	// Admin curation does not grant access to another user's personal agents.
+	void canAdminCurate;
 	const agent = await getAgentById(agentId, workspaceId);
 	if (!agent) return null;
-	if (canAdminCurate || canUseAgent(agent, userId)) return agent;
+	if (canUseAgent(agent, userId)) return agent;
 	return null;
 }
 
@@ -410,17 +412,17 @@ export function listAgents(
 	userId: string,
 	canAdminCurate: boolean,
 ) {
-	const visibilityFilter = canAdminCurate
-		? undefined
-		: or(
-				eq(agents.createdById, userId),
-				eq(agents.isGlobal, true),
-				eq(agents.sharingMode, "marketplace"),
-				and(
-					eq(agents.sharingMode, "specific_user"),
-					eq(agents.shareTargetUserId, userId),
-				),
-			);
+	// Keep user-facing lists scoped to agents the current user can actually use.
+	void canAdminCurate;
+	const visibilityFilter = or(
+		eq(agents.createdById, userId),
+		eq(agents.isGlobal, true),
+		eq(agents.sharingMode, "marketplace"),
+		and(
+			eq(agents.sharingMode, "specific_user"),
+			eq(agents.shareTargetUserId, userId),
+		),
+	);
 
 	return db
 		.select()

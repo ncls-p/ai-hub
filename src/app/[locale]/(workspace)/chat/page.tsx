@@ -445,6 +445,7 @@ export default function ChatPage() {
 		handleSubmit,
 		resolveApproval,
 		stopGeneration,
+		detachActiveStream,
 	} = useChatStream({
 		agentId: selectedAgentId,
 		conversationId: activeConversationId,
@@ -927,6 +928,8 @@ export default function ChatPage() {
 	}
 
 	function selectConversation(conversationId: string) {
+		if (conversationId === activeConversationId) return;
+		detachActiveStream();
 		setQueuedMessages([]);
 		setMessages([]);
 		setCodeWorkspaceArtifact(null);
@@ -946,6 +949,7 @@ export default function ChatPage() {
 	}
 
 	function startNewConversation() {
+		detachActiveStream();
 		setQueuedMessages([]);
 		setActiveConversationId(null);
 		setMessages([]);
@@ -992,6 +996,7 @@ export default function ChatPage() {
 			current.filter((conversation) => conversation.id !== conversationId),
 		);
 		if (activeConversationId === conversationId) {
+			detachActiveStream();
 			setQueuedMessages([]);
 			setActiveConversationId(null);
 			setMessages([]);

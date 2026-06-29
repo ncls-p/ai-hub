@@ -2053,19 +2053,27 @@ export function ChatMessageList({
 								precedingUserByMessageId.get(message.id) ?? null;
 							const isEditing = editingMessageId === message.id;
 							const isLast = message.id === lastMessageId;
-							const isAnimating =
-								sending && isLast && message.status === "streaming";
-							const messagePendingApprovals =
-								message.status === "streaming"
-									? pendingApprovals
-									: EMPTY_PENDING_APPROVALS;
+							const isStreamingAssistant =
+								isAssistant && message.status === "streaming";
+							const isOutgoingUserBeforeStreamingAssistant =
+								isUser &&
+								sending &&
+								messages[messages.length - 2]?.id === message.id &&
+								messages[messages.length - 1]?.role === "assistant" &&
+								messages[messages.length - 1]?.status === "streaming";
+							const isAnimating = sending && isLast && isStreamingAssistant;
+							const messagePendingApprovals = isStreamingAssistant
+								? pendingApprovals
+								: EMPTY_PENDING_APPROVALS;
 							const align = isUser ? "end" : "start";
 
 							return (
 								<MessageScrollerItem
 									key={message.id}
 									messageId={message.id}
-									scrollAnchor={isUser}
+									scrollAnchor={
+										isUser && !isOutgoingUserBeforeStreamingAssistant
+									}
 									id={`message-${message.id}`}
 									className="scroll-mt-6 animate-in-up"
 									style={{ animationDelay: isLast ? "0s" : undefined }}

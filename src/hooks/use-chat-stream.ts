@@ -438,6 +438,9 @@ export function useChatStream({
 	const [citations, setCitations] = useState<ChatCitation[]>([]);
 	const activeRequestControllerRef = useRef<AbortController | null>(null);
 	const activeConversationIdRef = useRef<string | null>(null);
+	const detachedRequestControllersRef = useRef<WeakSet<AbortController>>(
+		new WeakSet(),
+	);
 	const stopRequestedRef = useRef(false);
 	const resolvedApprovalIdsRef = useRef(new Set<string>());
 	const streamingMessageId = useMemo(() => {
@@ -450,6 +453,19 @@ export function useChatStream({
 				)?.id ?? null
 		);
 	}, [messages]);
+
+	const detachActiveStream = useCallback(() => {
+		const controller = activeRequestControllerRef.current;
+		if (!controller || controller.signal.aborted) return;
+		detachedRequestControllersRef.current.add(controller);
+		controller.abort();
+		activeRequestControllerRef.current = null;
+		activeConversationIdRef.current = null;
+		stopRequestedRef.current = false;
+		setSending(false);
+		setResuming(false);
+		setPendingApprovals([]);
+	}, []);
 
 	const setMessagesDirect = useCallback(
 		(next: ChatMessage[]) => {
@@ -473,6 +489,14 @@ export function useChatStream({
 		},
 		[conversationId],
 	);
+
+	useEffect(() => {
+		const activeStreamConversationId = activeConversationIdRef.current;
+		if (!activeRequestControllerRef.current) return;
+		if (!activeStreamConversationId && !conversationId) return;
+		if (activeStreamConversationId === conversationId) return;
+		detachActiveStream();
+	}, [conversationId, detachActiveStream]);
 
 	useEffect(() => {
 		if (!conversationId) return;
@@ -973,7 +997,13 @@ export function useChatStream({
 
 			await onConversationsRefresh();
 		} catch (err) {
+			const requestWasDetached =
+				detachedRequestControllersRef.current.has(controller);
 			if (err instanceof Error && err.name === "AbortError") {
+				if (requestWasDetached) {
+					persistDraft({ immediate: true });
+					return;
+				}
 				updateAssistantDraft((message) => ({
 					...message,
 					status: "completed",
@@ -995,15 +1025,19 @@ export function useChatStream({
 			if (activeConversationId)
 				clearStoredChatStreamDraft(activeConversationId);
 		} finally {
-			flushAssistantRender();
+			const requestWasDetached =
+				detachedRequestControllersRef.current.has(controller);
+			if (!requestWasDetached) flushAssistantRender();
 			cancelScheduledDraftWrite();
 			cancelScheduledRender();
 			if (activeRequestControllerRef.current === controller) {
 				activeRequestControllerRef.current = null;
 				activeConversationIdRef.current = null;
 			}
-			stopRequestedRef.current = false;
-			setSending(false);
+			if (!requestWasDetached) {
+				stopRequestedRef.current = false;
+				setSending(false);
+			}
 		}
 	}
 
@@ -1143,6 +1177,7 @@ export function useChatStream({
 		handleSubmit,
 		resolveApproval,
 		stopGeneration,
+		detachActiveStream,
 		clearPendingApprovals: () => setPendingApprovals([]),
 	};
 }

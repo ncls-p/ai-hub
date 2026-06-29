@@ -301,10 +301,10 @@ describe("getVisibleAgentById", () => {
     expect(result).toEqual(fakeAgent);
   });
 
-  it("returns agent when canAdminCurate is true", async () => {
+  it("does not expose another user's personal agent to admins", async () => {
     dbModule._c.limit.mockResolvedValueOnce([fakeAgent]);
     const result = await getVisibleAgentById("agent-1", "ws-1", "other", true);
-    expect(result).toEqual(fakeAgent);
+    expect(result).toBeNull();
   });
 
   it("returns null when non-creator and not admin", async () => {
@@ -317,10 +317,10 @@ describe("getVisibleAgentById", () => {
 // ─── listAgents ───────────────────────────────────────────────────────
 
 describe("listAgents", () => {
-  it("returns agents for workspace (admin)", async () => {
+  it("returns visible agents for workspace (admin)", async () => {
     dbModule._c.orderBy.mockResolvedValueOnce([fakeAgent]);
     await listAgents("ws-1", "user-1", true);
-    // Admin sees all — no additional visibility filter
+    // Admin curation does not bypass personal-agent visibility.
     expect(dbModule._c.orderBy).toHaveBeenCalled();
   });
 
