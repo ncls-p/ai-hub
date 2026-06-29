@@ -114,8 +114,27 @@ services:
       retries: 5
     restart: unless-stopped
 
+  opensandbox-images:
+    image: docker:27-cli
+    restart: "no"
+    environment:
+      OPENSANDBOX_IMAGE: ${OPENSANDBOX_IMAGE:-opensandbox/code-interpreter:v1.1.0}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        docker pull "$${OPENSANDBOX_IMAGE}"
+        docker pull opensandbox/execd:v1.0.20
+        docker pull opensandbox/egress:v1.1.3
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
   opensandbox-server:
     image: opensandbox/server:latest
+    depends_on:
+      opensandbox-images:
+        condition: service_completed_successfully
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
