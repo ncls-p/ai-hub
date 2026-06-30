@@ -4,7 +4,7 @@ import { registerTelemetry } from "ai";
 import { logHandledWarning } from "@/lib/logger";
 
 const globalForAiSdkDevTools = globalThis as typeof globalThis & {
-	__aiHubAiSdkDevToolsRegistered?: boolean;
+  __aiHubAiSdkDevToolsRegistered?: boolean;
 };
 
 /**
@@ -15,18 +15,18 @@ const globalForAiSdkDevTools = globalThis as typeof globalThis & {
  * emit local-only telemetry payloads.
  */
 export function registerAiSdkDevTools() {
-	if (globalForAiSdkDevTools.__aiHubAiSdkDevToolsRegistered) return;
-	const explicitlyEnabled = process.env.AI_SDK_DEVTOOLS === "true";
-	const explicitlyDisabled = process.env.AI_SDK_DEVTOOLS === "false";
-	if (explicitlyDisabled) return;
-	if (process.env.NODE_ENV === "production" && !explicitlyEnabled) return;
+  if (globalForAiSdkDevTools.__aiHubAiSdkDevToolsRegistered) return;
+  const explicitlyEnabled = process.env.AI_SDK_DEVTOOLS === "true";
+  const explicitlyDisabled = process.env.AI_SDK_DEVTOOLS === "false";
+  if (explicitlyDisabled) return;
+  if (process.env.NODE_ENV === "production" && !explicitlyEnabled) return;
 
-	try {
-		registerTelemetry(DevToolsTelemetry());
-		globalForAiSdkDevTools.__aiHubAiSdkDevToolsRegistered = true;
-	} catch (error) {
-		logHandledWarning("Failed to register AI SDK DevTools telemetry", {
-			error: error instanceof Error ? error.message : String(error),
-		});
-	}
+  try {
+    registerTelemetry(DevToolsTelemetry());
+    globalForAiSdkDevTools.__aiHubAiSdkDevToolsRegistered = true;
+  } catch (error) {
+    logHandledWarning("Failed to register AI SDK DevTools telemetry", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

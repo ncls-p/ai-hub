@@ -369,7 +369,7 @@ function trustedGitHubUrl(value: unknown) {
   }
 }
 
-export function createGitHubInstallationSettingsUrl(input: {
+function createGitHubInstallationSettingsUrl(input: {
   installationId: string;
   accountLogin?: string | null;
   accountType?: string | null;
@@ -911,7 +911,11 @@ export async function publishCodeWorkspaceToGitHub(
     userId: parsed.userId,
     repositoryId: parsed.repositoryId,
   });
-  if (!canAttemptGitHubRepositoryPublish(normalizePermissions(repo.permissionsJson))) {
+  if (
+    !canAttemptGitHubRepositoryPublish(
+      normalizePermissions(repo.permissionsJson),
+    )
+  ) {
     throw new Error(
       "GitHub repository write access is required before publishing.",
     );

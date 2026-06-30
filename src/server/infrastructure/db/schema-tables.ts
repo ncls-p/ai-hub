@@ -1,0 +1,1500 @@
+import {
+  pgTable,
+  text,
+  integer,
+  timestamp,
+  boolean,
+  varchar,
+  uuid,
+  jsonb,
+  vector,
+  index,
+  uniqueIndex,
+  pgEnum,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
+const CREATED_AT_COLUMN = "created_at";
+const UPDATED_AT_COLUMN = "updated_at";
+const SET_NULL_ACTION = "set null";
+const USER_ID_COLUMN = "user_id";
+const CASCADE_ACTION = "cascade";
+const CREATED_BY_USER_ID_COLUMN = "created_by_user_id";
+const WORKSPACE_ID_COLUMN = "workspace_id";
+const STATUS_COLUMN = "status";
+
+// ─── Better Auth tables ────────────────────────────────────────────────
+
+export const users = pgTable("user", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  role: varchar("role", { length: 64 }),
+  banned: boolean("banned").notNull().default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires", { withTimezone: true }),
+  createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const sessions = pgTable("session", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  token: text("token").notNull().unique(),
+  createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  impersonatedBy: uuid("impersonated_by").references(() => users.id, {
+    onDelete: SET_NULL_ACTION,
+  }),
+  userId: uuid(USER_ID_COLUMN)
+    .notNull()
+    .references(() => users.id, { onDelete: CASCADE_ACTION }),
+});
+
+export const accounts = pgTable("account", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: text("account_id").notNull(),
+  providerId: text("provider_id").notNull(),
+  userId: uuid(USER_ID_COLUMN)
+    .notNull()
+    .references(() => users.id, { onDelete: CASCADE_ACTION }),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  idToken: text("id_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", {
+    withTimezone: true,
+  }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+    withTimezone: true,
+  }),
+  scope: text("scope"),
+  password: text("password"),
+  createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const verifications = pgTable("verification", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true }),
+  updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true }),
+});
+
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 128 }).primaryKey(),
+  valueJson: jsonb("value_json").notNull(),
+  updatedById: uuid("updated_by_user_id").references(() => users.id, {
+    onDelete: SET_NULL_ACTION,
+  }),
+  updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── Organization & Workspace ──────────────────────────────────────────
+
+export const organizations = pgTable("organizations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 128 }).notNull().unique(),
+  createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const workspaces = pgTable(
+  "workspaces",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: CASCADE_ACTION }),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 128 }).notNull(),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("workspaces_org_slug_unique").on(t.organizationId, t.slug),
+  ],
+);
+
+export const workspaceMemberStatusEnum = pgEnum("workspace_member_status", [
+  "active",
+  "suspended",
+  "removed",
+]);
+
+export const workspaceMembers = pgTable(
+  "workspace_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id, { onDelete: CASCADE_ACTION }),
+    status: workspaceMemberStatusEnum(STATUS_COLUMN)
+      .notNull()
+      .default("active"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("workspace_members_ws_user_unique").on(t.workspaceId, t.userId),
+  ],
+);
+
+export const workspaceInvitations = pgTable("workspace_invitations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid(WORKSPACE_ID_COLUMN)
+    .notNull()
+    .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+  email: varchar("email", { length: 255 }).notNull(),
+  invitedById: uuid("invited_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  roleIdsJson: jsonb("role_ids_json"),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── IAM: Roles & Permissions ──────────────────────────────────────────
+
+export const roleScopeTypeEnum = pgEnum("role_scope_type", [
+  "system",
+  "organization",
+  "workspace",
+]);
+export const roleOwnerResourceTypeEnum = pgEnum("role_owner_resource_type", [
+  "organization",
+  "workspace",
+]);
+
+export const roles = pgTable(
+  "roles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    scopeType: roleScopeTypeEnum("scope_type").notNull(),
+    ownerResourceType: roleOwnerResourceTypeEnum("owner_resource_type"),
+    ownerResourceId: uuid("owner_resource_id"),
+    name: varchar("name", { length: 128 }).notNull(),
+    displayName: varchar("display_name", { length: 255 }).notNull(),
+    description: text("description"),
+    permissionsJson: jsonb("permissions_json").notNull(),
+    isSystem: boolean("is_system").notNull().default(false),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN).references(() => users.id),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("roles_system_name_unique")
+      .on(t.scopeType, t.name)
+      .where(sql`${t.isSystem} = true`),
+  ],
+);
+
+export const principalTypeEnum = pgEnum("principal_type", [
+  "user",
+  "group",
+  "service_account",
+  "api_key",
+]);
+export const roleBindingResourceTypeEnum = pgEnum(
+  "role_binding_resource_type",
+  [
+    "organization",
+    "workspace",
+    "agent",
+    "provider",
+    "mcp_server",
+    "knowledge_base",
+    "marketplace_item",
+  ],
+);
+
+export const roleBindings = pgTable(
+  "role_bindings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    principalType: principalTypeEnum("principal_type").notNull(),
+    principalId: uuid("principal_id").notNull(),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: CASCADE_ACTION }),
+    resourceType: roleBindingResourceTypeEnum("resource_type").notNull(),
+    resourceId: uuid("resource_id").notNull(),
+    conditionJson: jsonb("condition_json"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN).references(() => users.id),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("role_bindings_principal_role_resource").on(
+      t.principalType,
+      t.principalId,
+      t.resourceType,
+      t.resourceId,
+    ),
+  ],
+);
+
+// ─── Audit Events ──────────────────────────────────────────────────────
+
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id"),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN),
+    actorPrincipalType: varchar("actor_principal_type", { length: 32 }),
+    actorPrincipalId: uuid("actor_principal_id"),
+    action: varchar("action", { length: 128 }).notNull(),
+    resourceType: varchar("resource_type", { length: 64 }),
+    resourceId: uuid("resource_id"),
+    outcome: varchar("outcome", { length: 16 }).notNull(),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    metadataJson: jsonb("metadata_json"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("audit_events_actor").on(t.actorPrincipalType, t.actorPrincipalId),
+    index("audit_events_resource").on(t.resourceType, t.resourceId),
+    index("audit_events_workspace").on(t.workspaceId),
+  ],
+);
+
+// ─── Usage Events ──────────────────────────────────────────────────────
+
+export const usageEvents = pgTable(
+  "usage_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN),
+    userId: uuid(USER_ID_COLUMN),
+    providerId: uuid("provider_id"),
+    modelId: uuid("model_id"),
+    agentId: uuid("agent_id"),
+    conversationId: uuid("conversation_id"),
+    operation: varchar("operation", { length: 32 }).notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    costUsd: text("cost_usd"),
+    latencyMs: integer("latency_ms"),
+    status: varchar(STATUS_COLUMN, { length: 16 }),
+    metadataJson: jsonb("metadata_json"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("usage_events_workspace").on(t.workspaceId),
+    index("usage_events_user").on(t.userId),
+  ],
+);
+
+// ─── AI Providers ──────────────────────────────────────────────────────
+
+export const providerKindEnum = pgEnum("provider_kind", [
+  "openai-compatible",
+  "dragonfly",
+  "vercel-ai-gateway",
+  "native",
+]);
+export const providerAuthTypeEnum = pgEnum("provider_auth_type", [
+  "bearer",
+  "x-api-key",
+  "custom-header",
+  "gateway",
+]);
+
+export const aiProviders = pgTable(
+  "ai_providers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    kind: providerKindEnum("kind").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    baseUrl: text("base_url"),
+    authType: providerAuthTypeEnum("auth_type").notNull(),
+    encryptedApiKey: text("encrypted_api_key"),
+    encryptedHeadersJson: jsonb("encrypted_headers_json"),
+    queryParamsJson: jsonb("query_params_json"),
+    enabled: boolean("enabled").notNull().default(true),
+    healthStatus: varchar("health_status", { length: 16 }),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [index("ai_providers_workspace").on(t.workspaceId)],
+);
+
+export const aiModels = pgTable(
+  "ai_models",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    providerId: uuid("provider_id")
+      .notNull()
+      .references(() => aiProviders.id, { onDelete: CASCADE_ACTION }),
+    modelId: varchar("model_id", { length: 255 }).notNull(),
+    displayName: varchar("display_name", { length: 255 }),
+    logoUrl: text("logo_url"),
+    capabilitiesJson: jsonb("capabilities_json"),
+    contextWindow: integer("context_window"),
+    maxOutputTokens: integer("max_output_tokens"),
+    inputTokenCost: text("input_token_cost"),
+    outputTokenCost: text("output_token_cost"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("ai_models_provider_model_unique").on(t.providerId, t.modelId),
+  ],
+);
+
+// ─── Agents ────────────────────────────────────────────────────────────
+
+export const agentVisibilityEnum = pgEnum("agent_visibility", [
+  "private",
+  "workspace",
+  "organization",
+  "public",
+]);
+export const agentSourceTypeEnum = pgEnum("agent_source_type", [
+  "custom",
+  "marketplace_install",
+  "fork",
+]);
+
+export const agents = pgTable(
+  "agents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 128 }).notNull(),
+    description: text("description"),
+    logoUrl: text("logo_url"),
+    visibility: agentVisibilityEnum("visibility").notNull().default("private"),
+    sourceType: agentSourceTypeEnum("source_type").notNull().default("custom"),
+    sharingMode: varchar("sharing_mode", { length: 32 })
+      .notNull()
+      .default("personal"),
+    shareTargetUserId: uuid("share_target_user_id").references(() => users.id, {
+      onDelete: SET_NULL_ACTION,
+    }),
+    isGlobal: boolean("is_global").notNull().default(false),
+    isRecommended: boolean("is_recommended").notNull().default(false),
+    isOrganizationDefault: boolean("is_organization_default")
+      .notNull()
+      .default(false),
+    organizationDisplayOrder: integer("organization_display_order")
+      .notNull()
+      .default(0),
+    curationLabel: varchar("curation_label", { length: 64 }),
+    promptSuggestionsJson: jsonb("prompt_suggestions_json")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    marketplaceItemId: uuid("marketplace_item_id"),
+    marketplaceVersionId: uuid("marketplace_version_id"),
+    forkedFromAgentId: uuid("forked_from_agent_id"),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    activeVersionId: uuid("active_version_id"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("agents_workspace_slug_unique").on(t.workspaceId, t.slug),
+  ],
+);
+
+export const userAgentPreferences = pgTable(
+  "user_agent_preferences",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id, { onDelete: CASCADE_ACTION }),
+    defaultAgentId: uuid("default_agent_id").references(() => agents.id, {
+      onDelete: SET_NULL_ACTION,
+    }),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("user_agent_preferences_workspace_user_unique").on(
+      t.workspaceId,
+      t.userId,
+    ),
+  ],
+);
+
+export const agentVersions = pgTable(
+  "agent_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentId: uuid("agent_id").notNull(),
+    versionNumber: integer("version_number").notNull(),
+    name: varchar("name", { length: 255 }),
+    systemPrompt: text("system_prompt"),
+    providerId: uuid("provider_id").references(() => aiProviders.id),
+    modelId: uuid("model_id"),
+    temperature: text("temperature"),
+    topP: text("top_p"),
+    maxOutputTokens: integer("max_output_tokens"),
+    maxToolCalls: integer("max_tool_calls").notNull().default(6),
+    toolChoice: varchar("tool_choice", { length: 32 }),
+    generationSettingsJson: jsonb("generation_settings_json"),
+    responseFormatJson: jsonb("response_format_json"),
+    memoryPolicyJson: jsonb("memory_policy_json"),
+    guardrailsJson: jsonb("guardrails_json"),
+    approvalPolicyJson: jsonb("approval_policy_json"),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("agent_versions_agent_version_unique").on(
+      t.agentId,
+      t.versionNumber,
+    ),
+  ],
+);
+
+// ─── Conversations & Messages ──────────────────────────────────────────
+
+export const conversationStatusEnum = pgEnum("conversation_status", [
+  "active",
+  "archived",
+  "deleted",
+]);
+
+export const conversationFolders = pgTable(
+  "conversation_folders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id, { onDelete: CASCADE_ACTION }),
+    name: varchar("name", { length: 160 }).notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("conversation_folders_user_workspace_order").on(
+      t.userId,
+      t.workspaceId,
+      t.archivedAt,
+      t.sortOrder,
+      t.createdAt,
+      t.id,
+    ),
+  ],
+);
+
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: CASCADE_ACTION }),
+    agentVersionId: uuid("agent_version_id").references(() => agentVersions.id),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    title: varchar("title", { length: 512 }).notNull().default("New Chat"),
+    status: conversationStatusEnum(STATUS_COLUMN).notNull().default("active"),
+    folderId: uuid("folder_id").references(() => conversationFolders.id, {
+      onDelete: SET_NULL_ACTION,
+    }),
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+    sidebarOrder: integer("sidebar_order"),
+    parentConversationId: uuid("parent_conversation_id"),
+    branchFromMessageId: uuid("branch_from_message_id"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("conversations_workspace_agent").on(t.workspaceId, t.agentId),
+    index("conversations_user").on(t.userId),
+    index("conversations_user_workspace_updated").on(
+      t.userId,
+      t.workspaceId,
+      t.status,
+      t.archivedAt,
+      t.updatedAt,
+      t.id,
+    ),
+    index("conversations_sidebar_order").on(
+      t.userId,
+      t.workspaceId,
+      t.folderId,
+      t.pinnedAt,
+      t.sidebarOrder,
+      t.updatedAt,
+      t.id,
+    ),
+  ],
+);
+
+export const messageRoleEnum = pgEnum("message_role", [
+  "user",
+  "assistant",
+  "system",
+  "tool",
+]);
+export const messageStatusEnum = pgEnum("message_status", [
+  "pending",
+  "streaming",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export const scheduledTaskFrequencyEnum = pgEnum("scheduled_task_frequency", [
+  "daily",
+  "interval",
+]);
+
+export const scheduledTaskStatusEnum = pgEnum("scheduled_task_status", [
+  "idle",
+  "running",
+  "success",
+  "failed",
+]);
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id").notNull(),
+    role: messageRoleEnum("role").notNull(),
+    status: messageStatusEnum(STATUS_COLUMN).notNull().default("pending"),
+    tokenInput: integer("token_input"),
+    tokenOutput: integer("token_output"),
+    costUsd: text("cost_usd"),
+    modelId: varchar("model_id", { length: 255 }),
+    providerId: uuid("provider_id"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("messages_conversation").on(t.conversationId),
+    index("messages_conversation_created").on(t.conversationId, t.createdAt),
+  ],
+);
+
+export const messagePartTypeEnum = pgEnum("message_part_type", [
+  "text",
+  "file",
+  "tool-call",
+  "tool-result",
+  "reasoning",
+  "error",
+  "citation",
+  "citations",
+  "suggestions",
+]);
+
+export const scheduledTasks = pgTable(
+  "scheduled_tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id, { onDelete: CASCADE_ACTION }),
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: CASCADE_ACTION }),
+    conversationId: uuid("conversation_id").references(() => conversations.id, {
+      onDelete: SET_NULL_ACTION,
+    }),
+    title: varchar("title", { length: 255 }).notNull(),
+    prompt: text("prompt").notNull(),
+    frequency: scheduledTaskFrequencyEnum("frequency").notNull(),
+    timezone: varchar("timezone", { length: 64 }).notNull().default("UTC"),
+    timeOfDay: varchar("time_of_day", { length: 5 }),
+    intervalMinutes: integer("interval_minutes"),
+    enabled: boolean("enabled").notNull().default(true),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    lastStatus: scheduledTaskStatusEnum("last_status")
+      .notNull()
+      .default("idle"),
+    lastError: text("last_error"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("scheduled_tasks_due").on(t.enabled, t.nextRunAt),
+    index("scheduled_tasks_workspace_user").on(t.workspaceId, t.userId),
+  ],
+);
+
+export const messageParts = pgTable(
+  "message_parts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: CASCADE_ACTION }),
+    type: messagePartTypeEnum("type").notNull(),
+    contentEncrypted: text("content_encrypted"),
+    metadataJson: jsonb("metadata_json"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("message_parts_message").on(t.messageId, t.sortOrder)],
+);
+
+// ─── MCP Servers ───────────────────────────────────────────────────────
+
+export const mcpTransportEnum = pgEnum("mcp_transport", [
+  "stdio",
+  "sse",
+  "streamable-http",
+]);
+
+export const mcpServers = pgTable(
+  "mcp_servers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    name: varchar("name", { length: 255 }).notNull(),
+    transport: mcpTransportEnum("transport").notNull(),
+    command: text("command"),
+    argsJson: jsonb("args_json"),
+    url: text("url"),
+    encryptedHeadersJson: jsonb("encrypted_headers_json"),
+    encryptedEnvJson: jsonb("encrypted_env_json"),
+    enabled: boolean("enabled").notNull().default(true),
+    requireApproval: boolean("require_approval").notNull().default(false),
+    healthStatus: varchar("health_status", { length: 16 }),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [index("mcp_servers_workspace").on(t.workspaceId)],
+);
+
+export const mcpTools = pgTable(
+  "mcp_tools",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mcpServerId: uuid("mcp_server_id")
+      .notNull()
+      .references(() => mcpServers.id, { onDelete: CASCADE_ACTION }),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description"),
+    inputSchemaJson: jsonb("input_schema_json"),
+    outputSchemaJson: jsonb("output_schema_json"),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    enabled: boolean("enabled").notNull().default(true),
+    requireApproval: boolean("require_approval").notNull().default(false),
+  },
+  (t) => [index("mcp_tools_server").on(t.mcpServerId)],
+);
+
+export const workspaceApiKeys = pgTable(
+  "workspace_api_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    name: varchar("name", { length: 255 }).notNull(),
+    keyPrefix: varchar("key_prefix", { length: 16 }).notNull(),
+    keyHash: text("key_hash").notNull(),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("workspace_api_keys_workspace").on(t.workspaceId),
+    uniqueIndex("workspace_api_keys_hash_unique").on(t.keyHash),
+  ],
+);
+
+export const agentToolBindings = pgTable(
+  "agent_tool_bindings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentVersionId: uuid("agent_version_id")
+      .notNull()
+      .references(() => agentVersions.id, { onDelete: CASCADE_ACTION }),
+    toolSource: varchar("tool_source", { length: 16 }).notNull(),
+    toolId: uuid("tool_id").notNull(),
+    requireApproval: boolean("require_approval").notNull().default(false),
+    riskLevel: varchar("risk_level", { length: 16 }),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("agent_tool_bindings_version_tool_unique").on(
+      t.agentVersionId,
+      t.toolSource,
+      t.toolId,
+    ),
+  ],
+);
+
+export const toolInvocations = pgTable(
+  "tool_invocations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    conversationId: uuid("conversation_id").references(() => conversations.id),
+    messageId: uuid("message_id").references(() => messages.id),
+    toolSource: varchar("tool_source", { length: 16 }).notNull(),
+    toolId: uuid("tool_id").notNull(),
+    toolName: varchar("tool_name", { length: 255 }).notNull(),
+    riskLevel: varchar("risk_level", { length: 16 }),
+    inputJsonEncrypted: text("input_json_encrypted"),
+    outputJsonEncrypted: text("output_json_encrypted"),
+    status: varchar(STATUS_COLUMN, { length: 24 }).notNull(),
+    latencyMs: integer("latency_ms"),
+    errorMessage: text("error_message"),
+    approvedByUserId: uuid("approved_by_user_id"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("tool_invocations_workspace").on(t.workspaceId),
+    index("tool_invocations_conversation").on(t.conversationId),
+  ],
+);
+
+// ─── Knowledge / RAG ──────────────────────────────────────────────────
+
+export const knowledgeBases = pgTable(
+  "knowledge_bases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description"),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [index("knowledge_bases_workspace").on(t.workspaceId)],
+);
+
+export const documentSourceEnum = pgEnum("document_source_type", [
+  "upload",
+  "url",
+  "text",
+  "integration",
+]);
+export const documentStatusEnum = pgEnum("document_status", [
+  "pending",
+  "processing",
+  "ready",
+  "failed",
+]);
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    knowledgeBaseId: uuid("knowledge_base_id")
+      .notNull()
+      .references(() => knowledgeBases.id, { onDelete: CASCADE_ACTION }),
+    title: varchar("title", { length: 512 }).notNull(),
+    sourceType: documentSourceEnum("source_type").notNull(),
+    objectStorageKey: text("object_storage_key"),
+    mimeType: varchar("mime_type", { length: 128 }),
+    status: documentStatusEnum(STATUS_COLUMN).notNull().default("pending"),
+    errorMessage: text("error_message"),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("documents_knowledge_base").on(t.knowledgeBaseId)],
+);
+
+export const documentChunks = pgTable(
+  "document_chunks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: CASCADE_ACTION }),
+    chunkIndex: integer("chunk_index").notNull(),
+    contentEncrypted: text("content_encrypted"),
+    tokenCount: integer("token_count"),
+    metadataJson: jsonb("metadata_json"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("document_chunks_document").on(t.documentId, t.chunkIndex)],
+);
+
+export const documentEmbeddings = pgTable(
+  "document_embeddings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    chunkId: uuid("chunk_id")
+      .notNull()
+      .references(() => documentChunks.id, { onDelete: CASCADE_ACTION }),
+    embedding: vector("embedding", { dimensions: 1536 }),
+    embeddingModelId: varchar("embedding_model_id", { length: 255 }),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("document_embeddings_chunk_unique").on(t.chunkId)],
+);
+
+export const agentKnowledgeBindings = pgTable(
+  "agent_knowledge_bindings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentVersionId: uuid("agent_version_id")
+      .notNull()
+      .references(() => agentVersions.id, { onDelete: CASCADE_ACTION }),
+    knowledgeBaseId: uuid("knowledge_base_id")
+      .notNull()
+      .references(() => knowledgeBases.id, { onDelete: CASCADE_ACTION }),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("agent_knowledge_bindings_unique").on(
+      t.agentVersionId,
+      t.knowledgeBaseId,
+    ),
+  ],
+);
+
+export const agentSkills = pgTable(
+  "agent_skills",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description"),
+    sourcePackage: text("source_package"),
+    sourceSkillName: varchar("source_skill_name", { length: 255 }),
+    installCommand: text("install_command"),
+    markdownFilesJson: jsonb("markdown_files_json").notNull(),
+    metadataJson: jsonb("metadata_json"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [index("agent_skills_workspace").on(t.workspaceId)],
+);
+
+export const agentSkillBindings = pgTable(
+  "agent_skill_bindings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentVersionId: uuid("agent_version_id")
+      .notNull()
+      .references(() => agentVersions.id, { onDelete: CASCADE_ACTION }),
+    skillId: uuid("skill_id")
+      .notNull()
+      .references(() => agentSkills.id, { onDelete: CASCADE_ACTION }),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("agent_skill_bindings_unique").on(t.agentVersionId, t.skillId),
+  ],
+);
+
+// ─── Marketplace ───────────────────────────────────────────────────────
+
+export const marketplaceItemTypeEnum = pgEnum("marketplace_item_type", [
+  "agent",
+  "prompt_template",
+  "tool_pack",
+  "mcp_preset",
+  "workflow_template",
+  "knowledge_template",
+  "provider_preset",
+  "skill",
+  "custom_tool",
+]);
+
+export const marketplaceItemStatusEnum = pgEnum("marketplace_item_status", [
+  "draft",
+  "pending_review",
+  "published",
+  "rejected",
+  "suspended",
+  "archived",
+]);
+
+export const marketplaceItemVisibilityEnum = pgEnum(
+  "marketplace_item_visibility",
+  ["public", "private"],
+);
+
+export const marketplacePricingModelEnum = pgEnum("marketplace_pricing_model", [
+  "free",
+  "one_time",
+  "subscription",
+  "usage_based",
+]);
+
+export const marketplaceItems = pgTable(
+  "marketplace_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    publisherUserId: uuid("publisher_user_id")
+      .notNull()
+      .references(() => users.id),
+    publisherWorkspaceId: uuid("publisher_workspace_id").references(
+      () => workspaces.id,
+    ),
+    type: marketplaceItemTypeEnum("type").notNull(),
+    slug: varchar("slug", { length: 128 }).notNull().unique(),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description"),
+    visibility: marketplaceItemVisibilityEnum("visibility")
+      .notNull()
+      .default("private"),
+    status: marketplaceItemStatusEnum(STATUS_COLUMN).notNull().default("draft"),
+    latestVersionId: uuid("latest_version_id"),
+    installCount: integer("install_count").notNull().default(0),
+    ratingAverage: text("rating_average"),
+    pricingModel: marketplacePricingModelEnum("pricing_model")
+      .notNull()
+      .default("free"),
+    verifiedPublisher: boolean("verified_publisher").notNull().default(false),
+    isFeatured: boolean("is_featured").notNull().default(false),
+    featuredOrder: integer("featured_order"),
+    featuredAt: timestamp("featured_at", { withTimezone: true }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    totalDownloads: integer("total_downloads").notNull().default(0),
+    tagsJson: jsonb("tags_json"),
+    sourceResourceType: varchar("source_resource_type", { length: 32 }),
+    sourceResourceId: uuid("source_resource_id"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("marketplace_items_featured").on(t.isFeatured, t.featuredOrder),
+    index("marketplace_items_type").on(t.type),
+    index("marketplace_items_published").on(
+      t.status,
+      t.visibility,
+      t.publishedAt,
+    ),
+    index("marketplace_items_source_resource").on(
+      t.sourceResourceType,
+      t.sourceResourceId,
+    ),
+  ],
+);
+
+export const marketplaceItemVersions = pgTable(
+  "marketplace_item_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => marketplaceItems.id, { onDelete: CASCADE_ACTION }),
+    version: varchar("version", { length: 32 }).notNull(),
+    manifestJson: jsonb("manifest_json").notNull(),
+    changelog: text("changelog"),
+    compatibilityJson: jsonb("compatibility_json"),
+    requestedPermissionsJson: jsonb("requested_permissions_json"),
+    securityReviewStatus: varchar("security_review_status", { length: 16 }),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("marketplace_item_versions_item_version_unique").on(
+      t.itemId,
+      t.version,
+    ),
+  ],
+);
+
+export const marketplaceInstalls = pgTable(
+  "marketplace_installs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => marketplaceItems.id),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => marketplaceItemVersions.id),
+    installedByUserId: uuid("installed_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    installedResourceType: varchar("installed_resource_type", {
+      length: 32,
+    }),
+    installedResourceId: uuid("installed_resource_id"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("marketplace_installs_workspace_item").on(t.workspaceId, t.itemId),
+  ],
+);
+
+export const marketplaceReviews = pgTable("marketplace_reviews", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  itemId: uuid("item_id")
+    .notNull()
+    .references(() => marketplaceItems.id, { onDelete: CASCADE_ACTION }),
+  versionId: uuid("version_id").references(() => marketplaceItemVersions.id),
+  reviewerUserId: uuid("reviewer_user_id")
+    .notNull()
+    .references(() => users.id),
+  status: varchar(STATUS_COLUMN, { length: 24 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const marketplaceRatings = pgTable(
+  "marketplace_ratings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => marketplaceItems.id, { onDelete: CASCADE_ACTION }),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    rating: integer("rating").notNull(),
+    review: text("review"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("marketplace_ratings_item_user_unique").on(t.itemId, t.userId),
+  ],
+);
+
+export const marketplaceReports = pgTable("marketplace_reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  itemId: uuid("item_id")
+    .notNull()
+    .references(() => marketplaceItems.id, { onDelete: CASCADE_ACTION }),
+  reporterUserId: uuid("reporter_user_id")
+    .notNull()
+    .references(() => users.id),
+  reason: text("reason").notNull(),
+  status: varchar(STATUS_COLUMN, { length: 16 }).notNull().default("pending"),
+  createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── Marketplace Shares ────────────────────────────────────────────────
+
+export const marketplaceItemShares = pgTable(
+  "marketplace_item_shares",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => marketplaceItems.id, { onDelete: CASCADE_ACTION }),
+    sharedWithUserId: uuid("shared_with_user_id")
+      .notNull()
+      .references(() => users.id),
+    sharedAt: timestamp("shared_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("marketplace_item_shares_item_user_unique").on(
+      t.itemId,
+      t.sharedWithUserId,
+    ),
+  ],
+);
+
+// ─── Custom Tool Builder ───────────────────────────────────────────────
+
+export const customToolStatusEnum = pgEnum("custom_tool_status", [
+  "draft",
+  "awaiting_secrets",
+  "workflow_created",
+  "active",
+  "failed",
+  "disabled",
+]);
+
+export const customTools = pgTable(
+  "custom_tools",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    createdById: uuid(CREATED_BY_USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description"),
+    n8nWorkflowId: varchar("n8n_workflow_id", { length: 255 }),
+    n8nWorkflowUrl: text("n8n_workflow_url"),
+    status: customToolStatusEnum(STATUS_COLUMN).notNull().default("draft"),
+    inputSchemaJson: jsonb("input_schema_json"),
+    outputSchemaJson: jsonb("output_schema_json"),
+    metadataJson: jsonb("metadata_json"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [index("custom_tools_workspace").on(t.workspaceId)],
+);
+
+export const customToolSecretRequests = pgTable(
+  "custom_tool_secret_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    customToolId: uuid("custom_tool_id").references(() => customTools.id, {
+      onDelete: SET_NULL_ACTION,
+    }),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    fieldsJson: jsonb("fields_json").notNull(),
+    status: varchar(STATUS_COLUMN, { length: 24 }).notNull().default("pending"),
+    credentialRefId: uuid("credential_ref_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("custom_tool_secret_requests_workspace").on(t.workspaceId),
+    index("custom_tool_secret_requests_user").on(t.userId),
+  ],
+);
+
+export const customToolCredentialRefs = pgTable(
+  "custom_tool_credential_refs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    provider: varchar("provider", { length: 128 }).notNull(),
+    label: varchar("label", { length: 255 }).notNull(),
+    n8nCredentialId: varchar("n8n_credential_id", { length: 255 }),
+    encryptedPayload: text("encrypted_payload").notNull(),
+    metadataJson: jsonb("metadata_json"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("custom_tool_credential_refs_workspace").on(t.workspaceId),
+    index("custom_tool_credential_refs_user").on(t.userId),
+  ],
+);
+
+export const userGithubConnections = pgTable(
+  "user_github_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id, { onDelete: CASCADE_ACTION }),
+    installationId: varchar("installation_id", { length: 64 }).notNull(),
+    accountLogin: varchar("account_login", { length: 255 }).notNull(),
+    accountId: varchar("account_id", { length: 64 }),
+    accountType: varchar("account_type", { length: 32 }),
+    repositorySelection: varchar("repository_selection", { length: 32 }),
+    settingsUrl: text("settings_url"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp(UPDATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("user_github_connections_user").on(t.userId),
+    uniqueIndex("user_github_connections_user_installation_unique").on(
+      t.userId,
+      t.installationId,
+    ),
+  ],
+);
+
+export const userGithubRepositories = pgTable(
+  "user_github_repositories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => userGithubConnections.id, { onDelete: CASCADE_ACTION }),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id, { onDelete: CASCADE_ACTION }),
+    githubRepositoryId: varchar("github_repository_id", {
+      length: 64,
+    }).notNull(),
+    owner: varchar("owner", { length: 255 }).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    fullName: varchar("full_name", { length: 512 }).notNull(),
+    private: boolean("private").notNull().default(false),
+    defaultBranch: varchar("default_branch", { length: 255 }).notNull(),
+    permissionsJson: jsonb("permissions_json"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("user_github_repositories_user").on(t.userId),
+    index("user_github_repositories_connection").on(t.connectionId),
+    uniqueIndex("user_github_repositories_user_repo_unique").on(
+      t.userId,
+      t.owner,
+      t.name,
+    ),
+    index("user_github_repositories_github_repo").on(t.githubRepositoryId),
+  ],
+);
+
+export const githubPublishEvents = pgTable(
+  "github_publish_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid(WORKSPACE_ID_COLUMN)
+      .notNull()
+      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    userId: uuid(USER_ID_COLUMN)
+      .notNull()
+      .references(() => users.id),
+    connectionId: uuid("connection_id").references(
+      () => userGithubConnections.id,
+      { onDelete: SET_NULL_ACTION },
+    ),
+    repositoryId: uuid("repository_id").references(
+      () => userGithubRepositories.id,
+      { onDelete: SET_NULL_ACTION },
+    ),
+    codeWorkspaceId: uuid("code_workspace_id").notNull(),
+    conversationId: uuid("conversation_id").references(() => conversations.id, {
+      onDelete: SET_NULL_ACTION,
+    }),
+    agentId: uuid("agent_id").references(() => agents.id, {
+      onDelete: SET_NULL_ACTION,
+    }),
+    mode: varchar("mode", { length: 24 }).notNull(),
+    targetBranch: varchar("target_branch", { length: 255 }).notNull(),
+    sourceBranch: varchar("source_branch", { length: 255 }),
+    commitSha: varchar("commit_sha", { length: 64 }),
+    pullRequestUrl: text("pull_request_url"),
+    status: varchar(STATUS_COLUMN, { length: 24 }).notNull(),
+    metadataJson: jsonb("metadata_json"),
+    createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("github_publish_events_workspace").on(t.workspaceId),
+    index("github_publish_events_user").on(t.userId),
+    index("github_publish_events_repository").on(t.repositoryId),
+  ],
+);

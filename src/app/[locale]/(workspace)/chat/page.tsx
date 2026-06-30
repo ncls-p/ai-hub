@@ -1,14 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-	ChevronDownIcon,
-	MessageSquareIcon,
-	Loader2,
-	PlusIcon,
-} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -21,8 +14,6 @@ import {
 	ChatMessageList,
 	CodeWorkspaceArtifactCard,
 } from "@/components/chat/chat-message-list";
-import { ModelLogo } from "@/components/providers/model-logo";
-import { QuotaBanner } from "@/components/chat/quota-banner";
 import { textFromMessage } from "@/components/chat/chat-types";
 import type {
 	AgentVersion,
@@ -34,234 +25,31 @@ import type {
 	CodeWorkspaceArtifact,
 	PendingToolApproval,
 } from "@/components/chat/chat-types";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
 import { useChatStream } from "@/hooks/use-chat-stream";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { fetchJson } from "@/lib/api-client";
-import { cn } from "@/lib/utils";
-
-function createQueuedMessage(content: string): QueuedChatMessage {
-	return {
-		id:
-			typeof crypto !== "undefined" && "randomUUID" in crypto
-				? crypto.randomUUID()
-				: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-		content,
-	};
-}
-
-const CHAT_INTERFACE_MODE = "chat";
-const CODING_INTERFACE_MODE = "coding";
-type InterfaceMode = typeof CHAT_INTERFACE_MODE | typeof CODING_INTERFACE_MODE;
-
-const CONVERSATION_PAGE_SIZE = 50;
-
-function uploadPathForFile(file: File) {
-	const relativePath = (file as File & { webkitRelativePath?: string })
-		.webkitRelativePath;
-	return relativePath?.trim() || file.name;
-}
-
-type ConversationListPage = {
-	conversations: ChatConversation[];
-	folders: ChatConversationFolder[];
-	hasMore: boolean;
-	nextCursor: string | null;
-};
-
-type ConversationListPayload = ChatConversation[] | ConversationListPage;
-
-function normalizeConversationList(
-	payload: ConversationListPayload,
-): ConversationListPage {
-	if (Array.isArray(payload)) {
-		return {
-			conversations: payload,
-			folders: [],
-			hasMore: false,
-			nextCursor: null,
-		};
-	}
-	return {
-		conversations: payload.conversations ?? [],
-		folders: payload.folders ?? [],
-		hasMore: payload.hasMore,
-		nextCursor: payload.nextCursor,
-	};
-}
-
-function mergeConversationPages(
-	current: ChatConversation[],
-	incoming: ChatConversation[],
-) {
-	const existingIds = new Set(current.map((conversation) => conversation.id));
-	return [
-		...current,
-		...incoming.filter((conversation) => !existingIds.has(conversation.id)),
-	];
-}
-
-function conversationTitleFromFirstMessage(content: string) {
-	const normalized = content.trim().replace(/\s+/g, " ");
-	return normalized.length > 100 ? `${normalized.slice(0, 97)}…` : normalized;
-}
-
-function rotatePromptSuggestions(suggestions: string[], seed: string) {
-	if (suggestions.length <= 3) return suggestions;
-	const offset =
-		Array.from(seed).reduce((total, char) => total + char.charCodeAt(0), 0) %
-		suggestions.length;
-	return [...suggestions.slice(offset), ...suggestions.slice(0, offset)].slice(
-		0,
-		3,
-	);
-}
-
-function upsertConversation(
-	current: ChatConversation[],
-	conversation: ChatConversation,
-) {
-	let found = false;
-	const next = current.map((item) => {
-		if (item.id !== conversation.id) return item;
-		found = true;
-		return { ...item, ...conversation };
-	});
-	return found ? next : [conversation, ...next];
-}
-
-function isCodeWorkspaceArtifact(
-	value: unknown,
-): value is CodeWorkspaceArtifact {
-	if (typeof value !== "object" || value === null) return false;
-	const record = value as Record<string, unknown>;
-	return (
-		record.kind === "code_workspace_artifact" &&
-		typeof record.projectId === "string" &&
-		typeof record.version === "number" &&
-		Array.isArray(record.files)
-	);
-}
-
-function codeWorkspaceArtifactFromPartContent(content: string) {
-	try {
-		const parsed = JSON.parse(content) as unknown;
-		if (isCodeWorkspaceArtifact(parsed)) return parsed;
-		if (typeof parsed !== "object" || parsed === null) return null;
-		const output = (parsed as Record<string, unknown>).output;
-		return isCodeWorkspaceArtifact(output) ? output : null;
-	} catch {
-		return null;
-	}
-}
-
-function latestCodeWorkspaceArtifact(messages: ChatMessage[]) {
-	let latest: CodeWorkspaceArtifact | null = null;
-	for (const message of messages) {
-		for (const part of message.parts) {
-			if (
-				part.type !== "file" &&
-				part.type !== "tool-call" &&
-				part.type !== "tool-result"
-			) {
-				continue;
-			}
-			const artifact = codeWorkspaceArtifactFromPartContent(part.content);
-			if (!artifact) continue;
-			if (!latest || artifact.version >= latest.version) latest = artifact;
-		}
-	}
-	return latest;
-}
-
-function ChatContextBar({
-	quota,
-}: {
-	quota: { used: number; limit: number } | null;
-}) {
-	const [open, setOpen] = useState(false);
-	const quotaPercent = quota
-		? Math.min(100, Math.round((quota.used / quota.limit) * 100))
-		: 0;
-	const showQuota = Boolean(quota && quotaPercent >= 80);
-
-	useEffect(() => {
-		const stored = window.localStorage.getItem("chat-context-open-v2");
-		if (stored) {
-			queueMicrotask(() => setOpen(stored === "true"));
-		}
-	}, []);
-
-	function updateOpen(shouldOpen: boolean) {
-		setOpen(shouldOpen);
-		window.localStorage.setItem("chat-context-open-v2", String(shouldOpen));
-	}
-
-	if (!showQuota) return null;
-
-	return (
-		<Collapsible
-			open={open}
-			onOpenChange={updateOpen}
-			className="shrink-0 border-b border-border/60 bg-background"
-		>
-			<div className="mx-auto flex min-h-10 w-full max-w-4xl items-center justify-between gap-3 px-4 py-1.5">
-				<div className="flex min-w-0 flex-wrap items-center gap-2">
-					<span className="truncate text-sm font-medium">Chat status</span>
-					{showQuota ? (
-						<Badge
-							variant={quotaPercent >= 100 ? "destructive" : "outline"}
-							className="rounded-lg text-[11px] font-medium"
-						>
-							Usage {quotaPercent}%
-						</Badge>
-					) : null}
-				</div>
-				<div className="flex shrink-0 items-center gap-2">
-					<CollapsibleTrigger asChild>
-						<Button
-							type="button"
-							size="sm"
-							variant="ghost"
-							className="h-7 gap-1 px-2 text-xs"
-							aria-label={open ? "Hide context" : "Show context"}
-						>
-							<ChevronDownIcon
-								className={cn(
-									"size-3 transition-transform",
-									!open && "-rotate-90",
-								)}
-								aria-hidden="true"
-							/>
-						</Button>
-					</CollapsibleTrigger>
-				</div>
-			</div>
-			{showQuota ? (
-				<CollapsibleContent>
-					<div className="flex flex-col gap-0">
-						{quota ? (
-							<QuotaBanner used={quota.used} limit={quota.limit} />
-						) : null}
-					</div>
-				</CollapsibleContent>
-			) : null}
-		</Collapsible>
-	);
-}
+import {
+	CHAT_INTERFACE_MODE,
+	CODING_INTERFACE_MODE,
+	CONVERSATION_PAGE_SIZE,
+	ChatContextBar,
+	conversationTitleFromFirstMessage,
+	createQueuedMessage,
+	latestCodeWorkspaceArtifact,
+	mergeConversationPages,
+	normalizeConversationList,
+	rotatePromptSuggestions,
+	type ConversationListPayload,
+	type InterfaceMode,
+	uploadPathForFile,
+	upsertConversation,
+} from "./chat-page-helpers";
+import {
+	ChatPageLoading,
+	CodeWorkspaceModeBar,
+	EmptyConversationState,
+	NoAssistantsState,
+} from "./chat-page-view";
 
 export default function ChatPage() {
 	const t = useTranslations(CHAT_INTERFACE_MODE);
@@ -1415,48 +1203,11 @@ export default function ChatPage() {
 	);
 
 	if (workspaceLoading || loadingAgents) {
-		return (
-			<div className="flex h-full flex-col items-center justify-center gap-4">
-				<div className="flex size-12 items-center justify-center rounded-full border bg-card">
-					<Loader2
-						className="size-5 animate-spin text-muted-foreground"
-						aria-hidden="true"
-					/>
-				</div>
-				<div className="flex flex-col items-center gap-1 text-sm">
-					<span className="font-medium text-foreground">Loading</span>
-					<span className="text-xs text-muted-foreground">
-						Fetching your assistants and conversations…
-					</span>
-				</div>
-			</div>
-		);
+		return <ChatPageLoading />;
 	}
 
 	if (agents.length === 0) {
-		return (
-			<div className="mx-auto flex h-full w-full max-w-3xl items-center justify-center px-4 animate-in-fade">
-				<Empty className="min-h-80 w-full">
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<MessageSquareIcon aria-hidden="true" />
-						</EmptyMedia>
-						<EmptyTitle>{t("noAssistants")}</EmptyTitle>
-						<EmptyDescription>{t("noAssistantsDescription")}</EmptyDescription>
-					</EmptyHeader>
-					{canRunSetup ? (
-						<div className="flex justify-center">
-							<Button asChild>
-								<Link href="/setup">
-									<PlusIcon className="size-4" aria-hidden="true" />
-									{t("finishSetup")}
-								</Link>
-							</Button>
-						</div>
-					) : null}
-				</Empty>
-			</div>
-		);
+		return <NoAssistantsState canRunSetup={canRunSetup} t={t} />;
 	}
 
 	return (
@@ -1503,40 +1254,11 @@ export default function ChatPage() {
 		>
 			<ChatContextBar quota={quota} />
 			{codeWorkspaceArtifact ? (
-				<div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/60 bg-background px-3 py-2 sm:px-4">
-					<div className="min-w-0">
-						<p className="truncate text-sm font-medium text-foreground">
-							{codeWorkspaceArtifact.title}
-						</p>
-						<p className="text-xs text-muted-foreground">
-							Code workspace · v{codeWorkspaceArtifact.version}
-						</p>
-					</div>
-					<div className="flex shrink-0 items-center rounded-lg border bg-muted/30 p-0.5">
-						<Button
-							type="button"
-							variant={
-								interfaceMode === CHAT_INTERFACE_MODE ? "secondary" : "ghost"
-							}
-							size="sm"
-							className="h-7 px-3 text-xs"
-							onClick={() => setInterfaceMode(CHAT_INTERFACE_MODE)}
-						>
-							Chat
-						</Button>
-						<Button
-							type="button"
-							variant={
-								interfaceMode === CODING_INTERFACE_MODE ? "secondary" : "ghost"
-							}
-							size="sm"
-							className="h-7 px-3 text-xs"
-							onClick={() => setInterfaceMode(CODING_INTERFACE_MODE)}
-						>
-							Coding
-						</Button>
-					</div>
-				</div>
+				<CodeWorkspaceModeBar
+					artifact={codeWorkspaceArtifact}
+					interfaceMode={interfaceMode}
+					onModeChange={setInterfaceMode}
+				/>
 			) : null}
 			{interfaceMode === CODING_INTERFACE_MODE && codeWorkspaceArtifact ? (
 				<section className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden bg-background lg:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]">
@@ -1602,58 +1324,15 @@ export default function ChatPage() {
 			) : (
 				<section className="min-h-0 flex-1 overflow-hidden">
 					{!loadingMessages && messages.length === 0 ? (
-						<div className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center px-4 py-12 sm:py-16 animate-in-fade">
-							<div className="relative flex w-full flex-col items-center gap-5">
-								<div className="flex max-w-xl flex-col items-center text-center">
-									{selectedAgent ? (
-										<ModelLogo
-											logoUrl={selectedAgent.logoUrl}
-											label={selectedAgent.name}
-											size="lg"
-											imageFit="cover"
-											className="mb-4 rounded-full"
-										/>
-									) : null}
-									<h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-										{canChat
-											? selectedAgent
-												? t("emptyTitleNamed", { name: selectedAgent.name })
-												: t("emptyTitle")
-											: t("finishSetup")}
-									</h2>
-									<p className="mt-2 max-w-sm text-sm text-muted-foreground">
-										{canChat
-											? selectedAgent?.description || t("emptyDescription")
-											: t("emptySetup")}
-									</p>
-								</div>
-
-								{canChat &&
-								(conversations[0] || emptyPromptSuggestions.length > 0) ? (
-									<div className="flex flex-wrap justify-center gap-2">
-										{conversations[0] ? (
-											<Button
-												type="button"
-												variant="outline"
-												onClick={() => selectConversation(conversations[0].id)}
-											>
-												{t("continueLast")}
-											</Button>
-										) : null}
-										{emptyPromptSuggestions.map((suggestion) => (
-											<Button
-												key={suggestion}
-												type="button"
-												variant="outline"
-												onClick={() => submitSuggestion(suggestion)}
-											>
-												{suggestion}
-											</Button>
-										))}
-									</div>
-								) : null}
-							</div>
-						</div>
+						<EmptyConversationState
+							canChat={canChat}
+							selectedAgent={selectedAgent}
+							conversations={conversations}
+							emptyPromptSuggestions={emptyPromptSuggestions}
+							onSelectConversation={selectConversation}
+							onSubmitSuggestion={submitSuggestion}
+							t={t}
+						/>
 					) : null}
 					<div className="size-full min-h-0">
 						<ChatMessageList

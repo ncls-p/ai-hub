@@ -7,99 +7,99 @@ import type { ChatCitation } from "@/components/chat/chat-types";
 import { cn } from "@/lib/utils";
 
 interface CitationBlockProps {
-	citations: ChatCitation[];
-	className?: string;
+  citations: ChatCitation[];
+  className?: string;
 }
 
 export function CitationBlock({ citations, className }: CitationBlockProps) {
-	if (citations.length === 0) return null;
+  if (citations.length === 0) return null;
 
-	return (
-		<div
-			className={cn(
-				"group/citations overflow-hidden rounded-xl border bg-muted/30 transition-colors hover:border-input",
-				className,
-			)}
-		>
-			<div className="border-b border-border/50 px-3.5 py-2.5">
-				<div className="flex items-center gap-2">
-					<div className="flex size-6 items-center justify-center rounded-md border bg-background text-muted-foreground">
-						<BookOpenIcon className="size-3" aria-hidden="true" />
-					</div>
-					<span className="text-xs font-semibold text-foreground">Sources</span>
-					<Badge
-						variant="secondary"
-						className="h-5 rounded-full px-2 text-[11px] font-medium"
-					>
-						{citations.length}
-					</Badge>
-				</div>
-			</div>
+  return (
+    <div
+      className={cn(
+        "group/citations overflow-hidden rounded-xl border bg-muted/30 transition-colors hover:border-input",
+        className,
+      )}
+    >
+      <div className="border-b border-border/50 px-3.5 py-2.5">
+        <div className="flex items-center gap-2">
+          <div className="flex size-6 items-center justify-center rounded-md border bg-background text-muted-foreground">
+            <BookOpenIcon className="size-3" aria-hidden="true" />
+          </div>
+          <span className="text-xs font-semibold text-foreground">Sources</span>
+          <Badge
+            variant="secondary"
+            className="h-5 rounded-full px-2 text-[11px] font-medium"
+          >
+            {citations.length}
+          </Badge>
+        </div>
+      </div>
 
-			{/* Citation cards */}
-			<ul className="flex flex-col gap-0.5 p-2">
-				{citations.map((citation, index) => {
-					const rawRelevance = Number.isFinite(citation.score)
-						? Math.round(citation.score * 100)
-						: 0;
-					const relevancePct = Math.min(100, Math.max(0, rawRelevance));
-					const relevanceColor =
-						relevancePct > 70
-							? "bg-success"
-							: relevancePct > 40
-								? "bg-foreground"
-								: "bg-muted-foreground";
+      {/* Citation cards */}
+      <ul className="flex flex-col gap-0.5 p-2">
+        {citations.map((citation, index) => {
+          const rawRelevance = Number.isFinite(citation.score)
+            ? Math.round(citation.score * 100)
+            : 0;
+          const relevancePct = Math.min(100, Math.max(0, rawRelevance));
+          const relevanceColor =
+            relevancePct > 70
+              ? "bg-success"
+              : relevancePct > 40
+                ? "bg-foreground"
+                : "bg-muted-foreground";
 
-					return (
-						<li
-							key={citation.chunkId}
-							className="group/card rounded-lg border border-transparent bg-background/50 p-3 shadow-[var(--surface-shadow)] transition-[background-color,box-shadow] duration-150 ease-out hover:bg-background/80 hover:shadow-[var(--surface-shadow-hover)]"
-							style={{ animationDelay: `${index * 0.05}s` }}
-						>
-							{/* Title row */}
-							<div className="mb-1.5 flex items-start justify-between gap-2">
-								<div className="min-w-0 flex-1">
-									<div className="flex flex-wrap items-center gap-1.5">
-										<FileTextIcon
-											className="size-3 text-muted-foreground/60"
-											aria-hidden="true"
-										/>
-										<span className="truncate text-[13px] font-semibold text-foreground">
-											{citation.documentTitle}
-										</span>
-									</div>
-									{citation.knowledgeBaseName ? (
-										<Badge
-											variant="outline"
-											className="mt-1 rounded-md px-1.5 py-0 text-[10px] font-medium"
-										>
-											{citation.knowledgeBaseName}
-										</Badge>
-									) : null}
-								</div>
+          return (
+            <li
+              key={citation.chunkId}
+              className="group/card rounded-lg border border-transparent bg-background/50 p-3 shadow-[var(--surface-shadow)] transition-[background-color,box-shadow] duration-150 ease-out hover:bg-background/80 hover:shadow-[var(--surface-shadow-hover)]"
+              style={{ animationDelay: `${index * 0.05}s` }}
+            >
+              {/* Title row */}
+              <div className="mb-1.5 flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <FileTextIcon
+                      className="size-3 text-muted-foreground/60"
+                      aria-hidden="true"
+                    />
+                    <span className="truncate text-[13px] font-semibold text-foreground">
+                      {citation.documentTitle}
+                    </span>
+                  </div>
+                  {citation.knowledgeBaseName ? (
+                    <Badge
+                      variant="outline"
+                      className="mt-1 rounded-md px-1.5 py-0 text-[10px] font-medium"
+                    >
+                      {citation.knowledgeBaseName}
+                    </Badge>
+                  ) : null}
+                </div>
 
-								{/* Relevance indicator */}
-								<div className="shrink-0 flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
-									<div className="flex items-center gap-0.5">
-										<span>{relevancePct}%</span>
-									</div>
-									<div className="h-1 w-8 overflow-hidden rounded-full bg-muted">
-										<div
-											className={cn("h-full rounded-full", relevanceColor)}
-											style={{ width: `${relevancePct}%` }}
-										/>
-									</div>
-								</div>
-							</div>
+                {/* Relevance indicator */}
+                <div className="shrink-0 flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+                  <div className="flex items-center gap-0.5">
+                    <span>{relevancePct}%</span>
+                  </div>
+                  <div className="h-1 w-8 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn("h-full rounded-full", relevanceColor)}
+                      style={{ width: `${relevancePct}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
 
-							{/* Content preview */}
-							<p className="line-clamp-2 text-xs leading-5 text-muted-foreground/80 group-hover/card:text-muted-foreground transition-colors">
-								{citation.content}
-							</p>
-						</li>
-					);
-				})}
-			</ul>
-		</div>
-	);
+              {/* Content preview */}
+              <p className="line-clamp-2 text-xs leading-5 text-muted-foreground/80 group-hover/card:text-muted-foreground transition-colors">
+                {citation.content}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }

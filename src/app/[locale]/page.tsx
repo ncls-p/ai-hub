@@ -1,10 +1,10 @@
 import { redirect } from "@/i18n/navigation";
 
 export default async function LocaleHomePage({
-	params,
+  params,
 }: {
-	params: Promise<{ locale: string }>;
+  params: Promise<{ locale: string }>;
 }) {
-	const { locale } = await params;
-	redirect({ href: "/chat", locale });
+  const { locale } = await params;
+  redirect({ href: "/chat", locale });
 }

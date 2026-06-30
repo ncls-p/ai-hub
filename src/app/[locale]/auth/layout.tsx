@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/modules/auth/session";
 
 export const metadata: Metadata = {
-	title: "Account",
-	description: "Sign in or create an AI Hub account.",
+  title: "Account",
+  description: "Sign in or create an AI Hub account.",
 };
 
 // Auth pages depend on client-only form state and auth redirects.
@@ -14,12 +14,12 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AuthLayout({
-	children,
+  children,
 }: Readonly<{
-	children: React.ReactNode;
+  children: React.ReactNode;
 }>) {
-	const session = await getSession();
-	if (session) redirect("/chat");
+  const session = await getSession();
+  if (session) redirect("/chat");
 
-	return children;
+  return children;
 }
