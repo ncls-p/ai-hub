@@ -1,5 +1,3 @@
-name: ai-hub
-
 services:
   migrate:
     image: ${AI_HUB_MIGRATOR_IMAGE:?set AI_HUB_MIGRATOR_IMAGE}
