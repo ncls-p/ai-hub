@@ -215,14 +215,14 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 For Coolify/GitHub Actions, `.coolify/stack.compose.yml` is the deployment-safe
-image-based stack and `.github/workflows/coolify.yml` builds/pushes the app,
-worker, migrator, SearXNG, and sandbox runner images before patching the `maiah`
-Coolify service. PRs targeting `main` create isolated preview environments named
-`pr-<number>` with public hosts like `https://maiah-pr-<number>.shiftify.eco`;
-those previews are protected by Traefik basic auth and deleted when the PR is
-closed. Pushes to `main` still deploy the persistent production environment at
-`https://maiah.shiftify.eco`. RustFS runs from the official `rustfs/rustfs`
-image.
+image-based stack and `.github/workflows/coolify.yml` builds/pushes every app,
+worker, migrator, SearXNG, and sandbox runner image on each deployment before
+patching the `maiah` Coolify service. PRs targeting `main` create isolated
+preview environments named `pr-<number>` with public hosts like
+`https://maiah-pr-<number>.shiftify.eco`; those previews are protected by
+Traefik basic auth and deleted when the PR is closed. Pushes to `main` still
+deploy the persistent production environment at `https://maiah.shiftify.eco`.
+RustFS runs from the official `rustfs/rustfs` image.
 
 Required Coolify secrets/variables include `COOLIFY_DEPLOY_ENABLED=true`,
 `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `APP_ENCRYPTION_KEY`,
@@ -230,13 +230,17 @@ Required Coolify secrets/variables include `COOLIFY_DEPLOY_ENABLED=true`,
 `OBJECT_STORAGE_SECRET_ACCESS_KEY`, and `TRAEFIK_BASIC_AUTH_USERS` for PR
 previews. For the bundled RustFS service, use strong non-placeholder S3
 credentials. If MAIAH moves to a new Coolify project, set the repository
-variable `COOLIFY_PROJECT_UUID` to that project UUID. Override
+variable `COOLIFY_PROJECT_UUID` to that project UUID. Production deployments also
+pin named volumes to the existing Coolify volume prefix via
+`AI_HUB_PROD_VOLUME_PREFIX` (default: `i12keosppki9yixi1s1aeeav`) so Postgres,
+Dragonfly, RustFS, and OpenSandbox data are reused. Override
 `AI_HUB_PROD_APP_PORT` if the host port must differ from the safe default `3001`
 for the local production compose file.
 
 ## Phase Roadmap
 
-See [`docs/production-ai-platform-plan.md`](docs/production-ai-platform-plan.md) for the full plan.
+See [`docs/production-ai-platform-plan.md`](docs/production-ai-platform-plan.md)
+for the full plan.
 
 High-level phases:
 
@@ -252,7 +256,8 @@ High-level phases:
 ## Repository Notes
 
 - `.agents/` is intentionally committed for agent/project guidance.
-- `.pi-lens/`, `node_modules/`, `.next/`, `.env.local`, and build artifacts are ignored.
+- `.pi-lens/`, `node_modules/`, `.next/`, `.env.local`, and build artifacts are
+  ignored.
 - `.env.example` is intentionally tracked.
 
 ## License
