@@ -233,12 +233,11 @@ Required Coolify secrets/variables include `COOLIFY_DEPLOY_ENABLED=true`,
 `OBJECT_STORAGE_SECRET_ACCESS_KEY`, and `TRAEFIK_BASIC_AUTH_USERS` for PR
 previews. For the bundled RustFS service, use strong non-placeholder S3
 credentials. If MAIAH moves to a new Coolify project, set the repository
-variable `COOLIFY_PROJECT_UUID` to that project UUID. Production deployments
-bind-mount the existing Docker volume data directories from the required
-repository variable `AI_HUB_PROD_VOLUME_PREFIX` so Postgres, Dragonfly, RustFS,
-and OpenSandbox data are reused even if Coolify generates a new service volume
-prefix. Override `AI_HUB_PROD_APP_PORT` if the host port must differ from the
-safe default `3001` for the local production compose file.
+variable `COOLIFY_PROJECT_UUID` to that project UUID. Production deployments use
+Coolify-managed named volumes. To migrate data from an older Coolify service,
+copy the old Docker volumes into the new service volumes while MAIAH is stopped,
+then deploy again. Override `AI_HUB_PROD_APP_PORT` if the host port must differ
+from the safe default `3001` for the local production compose file.
 
 ## Phase Roadmap
 

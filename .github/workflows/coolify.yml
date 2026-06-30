@@ -28,7 +28,6 @@ env:
   COOLIFY_SERVICE_NAME: maiah
   AI_HUB_PUBLIC_HOST: maiah.shiftify.eco
   AI_HUB_PUBLIC_URL: https://maiah.shiftify.eco
-  AI_HUB_PROD_VOLUME_PREFIX: ${{ vars.AI_HUB_PROD_VOLUME_PREFIX }}
 
 jobs:
   prepare:
@@ -636,7 +635,6 @@ jobs:
           AI_HUB_PUBLIC_HOST: ${{ needs.prepare.outputs.public_host }}
           AI_HUB_PUBLIC_URL: ${{ needs.prepare.outputs.public_url }}
           APP_ROUTING_URL: ${{ needs.prepare.outputs.service_url }}
-          AI_HUB_PROD_VOLUME_PREFIX: ${{ env.AI_HUB_PROD_VOLUME_PREFIX }}
           IS_PREVIEW: ${{ needs.prepare.outputs.is_preview }}
           ENABLE_BASIC_AUTH: ${{ needs.prepare.outputs.enable_basic_auth }}
           TRAEFIK_BASIC_AUTH_USERS_VALUE: ${{ secrets.TRAEFIK_BASIC_AUTH_USERS }}
@@ -652,7 +650,6 @@ jobs:
             AI_HUB_PUBLIC_HOST
             AI_HUB_PUBLIC_URL
             APP_ROUTING_URL
-            AI_HUB_PROD_VOLUME_PREFIX
             POSTGRES_PASSWORD
             BETTER_AUTH_SECRET
             APP_ENCRYPTION_KEY
@@ -875,24 +872,6 @@ jobs:
           Path("/tmp/ai-hub.coolify.stack.yml").write_text(compose, encoding="utf-8")
           PY
           compose_args=(-f /tmp/ai-hub.coolify.stack.yml)
-          if [[ "${IS_PREVIEW}" != "true" ]]; then
-            cat > /tmp/ai-hub.coolify.prod-volumes.yml <<EOF
-          volumes:
-            dragonfly-data:
-              name: ${AI_HUB_PROD_VOLUME_PREFIX}_dragonfly-data
-              external: true
-            rustfs-data:
-              name: ${AI_HUB_PROD_VOLUME_PREFIX}_rustfs-data
-              external: true
-            postgres-data:
-              name: ${AI_HUB_PROD_VOLUME_PREFIX}_postgres-data
-              external: true
-            opensandbox-data:
-              name: ${AI_HUB_PROD_VOLUME_PREFIX}_opensandbox-data
-              external: true
-          EOF
-            compose_args+=(-f /tmp/ai-hub.coolify.prod-volumes.yml)
-          fi
           if [[ "${ENABLE_BASIC_AUTH}" == "true" ]]; then
             cat > /tmp/ai-hub.coolify.auth.yml <<EOF
           services:
