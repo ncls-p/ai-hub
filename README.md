@@ -222,7 +222,10 @@ preview environments named `pr-<number>` with public hosts like
 `https://maiah-pr-<number>.shiftify.eco`; those previews are protected by
 Traefik basic auth and deleted when the PR is closed. Pushes to `main` still
 deploy the persistent production environment at `https://maiah.shiftify.eco`.
-RustFS runs from the official `rustfs/rustfs` image.
+RustFS runs from the official `rustfs/rustfs` image. OpenSandbox runtime images
+are no longer pre-pulled as a deployment-blocking step; the first sandbox run on
+a fresh host may be slower, but app deployment is not held by those large image
+pulls.
 
 Required Coolify secrets/variables include `COOLIFY_DEPLOY_ENABLED=true`,
 `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `APP_ENCRYPTION_KEY`,
