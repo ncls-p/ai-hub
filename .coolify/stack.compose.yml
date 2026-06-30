@@ -2,33 +2,33 @@ services:
   migrate:
     image: ${AI_HUB_MIGRATOR_IMAGE:?set AI_HUB_MIGRATOR_IMAGE}
     environment: &app-environment
-      APP_ENV: production
-      NODE_ENV: production
-      NEXT_TELEMETRY_DISABLED: "1"
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://maiah.shiftify.eco}
-      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-https://maiah.shiftify.eco}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_hub}
-      DATABASE_SSL_REJECT_UNAUTHORIZED: disable
-      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?set APP_ENCRYPTION_KEY}
-      APP_ENCRYPTION_KEY_ID: ${APP_ENCRYPTION_KEY_ID:-default}
-      DRAGONFLY_URL: redis://dragonflydb:6379
-      DRAGONFLY_PASSWORD: ${DRAGONFLY_PASSWORD:?set DRAGONFLY_PASSWORD}
-      OBJECT_STORAGE_ENDPOINT: http://rustfs:9000
-      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
-      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-ai-hub}
-      CODE_WORKSPACE_STORAGE_PREFIX: ${CODE_WORKSPACE_STORAGE_PREFIX:-code-workspaces}
-      OBJECT_STORAGE_ACCESS_KEY_ID: ${OBJECT_STORAGE_ACCESS_KEY_ID:?set OBJECT_STORAGE_ACCESS_KEY_ID}
-      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${OBJECT_STORAGE_SECRET_ACCESS_KEY:?set OBJECT_STORAGE_SECRET_ACCESS_KEY}
-      OBJECT_STORAGE_FORCE_PATH_STYLE: "true"
-      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
-      OPENSANDBOX_DOMAIN: ${OPENSANDBOX_DOMAIN:-opensandbox-server:8090}
-      OPENSANDBOX_PROTOCOL: ${OPENSANDBOX_PROTOCOL:-http}
-      OPENSANDBOX_API_KEY: ${OPENSANDBOX_API_KEY:?set OPENSANDBOX_API_KEY}
-      OPENSANDBOX_IMAGE: ${AI_HUB_SANDBOX_IMAGE:?set AI_HUB_SANDBOX_IMAGE}
-      OPENSANDBOX_USE_SERVER_PROXY: ${OPENSANDBOX_USE_SERVER_PROXY:-false}
-      ALLOW_PERSONAL_WORKSPACES: ${ALLOW_PERSONAL_WORKSPACES:-true}
-      WORKSPACE_MONTHLY_TOKEN_LIMIT: ${WORKSPACE_MONTHLY_TOKEN_LIMIT:-}
+      - APP_ENV=production
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://maiah.shiftify.eco}
+      - BETTER_AUTH_TRUSTED_ORIGINS=${BETTER_AUTH_TRUSTED_ORIGINS:-https://maiah.shiftify.eco}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_hub}
+      - DATABASE_SSL_REJECT_UNAUTHORIZED=disable
+      - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY:?set APP_ENCRYPTION_KEY}
+      - APP_ENCRYPTION_KEY_ID=${APP_ENCRYPTION_KEY_ID:-default}
+      - DRAGONFLY_URL=redis://dragonflydb:6379
+      - DRAGONFLY_PASSWORD=${DRAGONFLY_PASSWORD:?set DRAGONFLY_PASSWORD}
+      - OBJECT_STORAGE_ENDPOINT=http://rustfs:9000
+      - OBJECT_STORAGE_REGION=${OBJECT_STORAGE_REGION:-us-east-1}
+      - OBJECT_STORAGE_BUCKET=${OBJECT_STORAGE_BUCKET:-ai-hub}
+      - CODE_WORKSPACE_STORAGE_PREFIX=${CODE_WORKSPACE_STORAGE_PREFIX:-code-workspaces}
+      - OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID:?set OBJECT_STORAGE_ACCESS_KEY_ID}
+      - OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:?set OBJECT_STORAGE_SECRET_ACCESS_KEY}
+      - OBJECT_STORAGE_FORCE_PATH_STYLE=true
+      - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
+      - OPENSANDBOX_DOMAIN=${OPENSANDBOX_DOMAIN:-opensandbox-server:8090}
+      - OPENSANDBOX_PROTOCOL=${OPENSANDBOX_PROTOCOL:-http}
+      - OPENSANDBOX_API_KEY=${OPENSANDBOX_API_KEY:?set OPENSANDBOX_API_KEY}
+      - OPENSANDBOX_IMAGE=${AI_HUB_SANDBOX_IMAGE:?set AI_HUB_SANDBOX_IMAGE}
+      - OPENSANDBOX_USE_SERVER_PROXY=${OPENSANDBOX_USE_SERVER_PROXY:-false}
+      - ALLOW_PERSONAL_WORKSPACES=${ALLOW_PERSONAL_WORKSPACES:-true}
+      - WORKSPACE_MONTHLY_TOKEN_LIMIT=${WORKSPACE_MONTHLY_TOKEN_LIMIT:-}
     depends_on:
       rustfs-init:
         condition: service_completed_successfully
@@ -38,8 +38,7 @@ services:
 
   app:
     image: ${AI_HUB_APP_IMAGE:?set AI_HUB_APP_IMAGE}
-    environment:
-      <<: *app-environment
+    environment: *app-environment
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -76,8 +75,7 @@ services:
 
   worker:
     image: ${AI_HUB_WORKER_IMAGE:?set AI_HUB_WORKER_IMAGE}
-    environment:
-      <<: *app-environment
+    environment: *app-environment
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -166,8 +164,8 @@ services:
         TOML
         exec opensandbox-server --config /tmp/opensandbox-config.toml
     environment:
-      SANDBOX_CONFIG_PATH: /tmp/opensandbox-config.toml
-      OPENSANDBOX_SERVER_API_KEY: ${OPENSANDBOX_API_KEY:?set OPENSANDBOX_API_KEY}
+      - SANDBOX_CONFIG_PATH=/tmp/opensandbox-config.toml
+      - OPENSANDBOX_SERVER_API_KEY=${OPENSANDBOX_API_KEY:?set OPENSANDBOX_API_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     deploy:
@@ -192,9 +190,9 @@ services:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-ai_hub}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-ai_hub}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     deploy:
@@ -218,7 +216,7 @@ services:
     restart: unless-stopped
     command: ["--requirepass", "${DRAGONFLY_PASSWORD:?set DRAGONFLY_PASSWORD}"]
     environment:
-      DRAGONFLY_PASSWORD: ${DRAGONFLY_PASSWORD:?set DRAGONFLY_PASSWORD}
+      - DRAGONFLY_PASSWORD=${DRAGONFLY_PASSWORD:?set DRAGONFLY_PASSWORD}
     volumes:
       - dragonfly-data:/data
     deploy:
@@ -242,11 +240,11 @@ services:
     restart: unless-stopped
     command: ["/data"]
     environment:
-      RUSTFS_ADDRESS: 0.0.0.0:9000
-      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
-      RUSTFS_CONSOLE_ENABLE: "false"
-      RUSTFS_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY_ID:?set OBJECT_STORAGE_ACCESS_KEY_ID}
-      RUSTFS_SECRET_KEY: ${OBJECT_STORAGE_SECRET_ACCESS_KEY:?set OBJECT_STORAGE_SECRET_ACCESS_KEY}
+      - RUSTFS_ADDRESS=0.0.0.0:9000
+      - RUSTFS_CONSOLE_ADDRESS=0.0.0.0:9001
+      - RUSTFS_CONSOLE_ENABLE=false
+      - RUSTFS_ACCESS_KEY=${OBJECT_STORAGE_ACCESS_KEY_ID:?set OBJECT_STORAGE_ACCESS_KEY_ID}
+      - RUSTFS_SECRET_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:?set OBJECT_STORAGE_SECRET_ACCESS_KEY}
     volumes:
       - rustfs-data:/data
     deploy:
@@ -273,11 +271,11 @@ services:
         condition: service_healthy
     restart: "no"
     environment:
-      AWS_ACCESS_KEY_ID: ${OBJECT_STORAGE_ACCESS_KEY_ID:?set OBJECT_STORAGE_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${OBJECT_STORAGE_SECRET_ACCESS_KEY:?set OBJECT_STORAGE_SECRET_ACCESS_KEY}
-      AWS_DEFAULT_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
-      AWS_EC2_METADATA_DISABLED: "true"
-      AWS_BUCKET: ${OBJECT_STORAGE_BUCKET:-ai-hub}
+      - AWS_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID:?set OBJECT_STORAGE_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:?set OBJECT_STORAGE_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${OBJECT_STORAGE_REGION:-us-east-1}
+      - AWS_EC2_METADATA_DISABLED=true
+      - AWS_BUCKET=${OBJECT_STORAGE_BUCKET:-ai-hub}
     entrypoint:
       - /bin/sh
       - -c
@@ -302,9 +300,9 @@ services:
     image: ${AI_HUB_SEARXNG_IMAGE:?set AI_HUB_SEARXNG_IMAGE}
     restart: unless-stopped
     environment:
-      SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080/}
-      SEARXNG_SECRET: ${SEARXNG_SECRET:?set SEARXNG_SECRET}
-      SEARXNG_SETTINGS_REVISION: ${SEARXNG_SETTINGS_REVISION:-local}
+      - SEARXNG_BASE_URL=${SEARXNG_BASE_URL:-http://searxng:8080/}
+      - SEARXNG_SECRET=${SEARXNG_SECRET:?set SEARXNG_SECRET}
+      - SEARXNG_SETTINGS_REVISION=${SEARXNG_SETTINGS_REVISION:-local}
     entrypoint:
       - /bin/sh
       - -c
@@ -343,7 +341,6 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 5
-
 
 volumes:
   dragonfly-data:
