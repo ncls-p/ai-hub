@@ -95,21 +95,6 @@ jobs:
           OBJECT_STORAGE_ACCESS_KEY_ID: "test"
           OBJECT_STORAGE_SECRET_ACCESS_KEY: "testtesttesttest"
 
-      - name: Build
-        run: npm run build
-        env:
-          NODE_ENV: "production"
-          APP_ENV: "development"
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ai_hub_test"
-          DATABASE_SSL_REJECT_UNAUTHORIZED: "disable"
-          BETTER_AUTH_SECRET: "test-secret-for-ci-pipeline-only"
-          BETTER_AUTH_URL: "http://localhost:3000"
-          BETTER_AUTH_TRUSTED_ORIGINS: "http://localhost:3000"
-          APP_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
-          OBJECT_STORAGE_BUCKET: "test-bucket"
-          OBJECT_STORAGE_ACCESS_KEY_ID: "test"
-          OBJECT_STORAGE_SECRET_ACCESS_KEY: "testtesttesttest"
-
   build_images:
     name: Build and push deployment images
     runs-on: ubuntu-latest
@@ -130,6 +115,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
+          fetch-depth: 2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -144,80 +130,167 @@ jobs:
       - name: Resolve image references
         id: images
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
           owner_lc="${GITHUB_REPOSITORY_OWNER,,}"
           sha_short="${GITHUB_SHA::12}"
           tag="main-${sha_short}"
-          app_image="ghcr.io/${owner_lc}/ai-hub-app:${tag}"
-          worker_image="ghcr.io/${owner_lc}/ai-hub-worker:${tag}"
-          migrator_image="ghcr.io/${owner_lc}/ai-hub-migrator:${tag}"
-          searxng_image="ghcr.io/${owner_lc}/ai-hub-searxng:${tag}"
-          sandbox_image="ghcr.io/${owner_lc}/ai-hub-sandbox:${tag}"
+          latest_tag="main-latest"
+
+          app_current="ghcr.io/${owner_lc}/ai-hub-app:${tag}"
+          worker_current="ghcr.io/${owner_lc}/ai-hub-worker:${tag}"
+          migrator_current="ghcr.io/${owner_lc}/ai-hub-migrator:${tag}"
+          searxng_current="ghcr.io/${owner_lc}/ai-hub-searxng:${tag}"
+          sandbox_current="ghcr.io/${owner_lc}/ai-hub-sandbox:${tag}"
+
+          app_latest="ghcr.io/${owner_lc}/ai-hub-app:${latest_tag}"
+          worker_latest="ghcr.io/${owner_lc}/ai-hub-worker:${latest_tag}"
+          migrator_latest="ghcr.io/${owner_lc}/ai-hub-migrator:${latest_tag}"
+          searxng_latest="ghcr.io/${owner_lc}/ai-hub-searxng:${latest_tag}"
+          sandbox_latest="ghcr.io/${owner_lc}/ai-hub-sandbox:${latest_tag}"
+
+          changed_files="$(mktemp)"
+          build_all=false
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" || -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
+            build_all=true
+          else
+            git fetch --no-tags --depth=1 origin "${BASE_SHA}" || build_all=true
+            if [[ "${build_all}" != "true" ]]; then
+              git diff --name-only "${BASE_SHA}" "${GITHUB_SHA}" > "${changed_files}"
+            fi
+          fi
+
+          changes_match() {
+            local pattern="$1"
+            if [[ "${build_all}" == "true" ]]; then
+              return 0
+            fi
+            grep -E "${pattern}" "${changed_files}" >/dev/null
+          }
+
+          app_changed=false
+          searxng_changed=false
+          sandbox_changed=false
+          if changes_match '^(Dockerfile|\.dockerignore|\.npmrc|package(-lock)?\.json|next\.config\.ts|postcss\.config\.mjs|tsconfig\.json|components\.json|messages/|public/|scripts/migrate|src/)'; then
+            app_changed=true
+          fi
+          if changes_match '^(Dockerfile|searxng/)'; then
+            searxng_changed=true
+          fi
+          if changes_match '^(opensandbox/)'; then
+            sandbox_changed=true
+          fi
+
+          image_exists() {
+            docker buildx imagetools inspect "$1" >/dev/null 2>&1
+          }
+
+          choose_image() {
+            local name="$1"
+            local current_ref="$2"
+            local latest_ref="$3"
+            local changed="$4"
+            local build="${changed}"
+            if [[ "${build}" != "true" ]] && ! image_exists "${latest_ref}"; then
+              echo "${latest_ref} is missing; forcing ${name} image build."
+              build=true
+            fi
+            if [[ "${build}" == "true" ]]; then
+              echo "${name}_image=${current_ref}" >> "${GITHUB_OUTPUT}"
+            else
+              echo "${name}_image=${latest_ref}" >> "${GITHUB_OUTPUT}"
+            fi
+            echo "${name}_latest=${latest_ref}" >> "${GITHUB_OUTPUT}"
+            echo "build_${name}=${build}" >> "${GITHUB_OUTPUT}"
+          }
+
+          choose_image app "${app_current}" "${app_latest}" "${app_changed}"
+          choose_image worker "${worker_current}" "${worker_latest}" "${app_changed}"
+          choose_image migrator "${migrator_current}" "${migrator_latest}" "${app_changed}"
+          choose_image searxng "${searxng_current}" "${searxng_latest}" "${searxng_changed}"
+          choose_image sandbox "${sandbox_current}" "${sandbox_latest}" "${sandbox_changed}"
+
           {
-            echo "app_image=${app_image}"
-            echo "worker_image=${worker_image}"
-            echo "migrator_image=${migrator_image}"
-            echo "searxng_image=${searxng_image}"
-            echo "sandbox_image=${sandbox_image}"
-          } >> "$GITHUB_OUTPUT"
+            echo "### Image build plan"
+            echo ""
+            echo "| Image | Build? | Reference |"
+            echo "| --- | --- | --- |"
+            echo "| app | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_app=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^app_image=//p') |"
+            echo "| worker | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_worker=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^worker_image=//p') |"
+            echo "| migrator | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_migrator=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^migrator_image=//p') |"
+            echo "| searxng | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_searxng=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^searxng_image=//p') |"
+            echo "| sandbox | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_sandbox=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^sandbox_image=//p') |"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Build and push app image
+        if: steps.images.outputs.build_app == 'true'
         run: |
           docker buildx build \
             --platform linux/amd64 \
             --target runner \
             --tag "${{ steps.images.outputs.app_image }}" \
+            --tag "${{ steps.images.outputs.app_latest }}" \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --push \
             .
 
       - name: Build and push worker image
+        if: steps.images.outputs.build_worker == 'true'
         run: |
           docker buildx build \
             --platform linux/amd64 \
             --target worker \
             --tag "${{ steps.images.outputs.worker_image }}" \
+            --tag "${{ steps.images.outputs.worker_latest }}" \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --push \
             .
 
       - name: Build and push migrator image
+        if: steps.images.outputs.build_migrator == 'true'
         run: |
           docker buildx build \
             --platform linux/amd64 \
             --target migrator \
             --tag "${{ steps.images.outputs.migrator_image }}" \
+            --tag "${{ steps.images.outputs.migrator_latest }}" \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --push \
             .
 
       - name: Build and push SearXNG image
+        if: steps.images.outputs.build_searxng == 'true'
         run: |
           docker buildx build \
             --platform linux/amd64 \
             --target searxng \
             --tag "${{ steps.images.outputs.searxng_image }}" \
+            --tag "${{ steps.images.outputs.searxng_latest }}" \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --push \
             .
 
       - name: Build and push OpenSandbox code image
+        if: steps.images.outputs.build_sandbox == 'true'
         run: |
           docker buildx build \
             --platform linux/amd64 \
             --file opensandbox/Dockerfile.code-interpreter \
             --tag "${{ steps.images.outputs.sandbox_image }}" \
+            --tag "${{ steps.images.outputs.sandbox_latest }}" \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --push \
             opensandbox
 
       - name: Verify pushed SearXNG image config
+        if: steps.images.outputs.build_searxng == 'true'
         run: |
           docker pull "${{ steps.images.outputs.searxng_image }}"
           docker run --rm -i \
