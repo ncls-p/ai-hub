@@ -95,13 +95,13 @@ jobs:
           OBJECT_STORAGE_ACCESS_KEY_ID: "test"
           OBJECT_STORAGE_SECRET_ACCESS_KEY: "testtesttesttest"
 
-  build_images:
-    name: Build and push deployment images
+  plan_images:
+    name: Plan deployment images
     runs-on: ubuntu-latest
     needs: validate
     permissions:
       contents: read
-      packages: write
+      packages: read
     if: needs.validate.result == 'success' && vars.COOLIFY_DEPLOY_ENABLED == 'true'
     outputs:
       app_image: ${{ steps.images.outputs.app_image }}
@@ -109,6 +109,16 @@ jobs:
       migrator_image: ${{ steps.images.outputs.migrator_image }}
       searxng_image: ${{ steps.images.outputs.searxng_image }}
       sandbox_image: ${{ steps.images.outputs.sandbox_image }}
+      app_latest: ${{ steps.images.outputs.app_latest }}
+      worker_latest: ${{ steps.images.outputs.worker_latest }}
+      migrator_latest: ${{ steps.images.outputs.migrator_latest }}
+      searxng_latest: ${{ steps.images.outputs.searxng_latest }}
+      sandbox_latest: ${{ steps.images.outputs.sandbox_latest }}
+      build_app: ${{ steps.images.outputs.build_app }}
+      build_worker: ${{ steps.images.outputs.build_worker }}
+      build_migrator: ${{ steps.images.outputs.build_migrator }}
+      build_searxng: ${{ steps.images.outputs.build_searxng }}
+      build_sandbox: ${{ steps.images.outputs.build_sandbox }}
 
     steps:
       - name: Checkout repository
@@ -224,78 +234,116 @@ jobs:
             echo "| sandbox | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_sandbox=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^sandbox_image=//p') |"
           } >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Build and push app image
-        if: steps.images.outputs.build_app == 'true'
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --target runner \
-            --tag "${{ steps.images.outputs.app_image }}" \
-            --tag "${{ steps.images.outputs.app_latest }}" \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --push \
-            .
+  build_app_images:
+    name: Build app images
+    runs-on: ubuntu-latest
+    needs: plan_images
+    permissions:
+      contents: read
+      packages: write
+    if: needs.plan_images.outputs.build_app == 'true'
 
-      - name: Build and push worker image
-        if: steps.images.outputs.build_worker == 'true'
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --target worker \
-            --tag "${{ steps.images.outputs.worker_image }}" \
-            --tag "${{ steps.images.outputs.worker_latest }}" \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --push \
-            .
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
-      - name: Build and push migrator image
-        if: steps.images.outputs.build_migrator == 'true'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push app, worker, and migrator images
+        env:
+          APP_IMAGE: ${{ needs.plan_images.outputs.app_image }}
+          APP_LATEST: ${{ needs.plan_images.outputs.app_latest }}
+          WORKER_IMAGE: ${{ needs.plan_images.outputs.worker_image }}
+          WORKER_LATEST: ${{ needs.plan_images.outputs.worker_latest }}
+          MIGRATOR_IMAGE: ${{ needs.plan_images.outputs.migrator_image }}
+          MIGRATOR_LATEST: ${{ needs.plan_images.outputs.migrator_latest }}
         run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --target migrator \
-            --tag "${{ steps.images.outputs.migrator_image }}" \
-            --tag "${{ steps.images.outputs.migrator_latest }}" \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --push \
-            .
+          set -euo pipefail
+          cat > /tmp/ai-hub-app-images.hcl <<EOF
+          group "default" {
+            targets = ["app", "worker", "migrator"]
+          }
+
+          target "_common" {
+            context = "."
+            platforms = ["linux/amd64"]
+            cache-from = ["type=gha,scope=ai-hub-app"]
+            cache-to = ["type=gha,mode=max,scope=ai-hub-app"]
+          }
+
+          target "app" {
+            inherits = ["_common"]
+            target = "runner"
+            tags = ["${APP_IMAGE}", "${APP_LATEST}"]
+          }
+
+          target "worker" {
+            inherits = ["_common"]
+            target = "worker"
+            tags = ["${WORKER_IMAGE}", "${WORKER_LATEST}"]
+          }
+
+          target "migrator" {
+            inherits = ["_common"]
+            target = "migrator"
+            tags = ["${MIGRATOR_IMAGE}", "${MIGRATOR_LATEST}"]
+          }
+          EOF
+          docker buildx bake -f /tmp/ai-hub-app-images.hcl --push
+
+  build_searxng_image:
+    name: Build SearXNG image
+    runs-on: ubuntu-latest
+    needs: plan_images
+    permissions:
+      contents: read
+      packages: write
+    if: needs.plan_images.outputs.build_searxng == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push SearXNG image
-        if: steps.images.outputs.build_searxng == 'true'
         run: |
           docker buildx build \
             --platform linux/amd64 \
             --target searxng \
-            --tag "${{ steps.images.outputs.searxng_image }}" \
-            --tag "${{ steps.images.outputs.searxng_latest }}" \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
+            --tag "${{ needs.plan_images.outputs.searxng_image }}" \
+            --tag "${{ needs.plan_images.outputs.searxng_latest }}" \
+            --cache-from type=gha,scope=ai-hub-searxng \
+            --cache-to type=gha,mode=max,scope=ai-hub-searxng \
             --push \
             .
 
-      - name: Build and push OpenSandbox code image
-        if: steps.images.outputs.build_sandbox == 'true'
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --file opensandbox/Dockerfile.code-interpreter \
-            --tag "${{ steps.images.outputs.sandbox_image }}" \
-            --tag "${{ steps.images.outputs.sandbox_latest }}" \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --push \
-            opensandbox
-
       - name: Verify pushed SearXNG image config
-        if: steps.images.outputs.build_searxng == 'true'
         run: |
-          docker pull "${{ steps.images.outputs.searxng_image }}"
+          docker pull "${{ needs.plan_images.outputs.searxng_image }}"
           docker run --rm -i \
             --entrypoint /usr/local/searxng/.venv/bin/python \
-            "${{ steps.images.outputs.searxng_image }}" \
+            "${{ needs.plan_images.outputs.searxng_image }}" \
             - <<'PY'
           from searx.enginelib import EngineAbout
           from searx.settings_loader import DEFAULT_SETTINGS_FILE, get_yaml_cfg, load_yaml, update_settings
@@ -319,13 +367,53 @@ jobs:
                       raise SystemExit(f"invalid about metadata for engine {engine.get('name')!r}: {exc}") from exc
           PY
 
+  build_sandbox_image:
+    name: Build OpenSandbox image
+    runs-on: ubuntu-latest
+    needs: plan_images
+    permissions:
+      contents: read
+      packages: write
+    if: needs.plan_images.outputs.build_sandbox == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push OpenSandbox code image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --file opensandbox/Dockerfile.code-interpreter \
+            --tag "${{ needs.plan_images.outputs.sandbox_image }}" \
+            --tag "${{ needs.plan_images.outputs.sandbox_latest }}" \
+            --cache-from type=gha,scope=ai-hub-sandbox \
+            --cache-to type=gha,mode=max,scope=ai-hub-sandbox \
+            --push \
+            opensandbox
+
   deploy:
     name: Deploy to Coolify
     runs-on: ubuntu-latest
     needs:
       - validate
-      - build_images
-    if: needs.validate.result == 'success' && needs.build_images.result == 'success' && vars.COOLIFY_DEPLOY_ENABLED == 'true'
+      - plan_images
+      - build_app_images
+      - build_searxng_image
+      - build_sandbox_image
+    if: always() && needs.validate.result == 'success' && needs.plan_images.result == 'success' && (needs.build_app_images.result == 'success' || needs.build_app_images.result == 'skipped') && (needs.build_searxng_image.result == 'success' || needs.build_searxng_image.result == 'skipped') && (needs.build_sandbox_image.result == 'success' || needs.build_sandbox_image.result == 'skipped') && vars.COOLIFY_DEPLOY_ENABLED == 'true'
 
     steps:
       - name: Checkout repository
@@ -349,13 +437,13 @@ jobs:
           CODE_WORKSPACE_STORAGE_PREFIX: ${{ vars.CODE_WORKSPACE_STORAGE_PREFIX || 'code-workspaces' }}
           ALLOW_PERSONAL_WORKSPACES: ${{ vars.ALLOW_PERSONAL_WORKSPACES || 'true' }}
           WORKSPACE_MONTHLY_TOKEN_LIMIT: ${{ vars.WORKSPACE_MONTHLY_TOKEN_LIMIT }}
-          AI_HUB_APP_IMAGE: ${{ needs.build_images.outputs.app_image }}
-          AI_HUB_WORKER_IMAGE: ${{ needs.build_images.outputs.worker_image }}
-          AI_HUB_MIGRATOR_IMAGE: ${{ needs.build_images.outputs.migrator_image }}
-          AI_HUB_SEARXNG_IMAGE: ${{ needs.build_images.outputs.searxng_image }}
-          AI_HUB_SANDBOX_IMAGE: ${{ needs.build_images.outputs.sandbox_image }}
+          AI_HUB_APP_IMAGE: ${{ needs.plan_images.outputs.app_image }}
+          AI_HUB_WORKER_IMAGE: ${{ needs.plan_images.outputs.worker_image }}
+          AI_HUB_MIGRATOR_IMAGE: ${{ needs.plan_images.outputs.migrator_image }}
+          AI_HUB_SEARXNG_IMAGE: ${{ needs.plan_images.outputs.searxng_image }}
+          AI_HUB_SANDBOX_IMAGE: ${{ needs.plan_images.outputs.sandbox_image }}
           OPENSANDBOX_API_KEY: ${{ secrets.OPENSANDBOX_API_KEY }}
-          OPENSANDBOX_IMAGE: ${{ needs.build_images.outputs.sandbox_image }}
+          OPENSANDBOX_IMAGE: ${{ needs.plan_images.outputs.sandbox_image }}
           OPENSANDBOX_USE_SERVER_PROXY: ${{ vars.OPENSANDBOX_USE_SERVER_PROXY || 'false' }}
         shell: bash
         run: |
