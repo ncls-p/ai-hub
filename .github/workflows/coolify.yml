@@ -1,6 +1,9 @@
-name: Coolify Deploy
+name: CI/CD
 
 on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
   push:
     branches: [main]
   workflow_dispatch:
@@ -9,13 +12,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: coolify-ai-hub-${{ github.ref }}
+  group: >-
+    coolify-ai-hub-${{ github.event_name }}-${{
+      github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) ||
+      'main'
+    }}
   cancel-in-progress: true
 
 env:
   NPM_VERSION: 11.18.0
   COOLIFY_BASE_URL: https://coolify.shiftify.eco
-  COOLIFY_PROJECT_UUID: ${{ vars.COOLIFY_PROJECT_UUID || 'g10sq9dzp3869m0qjn6midtp' }}
+  COOLIFY_PROJECT_UUID: ${{ vars.COOLIFY_PROJECT_UUID || 'w2chgobcwbe3j1j9lj7m8dke' }}
   COOLIFY_SERVER_UUID: ${{ vars.COOLIFY_SERVER_UUID || 'o2dnvmz0zrjz0frynoq6bnfj' }}
   COOLIFY_ENVIRONMENT_NAME: ${{ vars.COOLIFY_ENVIRONMENT_NAME || 'production' }}
   COOLIFY_SERVICE_NAME: maiah
@@ -23,9 +30,105 @@ env:
   AI_HUB_PUBLIC_URL: https://maiah.shiftify.eco
 
 jobs:
+  prepare:
+    name: Prepare deployment target
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_stack: ${{ steps.prepare.outputs.deploy_stack }}
+      cleanup_preview: ${{ steps.prepare.outputs.cleanup_preview }}
+      target_env_name: ${{ steps.prepare.outputs.target_env_name }}
+      public_host: ${{ steps.prepare.outputs.public_host }}
+      public_url: ${{ steps.prepare.outputs.public_url }}
+      service_url: ${{ steps.prepare.outputs.service_url }}
+      is_preview: ${{ steps.prepare.outputs.is_preview }}
+      enable_basic_auth: ${{ steps.prepare.outputs.enable_basic_auth }}
+      image_tag: ${{ steps.prepare.outputs.image_tag }}
+      publish_latest: ${{ steps.prepare.outputs.publish_latest }}
+
+    steps:
+      - name: Compute deployment target
+        id: prepare
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action || '' }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          PR_IS_FORK: ${{ github.event.pull_request.head.repo.fork || 'false' }}
+          CURRENT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          PRODUCTION_ENV_NAME: ${{ env.COOLIFY_ENVIRONMENT_NAME }}
+          PRODUCTION_HOST: ${{ env.AI_HUB_PUBLIC_HOST }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          deploy_stack=false
+          cleanup_preview=false
+          target_env_name=""
+          public_host=""
+          public_url=""
+          service_url=""
+          is_preview=false
+          enable_basic_auth=false
+          image_tag=""
+          publish_latest=false
+          sha_short="${CURRENT_SHA::12}"
+
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            target_env_name="pr-${PR_NUMBER}"
+            if [[ "${PR_IS_FORK}" == "true" ]]; then
+              echo "Fork PR detected; preview deployment and cleanup are skipped."
+            elif [[ "${EVENT_ACTION}" == "closed" ]]; then
+              cleanup_preview=true
+            else
+              deploy_stack=true
+              is_preview=true
+              enable_basic_auth=true
+              image_tag="pr-${PR_NUMBER}-${sha_short}"
+              public_host="maiah-pr-${PR_NUMBER}.shiftify.eco"
+            fi
+          else
+            deploy_stack=true
+            target_env_name="${PRODUCTION_ENV_NAME}"
+            image_tag="main-${sha_short}"
+            publish_latest=true
+            public_host="${PRODUCTION_HOST}"
+          fi
+
+          if [[ -n "${public_host}" ]]; then
+            public_url="https://${public_host}"
+            service_url="http://${public_host}:3000"
+          fi
+
+          {
+            echo "deploy_stack=${deploy_stack}"
+            echo "cleanup_preview=${cleanup_preview}"
+            echo "target_env_name=${target_env_name}"
+            echo "public_host=${public_host}"
+            echo "public_url=${public_url}"
+            echo "service_url=${service_url}"
+            echo "is_preview=${is_preview}"
+            echo "enable_basic_auth=${enable_basic_auth}"
+            echo "image_tag=${image_tag}"
+            echo "publish_latest=${publish_latest}"
+          } >> "${GITHUB_OUTPUT}"
+
+          {
+            echo "### Deployment target"
+            echo ""
+            echo "- Deploy stack: \`${deploy_stack}\`"
+            echo "- Cleanup preview: \`${cleanup_preview}\`"
+            echo "- Environment: \`${target_env_name}\`"
+            if [[ -n "${public_url}" ]]; then
+              echo "- Public URL: ${public_url}"
+            fi
+            if [[ -n "${image_tag}" ]]; then
+              echo "- Image tag: \`${image_tag}\`"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
   validate:
     name: Validate
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
 
     services:
       postgres:
@@ -95,14 +198,30 @@ jobs:
           OBJECT_STORAGE_ACCESS_KEY_ID: "test"
           OBJECT_STORAGE_SECRET_ACCESS_KEY: "testtesttesttest"
 
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: "production"
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ai_hub_test"
+          DATABASE_SSL_REJECT_UNAUTHORIZED: "disable"
+          BETTER_AUTH_SECRET: "test-secret-for-ci-pipeline-only"
+          BETTER_AUTH_URL: "http://localhost:3000"
+          BETTER_AUTH_TRUSTED_ORIGINS: "http://localhost:3000"
+          APP_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+          OBJECT_STORAGE_BUCKET: "test-bucket"
+          OBJECT_STORAGE_ACCESS_KEY_ID: "test"
+          OBJECT_STORAGE_SECRET_ACCESS_KEY: "testtesttesttest"
+
   plan_images:
     name: Plan deployment images
     runs-on: ubuntu-latest
-    needs: validate
+    needs:
+      - prepare
+      - validate
     permissions:
       contents: read
       packages: read
-    if: needs.validate.result == 'success' && vars.COOLIFY_DEPLOY_ENABLED == 'true'
+    if: always() && needs.prepare.outputs.deploy_stack == 'true' && needs.validate.result == 'success' && vars.COOLIFY_DEPLOY_ENABLED == 'true'
     outputs:
       app_image: ${{ steps.images.outputs.app_image }}
       worker_image: ${{ steps.images.outputs.worker_image }}
@@ -125,7 +244,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -141,13 +260,17 @@ jobs:
         id: images
         shell: bash
         env:
-          BASE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.before || '' }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+          PUBLISH_LATEST: ${{ needs.prepare.outputs.publish_latest }}
         run: |
           set -euo pipefail
           owner_lc="${GITHUB_REPOSITORY_OWNER,,}"
-          sha_short="${GITHUB_SHA::12}"
-          tag="main-${sha_short}"
-          latest_tag="main-latest"
+          tag="${IMAGE_TAG}"
+          fallback_tag="main-latest"
 
           app_current="ghcr.io/${owner_lc}/ai-hub-app:${tag}"
           worker_current="ghcr.io/${owner_lc}/ai-hub-worker:${tag}"
@@ -155,15 +278,40 @@ jobs:
           searxng_current="ghcr.io/${owner_lc}/ai-hub-searxng:${tag}"
           sandbox_current="ghcr.io/${owner_lc}/ai-hub-sandbox:${tag}"
 
-          app_latest="ghcr.io/${owner_lc}/ai-hub-app:${latest_tag}"
-          worker_latest="ghcr.io/${owner_lc}/ai-hub-worker:${latest_tag}"
-          migrator_latest="ghcr.io/${owner_lc}/ai-hub-migrator:${latest_tag}"
-          searxng_latest="ghcr.io/${owner_lc}/ai-hub-searxng:${latest_tag}"
-          sandbox_latest="ghcr.io/${owner_lc}/ai-hub-sandbox:${latest_tag}"
+          app_fallback="ghcr.io/${owner_lc}/ai-hub-app:${fallback_tag}"
+          worker_fallback="ghcr.io/${owner_lc}/ai-hub-worker:${fallback_tag}"
+          migrator_fallback="ghcr.io/${owner_lc}/ai-hub-migrator:${fallback_tag}"
+          searxng_fallback="ghcr.io/${owner_lc}/ai-hub-searxng:${fallback_tag}"
+          sandbox_fallback="ghcr.io/${owner_lc}/ai-hub-sandbox:${fallback_tag}"
+
+          app_latest=""
+          worker_latest=""
+          migrator_latest=""
+          searxng_latest=""
+          sandbox_latest=""
+          if [[ "${PUBLISH_LATEST}" == "true" ]]; then
+            app_latest="${app_fallback}"
+            worker_latest="${worker_fallback}"
+            migrator_latest="${migrator_fallback}"
+            searxng_latest="${searxng_fallback}"
+            sandbox_latest="${sandbox_fallback}"
+          fi
 
           changed_files="$(mktemp)"
           build_all=false
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" || -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            build_all=true
+          elif [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            if [[ -z "${PR_BASE_REF}" || -z "${PR_HEAD_SHA}" ]]; then
+              build_all=true
+            else
+              git fetch --no-tags origin "${PR_BASE_REF}:${PR_BASE_REF}" || build_all=true
+              if [[ "${build_all}" != "true" ]]; then
+                diff_base="$(git merge-base "${PR_HEAD_SHA}" "${PR_BASE_REF}")"
+                git diff --name-only "${diff_base}" "${PR_HEAD_SHA}" > "${changed_files}"
+              fi
+            fi
+          elif [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
             build_all=true
           else
             git fetch --no-tags --depth=1 origin "${BASE_SHA}" || build_all=true
@@ -200,38 +348,50 @@ jobs:
           choose_image() {
             local name="$1"
             local current_ref="$2"
-            local latest_ref="$3"
-            local changed="$4"
+            local fallback_ref="$3"
+            local publish_latest_ref="$4"
+            local changed="$5"
             local build="${changed}"
-            if [[ "${build}" != "true" ]] && ! image_exists "${latest_ref}"; then
-              echo "${latest_ref} is missing; forcing ${name} image build."
+            if [[ "${build}" != "true" ]] && ! image_exists "${fallback_ref}"; then
+              echo "${fallback_ref} is missing; forcing ${name} image build."
               build=true
             fi
             if [[ "${build}" == "true" ]]; then
               echo "${name}_image=${current_ref}" >> "${GITHUB_OUTPUT}"
             else
-              echo "${name}_image=${latest_ref}" >> "${GITHUB_OUTPUT}"
+              echo "${name}_image=${fallback_ref}" >> "${GITHUB_OUTPUT}"
             fi
-            echo "${name}_latest=${latest_ref}" >> "${GITHUB_OUTPUT}"
+            echo "${name}_latest=${publish_latest_ref}" >> "${GITHUB_OUTPUT}"
             echo "build_${name}=${build}" >> "${GITHUB_OUTPUT}"
           }
 
-          choose_image app "${app_current}" "${app_latest}" "${app_changed}"
-          choose_image worker "${worker_current}" "${worker_latest}" "${app_changed}"
-          choose_image migrator "${migrator_current}" "${migrator_latest}" "${app_changed}"
-          choose_image searxng "${searxng_current}" "${searxng_latest}" "${searxng_changed}"
-          choose_image sandbox "${sandbox_current}" "${sandbox_latest}" "${sandbox_changed}"
+          choose_image app "${app_current}" "${app_fallback}" "${app_latest}" "${app_changed}"
+          choose_image worker "${worker_current}" "${worker_fallback}" "${worker_latest}" "${app_changed}"
+          choose_image migrator "${migrator_current}" "${migrator_fallback}" "${migrator_latest}" "${app_changed}"
+          choose_image searxng "${searxng_current}" "${searxng_fallback}" "${searxng_latest}" "${searxng_changed}"
+          choose_image sandbox "${sandbox_current}" "${sandbox_fallback}" "${sandbox_latest}" "${sandbox_changed}"
+
+          output_value() {
+            sed -n "s/^$1=//p" "${GITHUB_OUTPUT}"
+          }
+          publish_label() {
+            if [[ -n "$(output_value "$1")" ]]; then
+              echo yes
+            else
+              echo no
+            fi
+          }
 
           {
             echo "### Image build plan"
             echo ""
-            echo "| Image | Build? | Reference |"
-            echo "| --- | --- | --- |"
-            echo "| app | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_app=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^app_image=//p') |"
-            echo "| worker | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_worker=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^worker_image=//p') |"
-            echo "| migrator | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_migrator=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^migrator_image=//p') |"
-            echo "| searxng | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_searxng=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^searxng_image=//p') |"
-            echo "| sandbox | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^build_sandbox=//p') | $(cat "${GITHUB_OUTPUT}" | sed -n 's/^sandbox_image=//p') |"
+            echo "| Image | Build? | Reference | Publish latest? |"
+            echo "| --- | --- | --- | --- |"
+            echo "| app | $(output_value build_app) | $(output_value app_image) | $(publish_label app_latest) |"
+            echo "| worker | $(output_value build_worker) | $(output_value worker_image) | $(publish_label worker_latest) |"
+            echo "| migrator | $(output_value build_migrator) | $(output_value migrator_image) | $(publish_label migrator_latest) |"
+            echo "| searxng | $(output_value build_searxng) | $(output_value searxng_image) | $(publish_label searxng_latest) |"
+            echo "| sandbox | $(output_value build_sandbox) | $(output_value sandbox_image) | $(publish_label sandbox_latest) |"
           } >> "${GITHUB_STEP_SUMMARY}"
 
   build_app_images:
@@ -269,6 +429,19 @@ jobs:
           MIGRATOR_LATEST: ${{ needs.plan_images.outputs.migrator_latest }}
         run: |
           set -euo pipefail
+          hcl_tags_array() {
+            local primary="$1"
+            local secondary="${2:-}"
+            if [[ -n "${secondary}" ]]; then
+              printf '["%s", "%s"]' "${primary}" "${secondary}"
+            else
+              printf '["%s"]' "${primary}"
+            fi
+          }
+          APP_TAGS="$(hcl_tags_array "${APP_IMAGE}" "${APP_LATEST}")"
+          WORKER_TAGS="$(hcl_tags_array "${WORKER_IMAGE}" "${WORKER_LATEST}")"
+          MIGRATOR_TAGS="$(hcl_tags_array "${MIGRATOR_IMAGE}" "${MIGRATOR_LATEST}")"
+
           cat > /tmp/ai-hub-app-images.hcl <<EOF
           group "default" {
             targets = ["app", "worker", "migrator"]
@@ -284,19 +457,19 @@ jobs:
           target "app" {
             inherits = ["_common"]
             target = "runner"
-            tags = ["${APP_IMAGE}", "${APP_LATEST}"]
+            tags = ${APP_TAGS}
           }
 
           target "worker" {
             inherits = ["_common"]
             target = "worker"
-            tags = ["${WORKER_IMAGE}", "${WORKER_LATEST}"]
+            tags = ${WORKER_TAGS}
           }
 
           target "migrator" {
             inherits = ["_common"]
             target = "migrator"
-            tags = ["${MIGRATOR_IMAGE}", "${MIGRATOR_LATEST}"]
+            tags = ${MIGRATOR_TAGS}
           }
           EOF
           docker buildx bake -f /tmp/ai-hub-app-images.hcl --push
@@ -327,12 +500,20 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push SearXNG image
+        env:
+          SEARXNG_IMAGE: ${{ needs.plan_images.outputs.searxng_image }}
+          SEARXNG_LATEST: ${{ needs.plan_images.outputs.searxng_latest }}
         run: |
+          set -euo pipefail
+          latest_tag_args=()
+          if [[ -n "${SEARXNG_LATEST}" ]]; then
+            latest_tag_args+=(--tag "${SEARXNG_LATEST}")
+          fi
           docker buildx build \
             --platform linux/amd64 \
             --target searxng \
-            --tag "${{ needs.plan_images.outputs.searxng_image }}" \
-            --tag "${{ needs.plan_images.outputs.searxng_latest }}" \
+            --tag "${SEARXNG_IMAGE}" \
+            "${latest_tag_args[@]}" \
             --cache-from type=gha,scope=ai-hub-searxng \
             --cache-to type=gha,mode=max,scope=ai-hub-searxng \
             --push \
@@ -393,12 +574,20 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push OpenSandbox code image
+        env:
+          SANDBOX_IMAGE: ${{ needs.plan_images.outputs.sandbox_image }}
+          SANDBOX_LATEST: ${{ needs.plan_images.outputs.sandbox_latest }}
         run: |
+          set -euo pipefail
+          latest_tag_args=()
+          if [[ -n "${SANDBOX_LATEST}" ]]; then
+            latest_tag_args+=(--tag "${SANDBOX_LATEST}")
+          fi
           docker buildx build \
             --platform linux/amd64 \
             --file opensandbox/Dockerfile.code-interpreter \
-            --tag "${{ needs.plan_images.outputs.sandbox_image }}" \
-            --tag "${{ needs.plan_images.outputs.sandbox_latest }}" \
+            --tag "${SANDBOX_IMAGE}" \
+            "${latest_tag_args[@]}" \
             --cache-from type=gha,scope=ai-hub-sandbox \
             --cache-to type=gha,mode=max,scope=ai-hub-sandbox \
             --push \
@@ -408,12 +597,13 @@ jobs:
     name: Deploy to Coolify
     runs-on: ubuntu-latest
     needs:
+      - prepare
       - validate
       - plan_images
       - build_app_images
       - build_searxng_image
       - build_sandbox_image
-    if: always() && needs.validate.result == 'success' && needs.plan_images.result == 'success' && (needs.build_app_images.result == 'success' || needs.build_app_images.result == 'skipped') && (needs.build_searxng_image.result == 'success' || needs.build_searxng_image.result == 'skipped') && (needs.build_sandbox_image.result == 'success' || needs.build_sandbox_image.result == 'skipped') && vars.COOLIFY_DEPLOY_ENABLED == 'true'
+    if: always() && needs.prepare.outputs.deploy_stack == 'true' && needs.validate.result == 'success' && needs.plan_images.result == 'success' && (needs.build_app_images.result == 'success' || needs.build_app_images.result == 'skipped') && (needs.build_searxng_image.result == 'success' || needs.build_searxng_image.result == 'skipped') && (needs.build_sandbox_image.result == 'success' || needs.build_sandbox_image.result == 'skipped') && vars.COOLIFY_DEPLOY_ENABLED == 'true'
 
     steps:
       - name: Checkout repository
@@ -432,7 +622,7 @@ jobs:
           OBJECT_STORAGE_ACCESS_KEY_ID: ${{ secrets.OBJECT_STORAGE_ACCESS_KEY_ID }}
           OBJECT_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.OBJECT_STORAGE_SECRET_ACCESS_KEY }}
           SEARXNG_SECRET: ${{ secrets.SEARXNG_SECRET }}
-          SEARXNG_SETTINGS_REVISION: ${{ github.sha }}
+          SEARXNG_SETTINGS_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           OBJECT_STORAGE_BUCKET: ${{ vars.OBJECT_STORAGE_BUCKET || 'ai-hub' }}
           CODE_WORKSPACE_STORAGE_PREFIX: ${{ vars.CODE_WORKSPACE_STORAGE_PREFIX || 'code-workspaces' }}
           ALLOW_PERSONAL_WORKSPACES: ${{ vars.ALLOW_PERSONAL_WORKSPACES || 'true' }}
@@ -445,6 +635,13 @@ jobs:
           OPENSANDBOX_API_KEY: ${{ secrets.OPENSANDBOX_API_KEY }}
           OPENSANDBOX_IMAGE: ${{ needs.plan_images.outputs.sandbox_image }}
           OPENSANDBOX_USE_SERVER_PROXY: ${{ vars.OPENSANDBOX_USE_SERVER_PROXY || 'false' }}
+          TARGET_ENV_NAME: ${{ needs.prepare.outputs.target_env_name }}
+          AI_HUB_PUBLIC_HOST: ${{ needs.prepare.outputs.public_host }}
+          AI_HUB_PUBLIC_URL: ${{ needs.prepare.outputs.public_url }}
+          APP_ROUTING_URL: ${{ needs.prepare.outputs.service_url }}
+          IS_PREVIEW: ${{ needs.prepare.outputs.is_preview }}
+          ENABLE_BASIC_AUTH: ${{ needs.prepare.outputs.enable_basic_auth }}
+          TRAEFIK_BASIC_AUTH_USERS_VALUE: ${{ secrets.TRAEFIK_BASIC_AUTH_USERS }}
         shell: bash
         run: |
           set -euo pipefail
@@ -453,6 +650,10 @@ jobs:
             COOLIFY_TOKEN
             COOLIFY_PROJECT_UUID
             COOLIFY_SERVER_UUID
+            TARGET_ENV_NAME
+            AI_HUB_PUBLIC_HOST
+            AI_HUB_PUBLIC_URL
+            APP_ROUTING_URL
             POSTGRES_PASSWORD
             BETTER_AUTH_SECRET
             APP_ENCRYPTION_KEY
@@ -516,6 +717,18 @@ jobs:
             echo "OBJECT_STORAGE_ACCESS_KEY_ID must not contain a development or placeholder access key." >&2
             exit 1
           fi
+          if [[ "${ENABLE_BASIC_AUTH}" == "true" ]]; then
+            TRAEFIK_BASIC_AUTH_USERS="$(printf '%s' "${TRAEFIK_BASIC_AUTH_USERS_VALUE:-}" | tr -d '\r\n')"
+            if [[ -z "${TRAEFIK_BASIC_AUTH_USERS}" ]]; then
+              echo "TRAEFIK_BASIC_AUTH_USERS secret is required for preview deployments." >&2
+              exit 1
+            fi
+            TRAEFIK_BASIC_AUTH_MIDDLEWARE="maiah-auth-${TARGET_ENV_NAME}"
+          else
+            TRAEFIK_BASIC_AUTH_USERS=""
+            TRAEFIK_BASIC_AUTH_MIDDLEWARE=""
+          fi
+
           APP_ENCRYPTION_KEY_ID="${APP_ENCRYPTION_KEY_ID:-default}"
           OBJECT_STORAGE_BUCKET="${OBJECT_STORAGE_BUCKET:-ai-hub}"
           CODE_WORKSPACE_STORAGE_PREFIX="${CODE_WORKSPACE_STORAGE_PREFIX:-code-workspaces}"
@@ -540,7 +753,6 @@ jobs:
           validate_secret_length OPENSANDBOX_API_KEY "${OPENSANDBOX_API_KEY}" 32
           BETTER_AUTH_URL="${AI_HUB_PUBLIC_URL}"
           BETTER_AUTH_TRUSTED_ORIGINS="${AI_HUB_PUBLIC_URL}"
-          APP_ROUTING_URL="http://${AI_HUB_PUBLIC_HOST}:3000"
 
           api() {
             local method="$1"
@@ -618,15 +830,15 @@ jobs:
 
           ENV_ID="$(
             api GET "/projects/${COOLIFY_PROJECT_UUID}/environments" \
-              | jq -r --arg name "${COOLIFY_ENVIRONMENT_NAME}" '.[] | select(.name == $name) | .id' \
+              | jq -r --arg name "${TARGET_ENV_NAME}" '.[] | select(.name == $name) | .id' \
               | head -n1
           )"
           if [[ -z "$ENV_ID" ]]; then
             api POST "/projects/${COOLIFY_PROJECT_UUID}/environments" \
-              "$(jq -nc --arg name "${COOLIFY_ENVIRONMENT_NAME}" '{name: $name}')" >/dev/null
+              "$(jq -nc --arg name "${TARGET_ENV_NAME}" '{name: $name}')" >/dev/null
             ENV_ID="$(
               api GET "/projects/${COOLIFY_PROJECT_UUID}/environments" \
-                | jq -r --arg name "${COOLIFY_ENVIRONMENT_NAME}" '.[] | select(.name == $name) | .id' \
+                | jq -r --arg name "${TARGET_ENV_NAME}" '.[] | select(.name == $name) | .id' \
                 | head -n1
             )"
           fi
@@ -645,6 +857,10 @@ jobs:
 
           compose_path = Path(".coolify/stack.compose.yml")
           compose = compose_path.read_text(encoding="utf-8")
+          compose_name = "ai-hub"
+          if os.environ.get("IS_PREVIEW") == "true":
+              compose_name = "ai-hub-" + os.environ["TARGET_ENV_NAME"]
+          compose = compose.replace("name: ai-hub\n", f"name: {compose_name}\n", 1)
           replacements = {
               "${AI_HUB_APP_IMAGE:?set AI_HUB_APP_IMAGE}": os.environ["AI_HUB_APP_IMAGE"],
               "${AI_HUB_WORKER_IMAGE:?set AI_HUB_WORKER_IMAGE}": os.environ["AI_HUB_WORKER_IMAGE"],
@@ -659,14 +875,26 @@ jobs:
               compose = compose.replace(needle, value)
           Path("/tmp/ai-hub.coolify.stack.yml").write_text(compose, encoding="utf-8")
           PY
-          docker compose -f /tmp/ai-hub.coolify.stack.yml config --no-interpolate > /tmp/ai-hub.coolify.compose.yml
+          compose_args=(-f /tmp/ai-hub.coolify.stack.yml)
+          if [[ "${ENABLE_BASIC_AUTH}" == "true" ]]; then
+            cat > /tmp/ai-hub.coolify.auth.yml <<EOF
+          services:
+            app:
+              labels:
+                - "traefik.http.middlewares.${TRAEFIK_BASIC_AUTH_MIDDLEWARE}.basicauth.users=${TRAEFIK_BASIC_AUTH_USERS}"
+                - "coolify.traefik.middlewares=${TRAEFIK_BASIC_AUTH_MIDDLEWARE}"
+          EOF
+            compose_args+=(-f /tmp/ai-hub.coolify.auth.yml)
+          fi
+          docker compose "${compose_args[@]}" config --no-interpolate > /tmp/ai-hub.coolify.compose.yml
           COMPOSE_B64="$(base64 < /tmp/ai-hub.coolify.compose.yml | tr -d '\n')"
           PATCH_BODY="$(
             jq -nc \
               --arg name "${COOLIFY_SERVICE_NAME}" \
               --arg description "Managed by GitHub Actions for AI Hub" \
               --arg docker_compose_raw "${COMPOSE_B64}" \
-              '{name: $name, description: $description, instant_deploy: false, docker_compose_raw: $docker_compose_raw}'
+              --arg app_url "${APP_ROUTING_URL}" \
+              '{name: $name, description: $description, instant_deploy: false, docker_compose_raw: $docker_compose_raw, force_domain_override: true, is_container_label_escape_enabled: true, urls: [{name: "app", url: $app_url}]}'
           )"
 
           if [[ -z "$SERVICE_UUID" ]]; then
@@ -675,7 +903,7 @@ jobs:
                 --arg name "${COOLIFY_SERVICE_NAME}" \
                 --arg description "Managed by GitHub Actions for AI Hub" \
                 --arg project_uuid "${COOLIFY_PROJECT_UUID}" \
-                --arg environment_name "${COOLIFY_ENVIRONMENT_NAME}" \
+                --arg environment_name "${TARGET_ENV_NAME}" \
                 --arg server_uuid "${COOLIFY_SERVER_UUID}" \
                 --arg docker_compose_raw "${COMPOSE_B64}" \
                 --arg app_url "${APP_ROUTING_URL}" \
@@ -711,31 +939,32 @@ jobs:
               --arg opensandbox_use_server_proxy "${OPENSANDBOX_USE_SERVER_PROXY}" \
               --arg allow_personal_workspaces "${ALLOW_PERSONAL_WORKSPACES}" \
               --arg workspace_monthly_token_limit "${WORKSPACE_MONTHLY_TOKEN_LIMIT}" \
-              '{data: [
-                {key: "AI_HUB_APP_IMAGE", value: $ai_hub_app_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "AI_HUB_WORKER_IMAGE", value: $ai_hub_worker_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "AI_HUB_MIGRATOR_IMAGE", value: $ai_hub_migrator_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "AI_HUB_SEARXNG_IMAGE", value: $ai_hub_searxng_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "AI_HUB_SANDBOX_IMAGE", value: $ai_hub_sandbox_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "POSTGRES_PASSWORD", value: $postgres_password, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "BETTER_AUTH_SECRET", value: $better_auth_secret, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "BETTER_AUTH_URL", value: $better_auth_url, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "BETTER_AUTH_TRUSTED_ORIGINS", value: $better_auth_trusted_origins, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "APP_ENCRYPTION_KEY", value: $app_encryption_key, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "APP_ENCRYPTION_KEY_ID", value: $app_encryption_key_id, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "DRAGONFLY_PASSWORD", value: $dragonfly_password, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "OBJECT_STORAGE_ACCESS_KEY_ID", value: $object_storage_access_key_id, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "OBJECT_STORAGE_SECRET_ACCESS_KEY", value: $object_storage_secret_access_key, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "OBJECT_STORAGE_BUCKET", value: $object_storage_bucket, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "CODE_WORKSPACE_STORAGE_PREFIX", value: $code_workspace_storage_prefix, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "SEARXNG_SECRET", value: $searxng_secret, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "SEARXNG_SETTINGS_REVISION", value: $searxng_settings_revision, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "OPENSANDBOX_API_KEY", value: $opensandbox_api_key, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "OPENSANDBOX_IMAGE", value: $opensandbox_image, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "OPENSANDBOX_USE_SERVER_PROXY", value: $opensandbox_use_server_proxy, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "ALLOW_PERSONAL_WORKSPACES", value: $allow_personal_workspaces, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false},
-                {key: "WORKSPACE_MONTHLY_TOKEN_LIMIT", value: $workspace_monthly_token_limit, is_preview: false, is_literal: true, is_multiline: false, is_shown_once: false}
-              ]}'
+              --argjson is_preview "${IS_PREVIEW}" \
+              '{data: ([
+                {key: "AI_HUB_APP_IMAGE", value: $ai_hub_app_image},
+                {key: "AI_HUB_WORKER_IMAGE", value: $ai_hub_worker_image},
+                {key: "AI_HUB_MIGRATOR_IMAGE", value: $ai_hub_migrator_image},
+                {key: "AI_HUB_SEARXNG_IMAGE", value: $ai_hub_searxng_image},
+                {key: "AI_HUB_SANDBOX_IMAGE", value: $ai_hub_sandbox_image},
+                {key: "POSTGRES_PASSWORD", value: $postgres_password},
+                {key: "BETTER_AUTH_SECRET", value: $better_auth_secret},
+                {key: "BETTER_AUTH_URL", value: $better_auth_url},
+                {key: "BETTER_AUTH_TRUSTED_ORIGINS", value: $better_auth_trusted_origins},
+                {key: "APP_ENCRYPTION_KEY", value: $app_encryption_key},
+                {key: "APP_ENCRYPTION_KEY_ID", value: $app_encryption_key_id},
+                {key: "DRAGONFLY_PASSWORD", value: $dragonfly_password},
+                {key: "OBJECT_STORAGE_ACCESS_KEY_ID", value: $object_storage_access_key_id},
+                {key: "OBJECT_STORAGE_SECRET_ACCESS_KEY", value: $object_storage_secret_access_key},
+                {key: "OBJECT_STORAGE_BUCKET", value: $object_storage_bucket},
+                {key: "CODE_WORKSPACE_STORAGE_PREFIX", value: $code_workspace_storage_prefix},
+                {key: "SEARXNG_SECRET", value: $searxng_secret},
+                {key: "SEARXNG_SETTINGS_REVISION", value: $searxng_settings_revision},
+                {key: "OPENSANDBOX_API_KEY", value: $opensandbox_api_key},
+                {key: "OPENSANDBOX_IMAGE", value: $opensandbox_image},
+                {key: "OPENSANDBOX_USE_SERVER_PROXY", value: $opensandbox_use_server_proxy},
+                {key: "ALLOW_PERSONAL_WORKSPACES", value: $allow_personal_workspaces},
+                {key: "WORKSPACE_MONTHLY_TOKEN_LIMIT", value: $workspace_monthly_token_limit}
+              ] | map(. + {is_preview: $is_preview, is_literal: true, is_multiline: false, is_shown_once: false}))}'
           )"
           api PATCH "/services/${SERVICE_UUID}/envs/bulk" "${ENV_PAYLOAD}" >/dev/null
 
@@ -829,12 +1058,16 @@ jobs:
             exit 1
           fi
 
-          wait_for_http_status "${AI_HUB_PUBLIC_URL}/api/health" "AI Hub public health endpoint" "200" 30 10
+          expected_health_status="200"
+          if [[ "${ENABLE_BASIC_AUTH}" == "true" ]]; then
+            expected_health_status="401"
+          fi
+          wait_for_http_status "${AI_HUB_PUBLIC_URL}/api/health" "AI Hub public health endpoint" "${expected_health_status}" 30 10
 
           {
             echo "## Coolify Deployment"
             echo ""
-            echo "- Environment: \`${COOLIFY_ENVIRONMENT_NAME}\`"
+            echo "- Environment: \`${TARGET_ENV_NAME}\`"
             echo "- Service: \`${COOLIFY_SERVICE_NAME}\`"
             echo "- Service UUID: \`${SERVICE_UUID}\`"
             echo "- Public URL: ${AI_HUB_PUBLIC_URL}"
@@ -845,3 +1078,111 @@ jobs:
             echo "- OpenSandbox image: \`${OPENSANDBOX_IMAGE}\`"
             echo "- Built OpenSandbox image: \`${AI_HUB_SANDBOX_IMAGE}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  cleanup_preview:
+    name: Delete Preview Environment
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.cleanup_preview == 'true' && vars.COOLIFY_DEPLOY_ENABLED == 'true'
+
+    steps:
+      - name: Delete preview service and environment
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          TARGET_ENV_NAME: ${{ needs.prepare.outputs.target_env_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${COOLIFY_TOKEN:-}" ]]; then
+            echo "COOLIFY_TOKEN secret is required." >&2
+            exit 1
+          fi
+          if [[ -z "${TARGET_ENV_NAME:-}" ]]; then
+            echo "TARGET_ENV_NAME is required for preview cleanup." >&2
+            exit 1
+          fi
+
+          api() {
+            local method="$1"
+            local path="$2"
+            local data="${3:-}"
+            local response_file status
+            response_file="$(mktemp)"
+            if [[ -n "${data}" ]]; then
+              status="$(
+                /usr/bin/curl -sS -X "${method}" \
+                  -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+                  -H "Accept: application/json" \
+                  -H "Content-Type: application/json" \
+                  -d "${data}" \
+                  --output "${response_file}" \
+                  --write-out '%{http_code}' \
+                  "${COOLIFY_BASE_URL}/api/v1${path}" || true
+              )"
+            else
+              status="$(
+                /usr/bin/curl -sS -X "${method}" \
+                  -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+                  -H "Accept: application/json" \
+                  --output "${response_file}" \
+                  --write-out '%{http_code}' \
+                  "${COOLIFY_BASE_URL}/api/v1${path}" || true
+              )"
+            fi
+            if [[ "${status}" =~ ^2 ]]; then
+              cat "${response_file}"
+              rm -f "${response_file}"
+              return 0
+            fi
+            echo "Coolify API ${method} ${path} failed with HTTP ${status}" >&2
+            cat "${response_file}" >&2 || true
+            echo >&2
+            rm -f "${response_file}"
+            return 1
+          }
+
+          ENV_ID="$(
+            api GET "/projects/${COOLIFY_PROJECT_UUID}/environments" \
+              | jq -r --arg name "${TARGET_ENV_NAME}" '.[] | select(.name == $name) | .id' \
+              | head -n1
+          )"
+
+          if [[ -z "${ENV_ID}" ]]; then
+            echo "Preview environment ${TARGET_ENV_NAME} is already gone."
+            exit 0
+          fi
+
+          SERVICE_UUIDS="$(
+            api GET "/services" \
+              | jq -r --argjson env_id "${ENV_ID}" '.[] | select(.environment_id == $env_id) | .uuid'
+          )"
+
+          if [[ -n "${SERVICE_UUIDS}" ]]; then
+            while IFS= read -r service_uuid; do
+              [[ -z "${service_uuid}" ]] && continue
+              api DELETE "/services/${service_uuid}?delete_configurations=true&delete_volumes=true&docker_cleanup=true&delete_connected_networks=true" >/dev/null || true
+            done <<< "${SERVICE_UUIDS}"
+          fi
+
+          for _ in $(seq 1 20); do
+            REMAINING="$(
+              api GET "/services" \
+                | jq -r --argjson env_id "${ENV_ID}" '.[] | select(.environment_id == $env_id) | .uuid'
+            )"
+            if [[ -z "${REMAINING}" ]]; then
+              break
+            fi
+            sleep 10
+          done
+
+          for _ in $(seq 1 20); do
+            if api DELETE "/projects/${COOLIFY_PROJECT_UUID}/environments/${TARGET_ENV_NAME}" >/dev/null 2>&1; then
+              echo "Preview environment ${TARGET_ENV_NAME} deleted."
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "Preview environment ${TARGET_ENV_NAME} could not be deleted after retries." >&2
+          exit 1

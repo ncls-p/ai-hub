@@ -141,7 +141,7 @@ src/
   server/
     domain/               Entities and domain services
     infrastructure/       DB, cache, storage, worker adapters
-  
+
 test/unit/                Unit tests
 scripts/                  Operational scripts
 docs/                     Product and implementation plans
@@ -216,13 +216,21 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 For Coolify/GitHub Actions, `.coolify/stack.compose.yml` is the deployment-safe
 image-based stack and `.github/workflows/coolify.yml` builds/pushes the app,
-worker, migrator, SearXNG, and sandbox runner images before patching the single
-`ai-hub` Coolify service. RustFS runs from the official `rustfs/rustfs` image.
+worker, migrator, SearXNG, and sandbox runner images before patching the `maiah`
+Coolify service. PRs targeting `main` create isolated preview environments named
+`pr-<number>` with public hosts like `https://maiah-pr-<number>.shiftify.eco`;
+those previews are protected by Traefik basic auth and deleted when the PR is
+closed. Pushes to `main` still deploy the persistent production environment at
+`https://maiah.shiftify.eco`. RustFS runs from the official `rustfs/rustfs`
+image.
 
-Required Coolify secrets/variables include `POSTGRES_PASSWORD`,
-`BETTER_AUTH_SECRET`, `APP_ENCRYPTION_KEY`, `DRAGONFLY_PASSWORD`,
-`OBJECT_STORAGE_ACCESS_KEY_ID`, and `OBJECT_STORAGE_SECRET_ACCESS_KEY`. For the
-bundled RustFS service, use strong non-placeholder S3 credentials. Override
+Required Coolify secrets/variables include `COOLIFY_DEPLOY_ENABLED=true`,
+`POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `APP_ENCRYPTION_KEY`,
+`DRAGONFLY_PASSWORD`, `OBJECT_STORAGE_ACCESS_KEY_ID`,
+`OBJECT_STORAGE_SECRET_ACCESS_KEY`, and `TRAEFIK_BASIC_AUTH_USERS` for PR
+previews. For the bundled RustFS service, use strong non-placeholder S3
+credentials. If MAIAH moves to a new Coolify project, set the repository
+variable `COOLIFY_PROJECT_UUID` to that project UUID. Override
 `AI_HUB_PROD_APP_PORT` if the host port must differ from the safe default `3001`
 for the local production compose file.
 
