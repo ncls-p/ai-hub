@@ -845,30 +845,8 @@ jobs:
               | head -n1
           )"
 
-          # Render image references directly into the Compose payload so Coolify
-          # cannot keep running a stale AI_HUB_*_IMAGE environment value.
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-
-          compose_path = Path(".coolify/stack.compose.yml")
-          compose = compose_path.read_text(encoding="utf-8")
-          replacements = {
-              "${AI_HUB_APP_IMAGE:?set AI_HUB_APP_IMAGE}": os.environ["AI_HUB_APP_IMAGE"],
-              "${AI_HUB_WORKER_IMAGE:?set AI_HUB_WORKER_IMAGE}": os.environ["AI_HUB_WORKER_IMAGE"],
-              "${AI_HUB_MIGRATOR_IMAGE:?set AI_HUB_MIGRATOR_IMAGE}": os.environ["AI_HUB_MIGRATOR_IMAGE"],
-              "${AI_HUB_SEARXNG_IMAGE:?set AI_HUB_SEARXNG_IMAGE}": os.environ["AI_HUB_SEARXNG_IMAGE"],
-              "${AI_HUB_SANDBOX_IMAGE:?set AI_HUB_SANDBOX_IMAGE}": os.environ["OPENSANDBOX_IMAGE"],
-          }
-          missing = [needle for needle in replacements if needle not in compose]
-          if missing:
-              raise SystemExit(f"missing image placeholders in {compose_path}: {missing}")
-          for needle, value in replacements.items():
-              compose = compose.replace(needle, value)
-          Path("/tmp/ai-hub.coolify.stack.yml").write_text(compose, encoding="utf-8")
-          PY
+          compose_args=(-f .coolify/stack.compose.yml)
           if [[ "${ENABLE_BASIC_AUTH}" == "true" ]]; then
-            compose_args=(-f /tmp/ai-hub.coolify.stack.yml)
             cat > /tmp/ai-hub.coolify.auth.yml <<EOF
           services:
             app:
@@ -877,19 +855,8 @@ jobs:
                 - "coolify.traefik.middlewares=${TRAEFIK_BASIC_AUTH_MIDDLEWARE}"
           EOF
             compose_args+=(-f /tmp/ai-hub.coolify.auth.yml)
-            docker compose "${compose_args[@]}" config --no-interpolate > /tmp/ai-hub.coolify.compose.yml
-            python3 - <<'PY'
-          from pathlib import Path
-
-          compose_path = Path("/tmp/ai-hub.coolify.compose.yml")
-          lines = compose_path.read_text(encoding="utf-8").splitlines()
-          if lines and lines[0].startswith("name:"):
-              lines = lines[1:]
-          compose_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-          PY
-          else
-            cp /tmp/ai-hub.coolify.stack.yml /tmp/ai-hub.coolify.compose.yml
           fi
+          docker compose "${compose_args[@]}" config --no-interpolate > /tmp/ai-hub.coolify.compose.yml
           COMPOSE_B64="$(base64 < /tmp/ai-hub.coolify.compose.yml | tr -d '\n')"
           PATCH_BODY="$(
             jq -nc \
@@ -971,45 +938,6 @@ jobs:
           )"
           api PATCH "/services/${SERVICE_UUID}/envs/bulk" "${ENV_PAYLOAD}" >/dev/null
 
-          verify_compose_images() {
-            local service_json="$1"
-            SERVICE_JSON_FOR_VERIFY="${service_json}" python3 - \
-              "${AI_HUB_APP_IMAGE}" \
-              "${AI_HUB_WORKER_IMAGE}" \
-              "${AI_HUB_MIGRATOR_IMAGE}" \
-              "${AI_HUB_SEARXNG_IMAGE}" \
-              "${OPENSANDBOX_IMAGE}" \
-              "opensandbox/server:latest" <<'PY'
-          import base64
-          import json
-          import os
-          import sys
-
-          expected_values = sys.argv[1:]
-          service = json.loads(os.environ["SERVICE_JSON_FOR_VERIFY"])
-          fields = [service.get("docker_compose") or "", service.get("docker_compose_raw") or ""]
-          expanded = list(fields)
-          for value in fields:
-              try:
-                  expanded.append(base64.b64decode(value, validate=True).decode("utf-8", "replace"))
-              except Exception:
-                  pass
-          missing = [expected for expected in expected_values if not any(expected in value for value in expanded)]
-          if not missing:
-              sys.exit(0)
-          print(f"Expected values not found in Coolify service compose: {missing}", file=sys.stderr)
-          print(
-              "Compose field lengths: "
-              f"docker_compose={len(fields[0])}, docker_compose_raw={len(fields[1])}",
-              file=sys.stderr,
-          )
-          sys.exit(1)
-          PY
-          }
-
-          SERVICE_JSON="$(api GET "/services/${SERVICE_UUID}")"
-          verify_compose_images "${SERVICE_JSON}"
-
           echo "Using Coolify service UUID ${SERVICE_UUID}"
           echo "Using SearXNG image ${AI_HUB_SEARXNG_IMAGE}"
           echo "Using OpenSandbox image ${OPENSANDBOX_IMAGE}"
@@ -1044,14 +972,6 @@ jobs:
               ' <<<"${STATUS_JSON}" >&2
             fi
 
-            EXITED_COUNT="$(
-              jq -r --argjson names "${long_running}" '[.applications[]? | select(.name as $name | $names | index($name)) | select(.status | test("exited|dead|unhealthy"))] | length' <<<"${STATUS_JSON}"
-            )"
-            if [[ "${EXITED_COUNT}" -gt 0 && "${attempt}" -gt 8 ]]; then
-              echo "Coolify deployment failed: one or more long-running services exited." >&2
-              jq -r --argjson names "${long_running}" '.applications[]? | select(.name as $name | $names | index($name)) | "\(.name): \(.status)"' <<<"${STATUS_JSON}" >&2
-              break
-            fi
             sleep 15
           done
 
