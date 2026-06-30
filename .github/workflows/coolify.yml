@@ -877,19 +877,28 @@ jobs:
           compose_args=(-f /tmp/ai-hub.coolify.stack.yml)
           if [[ "${IS_PREVIEW}" != "true" ]]; then
             cat > /tmp/ai-hub.coolify.prod-volumes.yml <<EOF
-          volumes:
-            dragonfly-data:
-              name: ${AI_HUB_PROD_VOLUME_PREFIX}_dragonfly-data
-              external: true
-            rustfs-data:
-              name: ${AI_HUB_PROD_VOLUME_PREFIX}_rustfs-data
-              external: true
-            postgres-data:
-              name: ${AI_HUB_PROD_VOLUME_PREFIX}_postgres-data
-              external: true
-            opensandbox-data:
-              name: ${AI_HUB_PROD_VOLUME_PREFIX}_opensandbox-data
-              external: true
+          services:
+            postgres:
+              volumes:
+                - type: bind
+                  source: /var/lib/docker/volumes/${AI_HUB_PROD_VOLUME_PREFIX}_postgres-data/_data
+                  target: /var/lib/postgresql/data
+            dragonflydb:
+              volumes:
+                - type: bind
+                  source: /var/lib/docker/volumes/${AI_HUB_PROD_VOLUME_PREFIX}_dragonfly-data/_data
+                  target: /data
+            rustfs:
+              volumes:
+                - type: bind
+                  source: /var/lib/docker/volumes/${AI_HUB_PROD_VOLUME_PREFIX}_rustfs-data/_data
+                  target: /data
+            opensandbox-server:
+              volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+                - type: bind
+                  source: /var/lib/docker/volumes/${AI_HUB_PROD_VOLUME_PREFIX}_opensandbox-data/_data
+                  target: /root/.opensandbox
           EOF
             compose_args+=(-f /tmp/ai-hub.coolify.prod-volumes.yml)
           fi
