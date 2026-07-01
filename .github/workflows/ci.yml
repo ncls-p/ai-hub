@@ -47,10 +47,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@692979e3891fa7a6a9c2939e561259747f9bd5e8
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@60edb5151533d05c17d0e5aba29fa4d3f32bbb5d
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
