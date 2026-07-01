@@ -1,8 +1,6 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { decryptValue, encryptValue } from "@/lib/crypto";
-import { logHandledError } from "@/lib/logger";
 import { getSession } from "@/modules/auth/session";
 import { executeCustomToolWorkflow } from "@/modules/custom-tools/use-cases";
 import { executeMcpTool } from "@/modules/mcp/executor";
@@ -12,175 +10,149 @@ import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
 import { mcpTools, toolInvocations } from "@/server/infrastructure/db/schema";
 
-const paramsSchema = z.object({ invocationId: z.uuid() });
+import { invocationParamsSchema } from "../../invocation-shared";
+
+async function executeInvocation(
+	invocation: typeof toolInvocations.$inferSelect,
+	userId: string,
+) {
+	const input = invocation.inputJsonEncrypted
+		? JSON.parse(await decryptValue(invocation.inputJsonEncrypted))
+		: undefined;
+
+	let output: unknown;
+	if (invocation.toolSource === "builtin") {
+		const tool = getBuiltInTool(invocation.toolId);
+		if (!tool) {
+			return NextResponse.json({ error: "Tool not found" }, { status: 404 });
+		}
+		output = await tool.execute(input as never, {
+			workspaceId: invocation.workspaceId,
+			userId,
+		});
+	} else if (invocation.toolSource === "custom") {
+		output = await executeCustomToolWorkflow({
+			workspaceId: invocation.workspaceId,
+			userId,
+			customToolId: invocation.toolId,
+			toolInput: input,
+		});
+	} else if (invocation.toolSource === "mcp") {
+		const [tool] = await db
+			.select({ mcpServerId: mcpTools.mcpServerId })
+			.from(mcpTools)
+			.where(eq(mcpTools.id, invocation.toolId))
+			.limit(1);
+		if (!tool) {
+			return NextResponse.json(
+				{ error: "MCP tool not found" },
+				{ status: 404 },
+			);
+		}
+		output = await executeMcpTool({
+			serverId: tool.mcpServerId,
+			toolId: invocation.toolId,
+			workspaceId: invocation.workspaceId,
+			toolInput: input,
+		});
+	} else {
+		return NextResponse.json(
+			{ error: "Unsupported tool source" },
+			{ status: 400 },
+		);
+	}
+	return output;
+}
 
 export async function POST(
-  _req: Request,
-  { params }: { params: Promise<{ invocationId: string }> },
+	_req: Request,
+	{ params }: { params: Promise<{ invocationId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+	try {
+		const session = await getSession();
+		if (!session) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 
-    const parsed = paramsSchema.safeParse(await params);
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
+		const parsed = invocationParamsSchema.safeParse(await params);
+		if (!parsed.success) {
+			return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+		}
 
-    const [invocation] = await db
-      .select()
-      .from(toolInvocations)
-      .where(eq(toolInvocations.id, parsed.data.invocationId))
-      .limit(1);
+		const [invocation] = await db
+			.select()
+			.from(toolInvocations)
+			.where(eq(toolInvocations.id, parsed.data.invocationId))
+			.limit(1);
 
-    if (!invocation) {
-      return NextResponse.json(
-        { error: "Invocation not found" },
-        { status: 404 },
-      );
-    }
+		if (!invocation) {
+			return NextResponse.json(
+				{ error: "Invocation not found" },
+				{ status: 404 },
+			);
+		}
 
-    const approvalPermission =
-      invocation.toolSource === "builtin" &&
-      getBuiltInTool(invocation.toolId)?.name ===
-        "github_publish_code_workspace"
-        ? "agents.chat"
-        : "tools.executeRestricted";
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      approvalPermission,
-      "workspace",
-      invocation.workspaceId,
-    );
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
-      );
-    }
+		const approvalPermission =
+			invocation.toolSource === "builtin" &&
+			getBuiltInTool(invocation.toolId)?.name ===
+				"github_publish_code_workspace"
+				? "agents.chat"
+				: "tools.executeRestricted";
+		const permission = await authorization.requirePermission(
+			{ principalType: "user", principalId: session.user.id },
+			approvalPermission,
+			"workspace",
+			invocation.workspaceId,
+		);
+		if (!permission.granted) {
+			return NextResponse.json(
+				{ error: "Forbidden", reason: permission.reason },
+				{ status: 403 },
+			);
+		}
 
-    if (invocation.status !== "awaiting_approval") {
-      return NextResponse.json(
-        { error: "Invocation is not awaiting approval" },
-        { status: 409 },
-      );
-    }
+		if (invocation.status !== "awaiting_approval") {
+			return NextResponse.json(
+				{ error: "Invocation is not awaiting approval" },
+				{ status: 409 },
+			);
+		}
 
-    const startedAt = Date.now();
-    const input = invocation.inputJsonEncrypted
-      ? JSON.parse(await decryptValue(invocation.inputJsonEncrypted))
-      : undefined;
+		const startedAt = Date.now();
+		const result = await executeInvocation(invocation, session.user.id);
+		if (result instanceof NextResponse) return result;
 
-    try {
-      let output: unknown;
-      if (invocation.toolSource === "builtin") {
-        const tool = getBuiltInTool(invocation.toolId);
-        if (!tool) {
-          return NextResponse.json(
-            { error: "Tool not found" },
-            { status: 404 },
-          );
-        }
-        output = await tool.execute(input as never, {
-          workspaceId: invocation.workspaceId,
-          userId: session.user.id,
-        });
-      } else if (invocation.toolSource === "custom") {
-        output = await executeCustomToolWorkflow({
-          workspaceId: invocation.workspaceId,
-          userId: session.user.id,
-          customToolId: invocation.toolId,
-          toolInput: input,
-        });
-      } else if (invocation.toolSource === "mcp") {
-        const [tool] = await db
-          .select({ mcpServerId: mcpTools.mcpServerId })
-          .from(mcpTools)
-          .where(eq(mcpTools.id, invocation.toolId))
-          .limit(1);
-        if (!tool) {
-          return NextResponse.json(
-            { error: "MCP tool not found" },
-            { status: 404 },
-          );
-        }
-        output = await executeMcpTool({
-          serverId: tool.mcpServerId,
-          toolId: invocation.toolId,
-          workspaceId: invocation.workspaceId,
-          toolInput: input,
-        });
-      } else {
-        return NextResponse.json(
-          { error: "Unsupported tool source" },
-          { status: 400 },
-        );
-      }
+		await db
+			.update(toolInvocations)
+			.set({
+				outputJsonEncrypted: await encryptValue(JSON.stringify(result)),
+				status: "success",
+				latencyMs: Date.now() - startedAt,
+				approvedByUserId: session.user.id,
+				completedAt: new Date(),
+			})
+			.where(eq(toolInvocations.id, invocation.id));
 
-      await db
-        .update(toolInvocations)
-        .set({
-          outputJsonEncrypted: await encryptValue(JSON.stringify(output)),
-          status: "success",
-          latencyMs: Date.now() - startedAt,
-          approvedByUserId: session.user.id,
-          completedAt: new Date(),
-        })
-        .where(eq(toolInvocations.id, invocation.id));
+		await audit.emit({
+			workspaceId: invocation.workspaceId,
+			actorPrincipalType: "user",
+			actorPrincipalId: session.user.id,
+			action: "toolInvocation.approved",
+			resourceType: "tool_invocation",
+			resourceId: invocation.id,
+			outcome: "success",
+			metadata: {
+				toolName: invocation.toolName,
+				toolSource: invocation.toolSource,
+				riskLevel: invocation.riskLevel,
+			},
+		});
 
-      await audit.emit({
-        workspaceId: invocation.workspaceId,
-        actorPrincipalType: "user",
-        actorPrincipalId: session.user.id,
-        action: "toolInvocation.approved",
-        resourceType: "tool_invocation",
-        resourceId: invocation.id,
-        outcome: "success",
-        metadata: {
-          toolName: invocation.toolName,
-          toolSource: invocation.toolSource,
-          riskLevel: invocation.riskLevel,
-        },
-      });
-
-      return NextResponse.json({ ok: true, output });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      await db
-        .update(toolInvocations)
-        .set({
-          status: "failed",
-          latencyMs: Date.now() - startedAt,
-          approvedByUserId: session.user.id,
-          errorMessage,
-          completedAt: new Date(),
-        })
-        .where(eq(toolInvocations.id, invocation.id));
-
-      await audit.emit({
-        workspaceId: invocation.workspaceId,
-        actorPrincipalType: "user",
-        actorPrincipalId: session.user.id,
-        action: "toolInvocation.approved",
-        resourceType: "tool_invocation",
-        resourceId: invocation.id,
-        outcome: "failed",
-        metadata: {
-          toolName: invocation.toolName,
-          toolSource: invocation.toolSource,
-          error: errorMessage,
-        },
-      });
-      throw error;
-    }
-  } catch (error) {
-    logHandledError("Failed to approve tool invocation", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+		return NextResponse.json({ ok: true, output: result });
+	} catch {
+		return NextResponse.json(
+			{ error: "Internal server error" },
+			{ status: 500 },
+		);
+	}
 }

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { logHandledError } from "@/lib/logger";
-import { getSession } from "@/modules/auth/session";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import { runCustomToolBuilder } from "@/modules/custom-tools/use-cases";
-import { authorization } from "@/server/domain/services/authorization";
 
 const messageSchema = z.object({
   workspaceId: z.uuid(),
@@ -29,44 +30,38 @@ const messageSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const parsed = messageSchema.safeParse(await req.json());
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid input", details: parsed.error.issues },
-        { status: 400 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsed = messageSchema.safeParse(await req.json());
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Invalid input", details: parsed.error.issues },
+          { status: 400 },
+        );
+      }
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        parsed.data.workspaceId,
+        "tools.configure",
       );
-    }
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "tools.configure",
-      "workspace",
-      parsed.data.workspaceId,
-    );
-    if (!permission.granted) {
+      if (forbidden) return forbidden;
       return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
+        await runCustomToolBuilder({
+          workspaceId: parsed.data.workspaceId,
+          userId: session.user.id,
+          messages: parsed.data.messages,
+          credentialRefs: parsed.data.credentialRefs,
+        }),
       );
-    }
-
-    return NextResponse.json(
-      await runCustomToolBuilder({
-        workspaceId: parsed.data.workspaceId,
-        userId: session.user.id,
-        messages: parsed.data.messages,
-        credentialRefs: parsed.data.credentialRefs,
-      }),
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to run builder";
-    logHandledError("Custom tool builder failed", { message }, error as Error);
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+    },
+    {
+      logLabel: "Custom tool builder failed",
+      expectedError: (error) => {
+        const message =
+          error instanceof Error ? error.message : "Unable to run builder";
+        return NextResponse.json({ error: message }, { status: 500 });
+      },
+    },
+  );
 }

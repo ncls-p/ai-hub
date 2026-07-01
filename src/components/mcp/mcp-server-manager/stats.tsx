@@ -1,30 +1,6 @@
-import { cn } from "@/lib/utils";
+import { MetricCell } from "@/components/ui/metric-cell";
 
 import type { McpServer, McpTool } from "./types";
-
-function MetricCell({
-  label,
-  value,
-  accent = false,
-}: {
-  label: string;
-  value: string | number;
-  accent?: boolean;
-}) {
-  return (
-    <div>
-      <p
-        className={cn(
-          "text-2xl font-bold leading-none",
-          accent ? "text-success" : "text-foreground",
-        )}
-      >
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-    </div>
-  );
-}
 
 export function SystemStrip({
   servers,

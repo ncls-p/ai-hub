@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getSession } from "@/modules/auth/session";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import {
   createProvider,
   listProviders,
   toSafeProvider,
 } from "@/modules/provider/use-cases";
-import { authorization } from "@/server/domain/services/authorization";
-import { logHandledError } from "@/lib/logger";
 
 const providerKindSchema = z.enum([
   "openai-compatible",
@@ -39,95 +40,57 @@ const listProvidersSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const parsed = listProvidersSchema.safeParse({
-      workspaceId: searchParams.get("workspaceId"),
-    });
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "workspaceId must be a valid UUID" },
-        { status: 400 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const { searchParams } = new URL(req.url);
+      const parsed = listProvidersSchema.safeParse({
+        workspaceId: searchParams.get("workspaceId"),
+      });
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "workspaceId must be a valid UUID" },
+          { status: 400 },
+        );
+      }
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        parsed.data.workspaceId,
+        "providers.viewMetadata",
       );
-    }
-
-    const { workspaceId } = parsed.data;
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "providers.viewMetadata",
-      "workspace",
-      workspaceId,
-    );
-
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
-      );
-    }
-
-    const providers = await listProviders(workspaceId);
-    return NextResponse.json(providers.map(toSafeProvider));
-  } catch (error) {
-    logHandledError("Failed to list providers", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+      if (forbidden) return forbidden;
+      const providers = await listProviders(parsed.data.workspaceId);
+      return NextResponse.json(providers.map(toSafeProvider));
+    },
+    { logLabel: "Failed to list providers" },
+  );
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const parsed = createProviderSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid input", details: parsed.error.issues },
-        { status: 400 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsed = createProviderSchema.safeParse(await req.json());
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Invalid input", details: parsed.error.issues },
+          { status: 400 },
+        );
+      }
+      const { workspaceId, ...input } = parsed.data;
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        workspaceId,
+        "providers.create",
       );
-    }
-
-    const { workspaceId, ...input } = parsed.data;
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "providers.create",
-      "workspace",
-      workspaceId,
-    );
-
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
-      );
-    }
-
-    const provider = await createProvider({
-      workspaceId,
-      userId: session.user.id,
-      ...input,
-    });
-
-    return NextResponse.json(toSafeProvider(provider), { status: 201 });
-  } catch (error) {
-    logHandledError("Failed to create provider", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+      if (forbidden) return forbidden;
+      const provider = await createProvider({
+        workspaceId,
+        userId: session.user.id,
+        ...input,
+      });
+      return NextResponse.json(toSafeProvider(provider), { status: 201 });
+    },
+    { logLabel: "Failed to create provider" },
+  );
 }

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { getSession } from "@/modules/auth/session";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import { db } from "@/server/infrastructure/db";
 import { users } from "@/server/infrastructure/db/schema";
 import {
@@ -13,7 +16,6 @@ import {
 } from "@/modules/agent/use-cases";
 import { isAdminRole } from "@/modules/admin/use-cases";
 import { authorization } from "@/server/domain/services/authorization";
-import { logHandledError } from "@/lib/logger";
 import { toolBindingInputSchema } from "@/modules/tool/use-cases";
 
 const routeParamsSchema = z.object({ agentId: z.uuid() });
@@ -114,262 +116,225 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsedParams = routeParamsSchema.safeParse(await params);
-    const { searchParams } = new URL(req.url);
-    const parsedQuery = workspaceQuerySchema.safeParse({
-      workspaceId: searchParams.get("workspaceId"),
-    });
-
-    if (!parsedParams.success || !parsedQuery.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
-
-    const { agentId } = parsedParams.data;
-    const { workspaceId } = parsedQuery.data;
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "agents.get",
-      "workspace",
-      workspaceId,
-    );
-
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsedParams = routeParamsSchema.safeParse(await params);
+      const { searchParams } = new URL(req.url);
+      const parsedQuery = workspaceQuerySchema.safeParse({
+        workspaceId: searchParams.get("workspaceId"),
+      });
+      if (!parsedParams.success || !parsedQuery.success) {
+        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      }
+      const { agentId } = parsedParams.data;
+      const { workspaceId } = parsedQuery.data;
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        workspaceId,
+        "agents.get",
       );
-    }
-
-    const canAdminCurate = isAdminRole(session.user.role);
-    const agent = await getVisibleAgentById(
-      agentId,
-      workspaceId,
-      session.user.id,
-      canAdminCurate,
-    );
-    if (!agent) {
-      return NextResponse.json({ error: "Agent not found" }, { status: 404 });
-    }
-
-    let shareTargetEmail: string | null = null;
-    if (agent.shareTargetUserId) {
-      const [target] = await db
-        .select({ email: users.email })
-        .from(users)
-        .where(eq(users.id, agent.shareTargetUserId))
-        .limit(1);
-      shareTargetEmail = target?.email ?? null;
-    }
-
-    const permissionContext = {
-      principalType: "user" as const,
-      principalId: session.user.id,
-    };
-    const [canCreateAgent, canUpdateAgents] = await Promise.all([
-      authorization.hasPermission(
-        permissionContext,
-        "agents.create",
-        "workspace",
+      if (forbidden) return forbidden;
+      const canAdminCurate = isAdminRole(session.user.role);
+      const agent = await getVisibleAgentById(
+        agentId,
         workspaceId,
-      ),
-      authorization.hasPermission(
-        permissionContext,
-        "agents.update",
-        "workspace",
-        workspaceId,
-      ),
-    ]);
-
-    return NextResponse.json({
-      ...agent,
-      promptSuggestions: normalizePromptSuggestions(
-        agent.promptSuggestionsJson,
-      ),
-      canAdminCurate,
-      canEdit:
-        canUpdateAgents && canEditAgent(agent, session.user.id, canAdminCurate),
-      canClone: canCreateAgent,
-      shareTargetEmail,
-    });
-  } catch (error) {
-    logHandledError("Failed to get agent", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+        session.user.id,
+        canAdminCurate,
+      );
+      if (!agent) {
+        return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+      }
+      let shareTargetEmail: string | null = null;
+      if (agent.shareTargetUserId) {
+        const [target] = await db
+          .select({ email: users.email })
+          .from(users)
+          .where(eq(users.id, agent.shareTargetUserId))
+          .limit(1);
+        shareTargetEmail = target?.email ?? null;
+      }
+      const permissionContext = {
+        principalType: "user" as const,
+        principalId: session.user.id,
+      };
+      const [canCreateAgent, canUpdateAgents] = await Promise.all([
+        authorization.hasPermission(
+          permissionContext,
+          "agents.create",
+          "workspace",
+          workspaceId,
+        ),
+        authorization.hasPermission(
+          permissionContext,
+          "agents.update",
+          "workspace",
+          workspaceId,
+        ),
+      ]);
+      return NextResponse.json({
+        ...agent,
+        promptSuggestions: normalizePromptSuggestions(
+          agent.promptSuggestionsJson,
+        ),
+        canAdminCurate,
+        canEdit:
+          canUpdateAgents &&
+          canEditAgent(agent, session.user.id, canAdminCurate),
+        canClone: canCreateAgent,
+        shareTargetEmail,
+      });
+    },
+    { logLabel: "Failed to get agent" },
+  );
 }
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsedParams = routeParamsSchema.safeParse(await params);
-    const body = await req.json();
-    const parsedBody = updateAgentSchema.safeParse(body);
-
-    if (!parsedParams.success || !parsedBody.success) {
-      return NextResponse.json(
-        {
-          error: "Invalid input",
-          details: parsedBody.success ? undefined : parsedBody.error.issues,
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsedParams = routeParamsSchema.safeParse(await params);
+      const body = await req.json();
+      const parsedBody = updateAgentSchema.safeParse(body);
+      if (!parsedParams.success || !parsedBody.success) {
+        return NextResponse.json(
+          {
+            error: "Invalid input",
+            details: parsedBody.success ? undefined : parsedBody.error.issues,
+          },
+          { status: 400 },
+        );
+      }
+      const { agentId } = parsedParams.data;
+      const { workspaceId, ...input } = parsedBody.data;
+      const canAdminCurate = isAdminRole(session.user.role);
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        workspaceId,
+        "agents.update",
+      );
+      if (forbidden) return forbidden;
+      const { agent, version } = await updateAgent({
+        agentId,
+        workspaceId,
+        userId: session.user.id,
+        canAdminCurate,
+        ...input,
+        shareTargetEmail: input.shareTargetEmail || undefined,
+      });
+      return NextResponse.json({
+        agent: {
+          ...agent,
+          promptSuggestions: normalizePromptSuggestions(
+            agent.promptSuggestionsJson,
+          ),
         },
-        { status: 400 },
-      );
-    }
-
-    const { agentId } = parsedParams.data;
-    const { workspaceId, ...input } = parsedBody.data;
-    const canAdminCurate = isAdminRole(session.user.role);
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "agents.update",
-      "workspace",
-      workspaceId,
-    );
-
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
-      );
-    }
-
-    const { agent, version } = await updateAgent({
-      agentId,
-      workspaceId,
-      userId: session.user.id,
-      canAdminCurate,
-      ...input,
-      shareTargetEmail: input.shareTargetEmail || undefined,
-    });
-
-    return NextResponse.json({
-      agent: {
-        ...agent,
-        promptSuggestions: normalizePromptSuggestions(
-          agent.promptSuggestionsJson,
-        ),
+        version,
+      });
+    },
+    {
+      logLabel: "Failed to update agent",
+      expectedError: (error) => {
+        if (isUniqueConstraintError(error)) {
+          return NextResponse.json(
+            { error: "Agent slug already exists in this workspace" },
+            { status: 409 },
+          );
+        }
+        if ((error as Error).message === "Agent not found") {
+          return NextResponse.json(
+            { error: "Agent not found" },
+            { status: 404 },
+          );
+        }
+        if (
+          error instanceof Error &&
+          error.message === "Only the creator or an admin can update this agent"
+        ) {
+          return NextResponse.json({ error: error.message }, { status: 403 });
+        }
+        if (
+          error instanceof Error &&
+          [
+            "Provider not found",
+            "Model not found",
+            "Model requires a provider",
+            "Tool not found",
+            "Custom tool not found",
+            "MCP tool not found",
+            "Knowledge base not found",
+            "Share target user not found",
+            "Share target user is required",
+          ].includes(error.message)
+        ) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        return NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 },
+        );
       },
-      version,
-    });
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      return NextResponse.json(
-        { error: "Agent slug already exists in this workspace" },
-        { status: 409 },
-      );
-    }
-    if ((error as Error).message === "Agent not found") {
-      return NextResponse.json({ error: "Agent not found" }, { status: 404 });
-    }
-    if (
-      error instanceof Error &&
-      error.message === "Only the creator or an admin can update this agent"
-    ) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
-    }
-    if (
-      error instanceof Error &&
-      [
-        "Provider not found",
-        "Model not found",
-        "Model requires a provider",
-        "Tool not found",
-        "Custom tool not found",
-        "MCP tool not found",
-        "Knowledge base not found",
-        "Share target user not found",
-        "Share target user is required",
-      ].includes(error.message)
-    ) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    logHandledError("Failed to update agent", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+    },
+  );
 }
 
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsedParams = routeParamsSchema.safeParse(await params);
-    const { searchParams } = new URL(req.url);
-    const parsedQuery = workspaceQuerySchema.safeParse({
-      workspaceId: searchParams.get("workspaceId"),
-    });
-
-    if (!parsedParams.success || !parsedQuery.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
-
-    const { agentId } = parsedParams.data;
-    const { workspaceId } = parsedQuery.data;
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "agents.delete",
-      "workspace",
-      workspaceId,
-    );
-
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsedParams = routeParamsSchema.safeParse(await params);
+      const { searchParams } = new URL(req.url);
+      const parsedQuery = workspaceQuerySchema.safeParse({
+        workspaceId: searchParams.get("workspaceId"),
+      });
+      if (!parsedParams.success || !parsedQuery.success) {
+        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      }
+      const { agentId } = parsedParams.data;
+      const { workspaceId } = parsedQuery.data;
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        workspaceId,
+        "agents.delete",
       );
-    }
-
-    await archiveAgent(
-      agentId,
-      workspaceId,
-      session.user.id,
-      isAdminRole(session.user.role),
-    );
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    if ((error as Error).message === "Agent not found") {
-      return NextResponse.json({ error: "Agent not found" }, { status: 404 });
-    }
-    if (
-      (error as Error).message ===
-      "Only the creator or an admin can delete this agent"
-    ) {
-      return NextResponse.json(
-        { error: (error as Error).message },
-        { status: 403 },
+      if (forbidden) return forbidden;
+      await archiveAgent(
+        agentId,
+        workspaceId,
+        session.user.id,
+        isAdminRole(session.user.role),
       );
-    }
-
-    logHandledError("Failed to archive agent", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+      return NextResponse.json({ ok: true });
+    },
+    {
+      logLabel: "Failed to archive agent",
+      expectedError: (error) => {
+        if ((error as Error).message === "Agent not found") {
+          return NextResponse.json(
+            { error: "Agent not found" },
+            { status: 404 },
+          );
+        }
+        if (
+          (error as Error).message ===
+          "Only the creator or an admin can delete this agent"
+        ) {
+          return NextResponse.json(
+            { error: (error as Error).message },
+            { status: 403 },
+          );
+        }
+        return NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 },
+        );
+      },
+    },
+  );
 }

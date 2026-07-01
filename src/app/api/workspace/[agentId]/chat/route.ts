@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { after, NextRequest, NextResponse } from "next/server";
 import { fallbackSystemPrompt } from "@/lib/copy-defaults";
 import { encryptValue } from "@/lib/crypto";
-import { logHandledError, logHandledWarning } from "@/lib/logger";
+import { logHandledWarning } from "@/lib/logger";
+import { requireWorkspacePermissionAsync } from "@/lib/route-handler";
 import {
   getActorUserId,
   resolveAuthContext,
@@ -37,7 +38,6 @@ import { searchBoundKnowledgeBases } from "@/modules/knowledge/use-cases";
 import { buildSkillsRegistryPrompt } from "@/modules/skills/use-cases";
 import { assertWorkspaceWithinTokenQuota } from "@/modules/usage/quota";
 import type { AiHubToolApprovalPolicy } from "@/modules/tool/approval-policy";
-import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
 import {
   agents,
@@ -124,19 +124,12 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: actorUserId },
-      "agents.chat",
-      "workspace",
+    const forbidden = await requireWorkspacePermissionAsync(
+      actorUserId,
       agent.workspaceId,
+      "agents.chat",
     );
-
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
-      );
-    }
+    if (forbidden) return forbidden;
 
     const quota = await assertWorkspaceWithinTokenQuota(agent.workspaceId);
     if (!quota.allowed) {
@@ -888,7 +881,7 @@ export async function POST(
             .where(eq(messages.id, assistantMessage.id));
           enqueueEvent({ type: "done", stopped: true });
         } else {
-          logHandledError("Chat stream failed", {}, error as Error);
+          // Chat stream failed — message already marked failed below
           await db
             .update(messages)
             .set({ status: "failed", completedAt: new Date() })
@@ -924,7 +917,7 @@ export async function POST(
       ? createChatUIMessageStreamResponse(assistantMessage.id, streamHeaders)
       : createChatStreamResponse(assistantMessage.id, streamHeaders);
   } catch (error) {
-    logHandledError("Chat request failed", {}, error as Error);
+    // Chat request failed — messages marked failed below
 
     if (assistantMessageId) {
       await db

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/modules/auth/session";
+import { eq, inArray } from "drizzle-orm";
+import { z } from "zod";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import {
   canEditAgent,
   createAgent,
@@ -15,9 +20,6 @@ import {
   workspaces,
 } from "@/server/infrastructure/db/schema";
 import { authorization } from "@/server/domain/services/authorization";
-import { eq, inArray } from "drizzle-orm";
-import { z } from "zod";
-import { logHandledError } from "@/lib/logger";
 
 const slugSchema = z
   .string()
@@ -134,208 +136,180 @@ async function getModelMetaByVersionId(
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const parsed = createAgentSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid input", details: parsed.error.issues },
-        { status: 400 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const body = await req.json();
+      const parsed = createAgentSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Invalid input", details: parsed.error.issues },
+          { status: 400 },
+        );
+      }
+      const { workspaceId, ...input } = parsed.data;
+      const [workspace] = await db
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.id, workspaceId))
+        .limit(1);
+      if (!workspace) {
+        return NextResponse.json(
+          { error: "Workspace not found" },
+          { status: 404 },
+        );
+      }
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        workspaceId,
+        "agents.create",
       );
-    }
-
-    const { workspaceId, ...input } = parsed.data;
-
-    // Verify workspace membership
-    const [workspace] = await db
-      .select()
-      .from(workspaces)
-      .where(eq(workspaces.id, workspaceId))
-      .limit(1);
-
-    if (!workspace) {
-      return NextResponse.json(
-        { error: "Workspace not found" },
-        { status: 404 },
-      );
-    }
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "agents.create",
-      "workspace",
-      workspaceId,
-    );
-
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
-      );
-    }
-
-    const result = await createAgent({
-      workspaceId,
-      userId: session.user.id,
-      canAdminCurate: isAdminRole(session.user.role),
-      ...input,
-    });
-
-    return NextResponse.json(result, { status: 201 });
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      return NextResponse.json(
-        { error: "Agent slug already exists in this workspace" },
-        { status: 409 },
-      );
-    }
-    if (
-      error instanceof Error &&
-      [
-        "Provider not found",
-        "Model not found",
-        "Model requires a provider",
-        "Tool not found",
-        "Custom tool not found",
-        "MCP tool not found",
-        "Knowledge base not found",
-        "Share target user not found",
-        "Share target user is required",
-      ].includes(error.message)
-    ) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    logHandledError("Failed to create agent", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+      if (forbidden) return forbidden;
+      const result = await createAgent({
+        workspaceId,
+        userId: session.user.id,
+        canAdminCurate: isAdminRole(session.user.role),
+        ...input,
+      });
+      return NextResponse.json(result, { status: 201 });
+    },
+    {
+      logLabel: "Failed to create agent",
+      expectedError: (error) => {
+        if (isUniqueConstraintError(error)) {
+          return NextResponse.json(
+            { error: "Agent slug already exists in this workspace" },
+            { status: 409 },
+          );
+        }
+        if (
+          error instanceof Error &&
+          [
+            "Provider not found",
+            "Model not found",
+            "Model requires a provider",
+            "Tool not found",
+            "Custom tool not found",
+            "MCP tool not found",
+            "Knowledge base not found",
+            "Share target user not found",
+            "Share target user is required",
+          ].includes(error.message)
+        ) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        return NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 },
+        );
+      },
+    },
+  );
 }
 
 export async function GET(req: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(req.url);
-    const parsed = listAgentsSchema.safeParse({
-      workspaceId: searchParams.get("workspaceId"),
-      includeModelMeta: searchParams.get("includeModelMeta") === "true",
-    });
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "workspaceId must be a valid UUID" },
-        { status: 400 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const { searchParams } = new URL(req.url);
+      const parsed = listAgentsSchema.safeParse({
+        workspaceId: searchParams.get("workspaceId"),
+        includeModelMeta: searchParams.get("includeModelMeta") === "true",
+      });
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "workspaceId must be a valid UUID" },
+          { status: 400 },
+        );
+      }
+      const { workspaceId, includeModelMeta } = parsed.data;
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        workspaceId,
+        "agents.list",
       );
-    }
-
-    const { workspaceId, includeModelMeta } = parsed.data;
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "agents.list",
-      "workspace",
-      workspaceId,
-    );
-
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
+      if (forbidden) return forbidden;
+      const canAdminCurate = isAdminRole(session.user.role);
+      const permissionContext = {
+        principalType: "user" as const,
+        principalId: session.user.id,
+      };
+      const [
+        canCreateAgent,
+        canUpdateAgents,
+        canManageProviderSettings,
+        canManageModels,
+      ] = await Promise.all([
+        authorization.hasPermission(
+          permissionContext,
+          "agents.create",
+          "workspace",
+          workspaceId,
+        ),
+        authorization.hasPermission(
+          permissionContext,
+          "agents.update",
+          "workspace",
+          workspaceId,
+        ),
+        authorization.hasPermission(
+          permissionContext,
+          "providers.update",
+          "workspace",
+          workspaceId,
+        ),
+        authorization.hasPermission(
+          permissionContext,
+          "models.manage",
+          "workspace",
+          workspaceId,
+        ),
+      ]);
+      const canManageProviders = canManageProviderSettings && canManageModels;
+      const list = await listAgents(
+        workspaceId,
+        session.user.id,
+        canAdminCurate,
       );
-    }
-
-    const canAdminCurate = isAdminRole(session.user.role);
-    const permissionContext = {
-      principalType: "user" as const,
-      principalId: session.user.id,
-    };
-    const [
-      canCreateAgent,
-      canUpdateAgents,
-      canManageProviderSettings,
-      canManageModels,
-    ] = await Promise.all([
-      authorization.hasPermission(
-        permissionContext,
-        "agents.create",
-        "workspace",
+      const defaultPreferences = await getAgentDefaultPreferences(
         workspaceId,
-      ),
-      authorization.hasPermission(
-        permissionContext,
-        "agents.update",
-        "workspace",
-        workspaceId,
-      ),
-      authorization.hasPermission(
-        permissionContext,
-        "providers.update",
-        "workspace",
-        workspaceId,
-      ),
-      authorization.hasPermission(
-        permissionContext,
-        "models.manage",
-        "workspace",
-        workspaceId,
-      ),
-    ]);
-    const canManageProviders = canManageProviderSettings && canManageModels;
-    const list = await listAgents(workspaceId, session.user.id, canAdminCurate);
-    const defaultPreferences = await getAgentDefaultPreferences(
-      workspaceId,
-      session.user.id,
-      new Set(list.map((agent) => agent.id)),
-    );
-    const modelMetaByVersionId = includeModelMeta
-      ? await getModelMetaByVersionId(
-          list.map((agent) => agent.activeVersionId).filter(Boolean),
-        )
-      : new Map<
-          string,
-          { displayName: string | null; logoUrl: string | null }
-        >();
-    const agentsWithAccess = list.map((agent) => ({
-      ...agent,
-      promptSuggestions: normalizePromptSuggestions(
-        agent.promptSuggestionsJson,
-      ),
-      ...(agent.activeVersionId
-        ? {
-            modelDisplayName: modelMetaByVersionId.get(agent.activeVersionId)
-              ?.displayName,
-            modelLogoUrl: modelMetaByVersionId.get(agent.activeVersionId)
-              ?.logoUrl,
-          }
-        : {}),
-      canEdit:
-        canUpdateAgents && canEditAgent(agent, session.user.id, canAdminCurate),
-      canClone: canCreateAgent,
-    }));
-
-    return NextResponse.json({
-      agents: agentsWithAccess,
-      canAdminCurate,
-      canCreateAgent,
-      canManageProviders,
-      ...defaultPreferences,
-    });
-  } catch (error) {
-    logHandledError("Failed to list agents", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+        session.user.id,
+        new Set(list.map((agent) => agent.id)),
+      );
+      const modelMetaByVersionId = includeModelMeta
+        ? await getModelMetaByVersionId(
+            list.map((agent) => agent.activeVersionId).filter(Boolean),
+          )
+        : new Map<
+            string,
+            { displayName: string | null; logoUrl: string | null }
+          >();
+      const agentsWithAccess = list.map((agent) => ({
+        ...agent,
+        promptSuggestions: normalizePromptSuggestions(
+          agent.promptSuggestionsJson,
+        ),
+        ...(agent.activeVersionId
+          ? {
+              modelDisplayName: modelMetaByVersionId.get(agent.activeVersionId)
+                ?.displayName,
+              modelLogoUrl: modelMetaByVersionId.get(agent.activeVersionId)
+                ?.logoUrl,
+            }
+          : {}),
+        canEdit:
+          canUpdateAgents &&
+          canEditAgent(agent, session.user.id, canAdminCurate),
+        canClone: canCreateAgent,
+      }));
+      return NextResponse.json({
+        agents: agentsWithAccess,
+        canAdminCurate,
+        canCreateAgent,
+        canManageProviders,
+        ...defaultPreferences,
+      });
+    },
+    { logLabel: "Failed to list agents" },
+  );
 }

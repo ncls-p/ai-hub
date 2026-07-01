@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { logHandledError } from "@/lib/logger";
-import { getSession } from "@/modules/auth/session";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import { getPublishPreview } from "@/modules/marketplace/use-cases";
-import { authorization } from "@/server/domain/services/authorization";
 
 const schema = z
   .object({
@@ -35,65 +36,60 @@ const schema = z
   );
 
 export async function GET(req: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { searchParams } = new URL(req.url);
-    const parsed = schema.safeParse({
-      workspaceId: searchParams.get("workspaceId"),
-      agentId: searchParams.get("agentId") ?? undefined,
-      skillId: searchParams.get("skillId") ?? undefined,
-      customToolId: searchParams.get("customToolId") ?? undefined,
-      mcpServerId: searchParams.get("mcpServerId") ?? undefined,
-      mcpToolId: searchParams.get("mcpToolId") ?? undefined,
-      itemId: searchParams.get("itemId") ?? undefined,
-      includeSecrets: searchParams.get("includeSecrets") ?? undefined,
-    });
-    if (!parsed.success)
-      return NextResponse.json(
-        { error: "Invalid input", details: parsed.error.issues },
-        { status: 400 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const { searchParams } = new URL(req.url);
+      const parsed = schema.safeParse({
+        workspaceId: searchParams.get("workspaceId"),
+        agentId: searchParams.get("agentId") ?? undefined,
+        skillId: searchParams.get("skillId") ?? undefined,
+        customToolId: searchParams.get("customToolId") ?? undefined,
+        mcpServerId: searchParams.get("mcpServerId") ?? undefined,
+        mcpToolId: searchParams.get("mcpToolId") ?? undefined,
+        itemId: searchParams.get("itemId") ?? undefined,
+        includeSecrets: searchParams.get("includeSecrets") ?? undefined,
+      });
+      if (!parsed.success)
+        return NextResponse.json(
+          { error: "Invalid input", details: parsed.error.issues },
+          { status: 400 },
+        );
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        parsed.data.workspaceId,
+        "marketplaceItems.publish",
       );
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "marketplaceItems.publish",
-      "workspace",
-      parsed.data.workspaceId,
-    );
-    if (!permission.granted)
+      if (forbidden) return forbidden;
       return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
+        await getPublishPreview({
+          workspaceId: parsed.data.workspaceId,
+          userId: session.user.id,
+          agentId: parsed.data.agentId,
+          skillId: parsed.data.skillId,
+          customToolId: parsed.data.customToolId,
+          mcpServerId: parsed.data.mcpServerId,
+          mcpToolId: parsed.data.mcpToolId,
+          itemId: parsed.data.itemId,
+          includeSecrets: parsed.data.includeSecrets,
+        }),
       );
-
-    return NextResponse.json(
-      await getPublishPreview({
-        workspaceId: parsed.data.workspaceId,
-        userId: session.user.id,
-        agentId: parsed.data.agentId,
-        skillId: parsed.data.skillId,
-        customToolId: parsed.data.customToolId,
-        mcpServerId: parsed.data.mcpServerId,
-        mcpToolId: parsed.data.mcpToolId,
-        itemId: parsed.data.itemId,
-        includeSecrets: parsed.data.includeSecrets,
-      }),
-    );
-  } catch (error) {
-    logHandledError("Failed to get publish preview", {}, error as Error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
+    },
+    {
+      logLabel: "Failed to get publish preview",
+      expectedError: (error) => {
+        const message =
+          error instanceof Error ? error.message : "Internal server error";
+        return NextResponse.json(
+          { error: message },
+          {
+            status:
+              error instanceof Error && error.message.includes("not found")
+                ? 404
+                : 500,
+          },
+        );
       },
-      {
-        status:
-          error instanceof Error && error.message.includes("not found")
-            ? 404
-            : 500,
-      },
-    );
-  }
+    },
+  );
 }

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { logHandledError } from "@/lib/logger";
-import { getSession } from "@/modules/auth/session";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import {
   codeWorkspaceArtifact,
   createCodeWorkspaceFromFiles,
   createCodeWorkspaceFromZip,
 } from "@/modules/code-workspace/storage";
-import { authorization } from "@/server/domain/services/authorization";
 
 const uploadSchema = z.object({
   workspaceId: z.uuid(),
@@ -79,168 +80,168 @@ function getUploadedFiles(formData: FormData) {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const contentLength = Number(req.headers.get("content-length") ?? "0");
+      if (contentLength > maxUploadRequestBytes) {
+        return NextResponse.json(
+          { error: "Upload request is too large." },
+          { status: 413 },
+        );
+      }
 
-    const contentLength = Number(req.headers.get("content-length") ?? "0");
-    if (contentLength > maxUploadRequestBytes) {
-      return NextResponse.json(
-        { error: "Upload request is too large." },
-        { status: 413 },
+      const formData = await req.formData();
+      const parsed = uploadSchema.safeParse({
+        workspaceId: formData.get("workspaceId"),
+      });
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      }
+
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        parsed.data.workspaceId,
+        "agents.chat",
       );
-    }
+      if (forbidden) return forbidden;
 
-    const formData = await req.formData();
-    const parsed = uploadSchema.safeParse({
-      workspaceId: formData.get("workspaceId"),
-    });
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
+      const uploadedFiles = getUploadedFiles(formData);
+      if (uploadedFiles.length === 0) {
+        return NextResponse.json(
+          { error: "Upload a ZIP file or HTML/CSS/JS files." },
+          { status: 400 },
+        );
+      }
 
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "agents.chat",
-      "workspace",
-      parsed.data.workspaceId,
-    );
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
+      const zipFiles = uploadedFiles.filter((file) =>
+        file.name.toLowerCase().endsWith(".zip"),
       );
-    }
+      if (zipFiles.length > 0) {
+        if (zipFiles.length !== 1 || uploadedFiles.length !== 1) {
+          return NextResponse.json(
+            {
+              error:
+                "Upload one ZIP file or direct HTML/CSS/JS files, not both.",
+            },
+            { status: 400 },
+          );
+        }
+        const uploadedFile = zipFiles[0];
+        if (uploadedFile.size > 20 * 1024 * 1024) {
+          return NextResponse.json(
+            { error: "ZIP file is too large. Maximum size is 20 MB." },
+            { status: 400 },
+          );
+        }
 
-    const uploadedFiles = getUploadedFiles(formData);
-    if (uploadedFiles.length === 0) {
-      return NextResponse.json(
-        { error: "Upload a ZIP file or HTML/CSS/JS files." },
-        { status: 400 },
+        const metadata = await createCodeWorkspaceFromZip({
+          workspaceId: parsed.data.workspaceId,
+          userId: session.user.id,
+          fileName: uploadedFile.name,
+          buffer: new Uint8Array(await uploadedFile.arrayBuffer()),
+        });
+        const artifact = codeWorkspaceArtifact(
+          metadata,
+          "Uploaded ZIP workspace.",
+        );
+
+        return NextResponse.json({
+          artifact,
+          prompt: uploadPrompt({
+            projectId: metadata.id,
+            title: metadata.title,
+            rootFile: metadata.rootFile,
+            files: metadata.files,
+            source: "zip",
+          }),
+        });
+      }
+
+      if (uploadedFiles.length > maxDirectFiles) {
+        return NextResponse.json(
+          { error: `Too many files. Maximum is ${maxDirectFiles}.` },
+          { status: 400 },
+        );
+      }
+      const unsupportedFile = uploadedFiles.find(
+        (file) => !isDirectCodeFile(file),
       );
-    }
-
-    const zipFiles = uploadedFiles.filter((file) =>
-      file.name.toLowerCase().endsWith(".zip"),
-    );
-    if (zipFiles.length > 0) {
-      if (zipFiles.length !== 1 || uploadedFiles.length !== 1) {
+      if (unsupportedFile) {
+        return NextResponse.json(
+          { error: "Only .zip, .html, .css, and .js uploads are supported." },
+          { status: 400 },
+        );
+      }
+      if (
+        !uploadedFiles.some((file) => /\.html?$/i.test(uploadedFilePath(file)))
+      ) {
+        return NextResponse.json(
+          { error: "Upload at least one HTML file, usually index.html." },
+          { status: 400 },
+        );
+      }
+      const totalDirectBytes = uploadedFiles.reduce(
+        (total, file) => total + file.size,
+        0,
+      );
+      if (totalDirectBytes > maxDirectWorkspaceBytes) {
         return NextResponse.json(
           {
-            error: "Upload one ZIP file or direct HTML/CSS/JS files, not both.",
+            error: "Code workspace files are too large. Maximum size is 50 MB.",
           },
           { status: 400 },
         );
       }
-      const uploadedFile = zipFiles[0];
-      if (uploadedFile.size > 20 * 1024 * 1024) {
+      const oversizedFile = uploadedFiles.find(
+        (file) => file.size > maxDirectFileBytes,
+      );
+      if (oversizedFile) {
         return NextResponse.json(
-          { error: "ZIP file is too large. Maximum size is 20 MB." },
+          {
+            error: `Text file is too large: ${uploadedFilePath(oversizedFile)}`,
+          },
           { status: 400 },
         );
       }
 
-      const metadata = await createCodeWorkspaceFromZip({
+      const artifact = await createCodeWorkspaceFromFiles({
         workspaceId: parsed.data.workspaceId,
         userId: session.user.id,
-        fileName: uploadedFile.name,
-        buffer: new Uint8Array(await uploadedFile.arrayBuffer()),
+        title: directUploadTitle(uploadedFiles),
+        files: await Promise.all(
+          uploadedFiles.map(async (file) => ({
+            path: uploadedFilePath(file),
+            content: await file.text(),
+          })),
+        ),
       });
-      const artifact = codeWorkspaceArtifact(
-        metadata,
-        "Uploaded ZIP workspace.",
-      );
 
       return NextResponse.json({
         artifact,
         prompt: uploadPrompt({
-          projectId: metadata.id,
-          title: metadata.title,
-          rootFile: metadata.rootFile,
-          files: metadata.files,
-          source: "zip",
+          projectId: artifact.projectId,
+          title: artifact.title,
+          rootFile: artifact.rootFile,
+          files: artifact.files,
+          source: "files",
         }),
       });
-    }
-
-    if (uploadedFiles.length > maxDirectFiles) {
-      return NextResponse.json(
-        { error: `Too many files. Maximum is ${maxDirectFiles}.` },
-        { status: 400 },
-      );
-    }
-    const unsupportedFile = uploadedFiles.find(
-      (file) => !isDirectCodeFile(file),
-    );
-    if (unsupportedFile) {
-      return NextResponse.json(
-        { error: "Only .zip, .html, .css, and .js uploads are supported." },
-        { status: 400 },
-      );
-    }
-    if (
-      !uploadedFiles.some((file) => /\.html?$/i.test(uploadedFilePath(file)))
-    ) {
-      return NextResponse.json(
-        { error: "Upload at least one HTML file, usually index.html." },
-        { status: 400 },
-      );
-    }
-    const totalDirectBytes = uploadedFiles.reduce(
-      (total, file) => total + file.size,
-      0,
-    );
-    if (totalDirectBytes > maxDirectWorkspaceBytes) {
-      return NextResponse.json(
-        { error: "Code workspace files are too large. Maximum size is 50 MB." },
-        { status: 400 },
-      );
-    }
-    const oversizedFile = uploadedFiles.find(
-      (file) => file.size > maxDirectFileBytes,
-    );
-    if (oversizedFile) {
-      return NextResponse.json(
-        { error: `Text file is too large: ${uploadedFilePath(oversizedFile)}` },
-        { status: 400 },
-      );
-    }
-
-    const artifact = await createCodeWorkspaceFromFiles({
-      workspaceId: parsed.data.workspaceId,
-      userId: session.user.id,
-      title: directUploadTitle(uploadedFiles),
-      files: await Promise.all(
-        uploadedFiles.map(async (file) => ({
-          path: uploadedFilePath(file),
-          content: await file.text(),
-        })),
-      ),
-    });
-
-    return NextResponse.json({
-      artifact,
-      prompt: uploadPrompt({
-        projectId: artifact.projectId,
-        title: artifact.title,
-        rootFile: artifact.rootFile,
-        files: artifact.files,
-        source: "files",
-      }),
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (
-      /zip|file|path|too large|unsupported|symlink|workspace/i.test(message)
-    ) {
-      return NextResponse.json({ error: message }, { status: 400 });
-    }
-    logHandledError("Failed to upload code workspace", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+    },
+    {
+      logLabel: "Failed to upload code workspace",
+      expectedError: (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        if (
+          /zip|file|path|too large|unsupported|symlink|workspace/i.test(message)
+        ) {
+          return NextResponse.json({ error: message }, { status: 400 });
+        }
+        return NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 },
+        );
+      },
+    },
+  );
 }

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { logHandledError } from "@/lib/logger";
-import { getSession } from "@/modules/auth/session";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import { updateMcpTool } from "@/modules/mcp/use-cases";
-import { authorization } from "@/server/domain/services/authorization";
 
 const updateSchema = z.object({
   workspaceId: z.uuid(),
@@ -15,47 +16,40 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ serverId: string; toolId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsed = updateSchema.safeParse(await req.json());
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid input", details: parsed.error.issues },
-        { status: 400 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsed = updateSchema.safeParse(await req.json());
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Invalid input", details: parsed.error.issues },
+          { status: 400 },
+        );
+      }
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        parsed.data.workspaceId,
+        "mcpServers.manage",
       );
-    }
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "mcpServers.manage",
-      "workspace",
-      parsed.data.workspaceId,
-    );
-    if (!permission.granted) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const { serverId, toolId } = await params;
-    const tool = await updateMcpTool({
-      toolId,
-      serverId,
-      workspaceId: parsed.data.workspaceId,
-      userId: session.user.id,
-      enabled: parsed.data.enabled,
-      requireApproval: parsed.data.requireApproval,
-    });
-    return NextResponse.json(tool);
-  } catch (error) {
-    logHandledError("Failed to update MCP tool", {}, error as Error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
+      if (forbidden) return forbidden;
+      const { serverId, toolId } = await params;
+      const tool = await updateMcpTool({
+        toolId,
+        serverId,
+        workspaceId: parsed.data.workspaceId,
+        userId: session.user.id,
+        enabled: parsed.data.enabled,
+        requireApproval: parsed.data.requireApproval,
+      });
+      return NextResponse.json(tool);
+    },
+    {
+      logLabel: "Failed to update MCP tool",
+      expectedError: (error) => {
+        const msg =
+          error instanceof Error ? error.message : "Internal server error";
+        return NextResponse.json({ error: msg }, { status: 400 });
       },
-      { status: 400 },
-    );
-  }
+    },
+  );
 }

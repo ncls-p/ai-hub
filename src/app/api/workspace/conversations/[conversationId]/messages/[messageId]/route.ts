@@ -1,10 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { encryptValue } from "@/lib/crypto";
-import { logHandledError } from "@/lib/logger";
-import { getSession } from "@/modules/auth/session";
-import { authorization } from "@/server/domain/services/authorization";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import { db } from "@/server/infrastructure/db";
 import {
   conversations,
@@ -37,147 +38,127 @@ async function getAuthorizedConversation(input: {
       ),
     )
     .limit(1);
-
   if (!conversation) return null;
-
-  const permission = await authorization.requirePermission(
-    { principalType: "user", principalId: input.userId },
-    "conversations.viewOwn",
-    "workspace",
+  const permission = await requireWorkspacePermissionAsync(
+    input.userId,
     conversation.workspaceId,
+    "conversations.viewOwn",
   );
-
-  if (!permission.granted) return null;
+  if (permission) return null;
   return conversation;
 }
 
 export async function PATCH(
-  req: Request,
+  req: NextRequest,
   {
     params,
   }: { params: Promise<{ conversationId: string; messageId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsedParams = paramsSchema.safeParse(await params);
-    const parsedBody = updateMessageSchema.safeParse(await req.json());
-    if (!parsedParams.success || !parsedBody.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
-
-    const { conversationId, messageId } = parsedParams.data;
-    const conversation = await getAuthorizedConversation({
-      conversationId,
-      userId: session.user.id,
-    });
-    if (!conversation) {
-      return NextResponse.json(
-        { error: "Conversation not found" },
-        { status: 404 },
-      );
-    }
-
-    const [message] = await db
-      .select()
-      .from(messages)
-      .where(
-        and(
-          eq(messages.id, messageId),
-          eq(messages.conversationId, conversation.id),
-        ),
-      )
-      .limit(1);
-
-    if (!message || !["user", "assistant"].includes(message.role)) {
-      return NextResponse.json({ error: "Message not found" }, { status: 404 });
-    }
-
-    await db.delete(messageParts).where(eq(messageParts.messageId, messageId));
-    await db.insert(messageParts).values({
-      messageId,
-      type: "text",
-      contentEncrypted: await encryptValue(parsedBody.data.content),
-      sortOrder: 0,
-    });
-    await db
-      .update(messages)
-      .set({ status: "completed", completedAt: new Date() })
-      .where(eq(messages.id, messageId));
-    await db
-      .update(conversations)
-      .set({ updatedAt: new Date() })
-      .where(eq(conversations.id, conversation.id));
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    logHandledError("Failed to update message", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsedParams = paramsSchema.safeParse(await params);
+      const parsedBody = updateMessageSchema.safeParse(await req.json());
+      if (!parsedParams.success || !parsedBody.success) {
+        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      }
+      const { conversationId, messageId } = parsedParams.data;
+      const conversation = await getAuthorizedConversation({
+        conversationId,
+        userId: session.user.id,
+      });
+      if (!conversation) {
+        return NextResponse.json(
+          { error: "Conversation not found" },
+          { status: 404 },
+        );
+      }
+      const [message] = await db
+        .select()
+        .from(messages)
+        .where(
+          and(
+            eq(messages.id, messageId),
+            eq(messages.conversationId, conversation.id),
+          ),
+        )
+        .limit(1);
+      if (!message || !["user", "assistant"].includes(message.role)) {
+        return NextResponse.json(
+          { error: "Message not found" },
+          { status: 404 },
+        );
+      }
+      await db
+        .delete(messageParts)
+        .where(eq(messageParts.messageId, messageId));
+      await db.insert(messageParts).values({
+        messageId,
+        type: "text",
+        contentEncrypted: await encryptValue(parsedBody.data.content),
+        sortOrder: 0,
+      });
+      await db
+        .update(messages)
+        .set({ status: "completed", completedAt: new Date() })
+        .where(eq(messages.id, messageId));
+      await db
+        .update(conversations)
+        .set({ updatedAt: new Date() })
+        .where(eq(conversations.id, conversation.id));
+      return NextResponse.json({ ok: true });
+    },
+    { logLabel: "Failed to update message" },
+  );
 }
 
 export async function DELETE(
-  _req: Request,
+  req: NextRequest,
   {
     params,
   }: { params: Promise<{ conversationId: string; messageId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsed = paramsSchema.safeParse(await params);
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
-
-    const { conversationId, messageId } = parsed.data;
-    const conversation = await getAuthorizedConversation({
-      conversationId,
-      userId: session.user.id,
-    });
-    if (!conversation) {
-      return NextResponse.json(
-        { error: "Conversation not found" },
-        { status: 404 },
-      );
-    }
-
-    const [message] = await db
-      .select({ id: messages.id })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.id, messageId),
-          eq(messages.conversationId, conversation.id),
-        ),
-      )
-      .limit(1);
-
-    if (!message) {
-      return NextResponse.json({ error: "Message not found" }, { status: 404 });
-    }
-
-    await db.delete(messages).where(eq(messages.id, messageId));
-    await db
-      .update(conversations)
-      .set({ updatedAt: new Date() })
-      .where(eq(conversations.id, conversation.id));
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    logHandledError("Failed to delete message", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsed = paramsSchema.safeParse(await params);
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      }
+      const { conversationId, messageId } = parsed.data;
+      const conversation = await getAuthorizedConversation({
+        conversationId,
+        userId: session.user.id,
+      });
+      if (!conversation) {
+        return NextResponse.json(
+          { error: "Conversation not found" },
+          { status: 404 },
+        );
+      }
+      const [message] = await db
+        .select({ id: messages.id })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.id, messageId),
+            eq(messages.conversationId, conversation.id),
+          ),
+        )
+        .limit(1);
+      if (!message) {
+        return NextResponse.json(
+          { error: "Message not found" },
+          { status: 404 },
+        );
+      }
+      await db.delete(messages).where(eq(messages.id, messageId));
+      await db
+        .update(conversations)
+        .set({ updatedAt: new Date() })
+        .where(eq(conversations.id, conversation.id));
+      return NextResponse.json({ ok: true });
+    },
+    { logLabel: "Failed to delete message" },
+  );
 }

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { logHandledError } from "@/lib/logger";
-import { getSession } from "@/modules/auth/session";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import {
   archiveProvider,
   getProviderById,
   toSafeProvider,
   updateProvider,
 } from "@/modules/provider/use-cases";
-import { authorization } from "@/server/domain/services/authorization";
 
 const routeParamsSchema = z.object({
   providerId: z.uuid(),
@@ -33,180 +34,139 @@ async function requireProviderPermission(
   workspaceId: string,
   permissionName: string,
 ) {
-  return authorization.requirePermission(
-    { principalType: "user", principalId: userId },
-    permissionName,
-    "workspace",
-    workspaceId,
-  );
+  return requireWorkspacePermissionAsync(userId, workspaceId, permissionName);
 }
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ providerId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsedParams = routeParamsSchema.safeParse(await params);
-    const { searchParams } = new URL(req.url);
-    const parsedQuery = workspaceQuerySchema.safeParse({
-      workspaceId: searchParams.get("workspaceId"),
-    });
-
-    if (!parsedParams.success || !parsedQuery.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
-
-    const { providerId } = parsedParams.data;
-    const { workspaceId } = parsedQuery.data;
-
-    const permission = await requireProviderPermission(
-      session.user.id,
-      workspaceId,
-      "providers.viewMetadata",
-    );
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsedParams = routeParamsSchema.safeParse(await params);
+      const { searchParams } = new URL(req.url);
+      const parsedQuery = workspaceQuerySchema.safeParse({
+        workspaceId: searchParams.get("workspaceId"),
+      });
+      if (!parsedParams.success || !parsedQuery.success) {
+        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      }
+      const { providerId } = parsedParams.data;
+      const { workspaceId } = parsedQuery.data;
+      const forbidden = await requireProviderPermission(
+        session.user.id,
+        workspaceId,
+        "providers.viewMetadata",
       );
-    }
-
-    const provider = await getProviderById(providerId, workspaceId);
-    if (!provider) {
-      return NextResponse.json(
-        { error: "Provider not found" },
-        { status: 404 },
-      );
-    }
-
-    return NextResponse.json(toSafeProvider(provider));
-  } catch (error) {
-    logHandledError("Failed to get provider", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+      if (forbidden) return forbidden;
+      const provider = await getProviderById(providerId, workspaceId);
+      if (!provider) {
+        return NextResponse.json(
+          { error: "Provider not found" },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json(toSafeProvider(provider));
+    },
+    { logLabel: "Failed to get provider" },
+  );
 }
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ providerId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsedParams = routeParamsSchema.safeParse(await params);
-    const body = await req.json();
-    const parsedBody = updateProviderSchema.safeParse(body);
-
-    if (!parsedParams.success || !parsedBody.success) {
-      return NextResponse.json(
-        {
-          error: "Invalid input",
-          details: parsedBody.success ? undefined : parsedBody.error.issues,
-        },
-        { status: 400 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsedParams = routeParamsSchema.safeParse(await params);
+      const body = await req.json();
+      const parsedBody = updateProviderSchema.safeParse(body);
+      if (!parsedParams.success || !parsedBody.success) {
+        return NextResponse.json(
+          {
+            error: "Invalid input",
+            details: parsedBody.success ? undefined : parsedBody.error.issues,
+          },
+          { status: 400 },
+        );
+      }
+      const { providerId } = parsedParams.data;
+      const { workspaceId, ...input } = parsedBody.data;
+      const forbidden = await requireProviderPermission(
+        session.user.id,
+        workspaceId,
+        "providers.update",
       );
-    }
-
-    const { providerId } = parsedParams.data;
-    const { workspaceId, ...input } = parsedBody.data;
-
-    const permission = await requireProviderPermission(
-      session.user.id,
-      workspaceId,
-      "providers.update",
-    );
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
-      );
-    }
-
-    await updateProvider({
-      providerId,
-      workspaceId,
-      userId: session.user.id,
-      ...input,
-    });
-
-    const provider = await getProviderById(providerId, workspaceId);
-    return NextResponse.json(provider ? toSafeProvider(provider) : null);
-  } catch (error) {
-    if ((error as Error).message === "Provider not found") {
-      return NextResponse.json(
-        { error: "Provider not found" },
-        { status: 404 },
-      );
-    }
-
-    logHandledError("Failed to update provider", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+      if (forbidden) return forbidden;
+      await updateProvider({
+        providerId,
+        workspaceId,
+        userId: session.user.id,
+        ...input,
+      });
+      const provider = await getProviderById(providerId, workspaceId);
+      return NextResponse.json(provider ? toSafeProvider(provider) : null);
+    },
+    {
+      logLabel: "Failed to update provider",
+      expectedError: (error) => {
+        if (error instanceof Error && error.message === "Provider not found") {
+          return NextResponse.json(
+            { error: "Provider not found" },
+            { status: 404 },
+          );
+        }
+        return NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 },
+        );
+      },
+    },
+  );
 }
 
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ providerId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsedParams = routeParamsSchema.safeParse(await params);
-    const { searchParams } = new URL(req.url);
-    const parsedQuery = workspaceQuerySchema.safeParse({
-      workspaceId: searchParams.get("workspaceId"),
-    });
-
-    if (!parsedParams.success || !parsedQuery.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
-
-    const { providerId } = parsedParams.data;
-    const { workspaceId } = parsedQuery.data;
-
-    const permission = await requireProviderPermission(
-      session.user.id,
-      workspaceId,
-      "providers.delete",
-    );
-    if (!permission.granted) {
-      return NextResponse.json(
-        { error: "Forbidden", reason: permission.reason },
-        { status: 403 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsedParams = routeParamsSchema.safeParse(await params);
+      const { searchParams } = new URL(req.url);
+      const parsedQuery = workspaceQuerySchema.safeParse({
+        workspaceId: searchParams.get("workspaceId"),
+      });
+      if (!parsedParams.success || !parsedQuery.success) {
+        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      }
+      const { providerId } = parsedParams.data;
+      const { workspaceId } = parsedQuery.data;
+      const forbidden = await requireProviderPermission(
+        session.user.id,
+        workspaceId,
+        "providers.delete",
       );
-    }
-
-    await archiveProvider(providerId, workspaceId, session.user.id);
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    if ((error as Error).message === "Provider not found") {
-      return NextResponse.json(
-        { error: "Provider not found" },
-        { status: 404 },
-      );
-    }
-
-    logHandledError("Failed to delete provider", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+      if (forbidden) return forbidden;
+      await archiveProvider(providerId, workspaceId, session.user.id);
+      return NextResponse.json({ ok: true });
+    },
+    {
+      logLabel: "Failed to delete provider",
+      expectedError: (error) => {
+        if (error instanceof Error && error.message === "Provider not found") {
+          return NextResponse.json(
+            { error: "Provider not found" },
+            { status: 404 },
+          );
+        }
+        return NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 },
+        );
+      },
+    },
+  );
 }

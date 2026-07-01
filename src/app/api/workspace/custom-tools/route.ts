@@ -1,43 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-
-import { logHandledError } from "@/lib/logger";
-import { getSession } from "@/modules/auth/session";
+import { handleRoute, requireWorkspaceMemberAsync } from "@/lib/route-handler";
 import { listCustomTools } from "@/modules/custom-tools/use-cases";
-import { authorization } from "@/server/domain/services/authorization";
 
 const querySchema = z.object({ workspaceId: z.uuid() });
 
 export async function GET(req: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const parsed = querySchema.safeParse({
-      workspaceId: new URL(req.url).searchParams.get("workspaceId"),
-    });
-    if (!parsed.success)
-      return NextResponse.json(
-        { error: "workspaceId must be a valid UUID" },
-        { status: 400 },
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsed = querySchema.safeParse({
+        workspaceId: new URL(req.url).searchParams.get("workspaceId"),
+      });
+      if (!parsed.success)
+        return NextResponse.json(
+          { error: "workspaceId must be a valid UUID" },
+          { status: 400 },
+        );
+
+      const forbidden = await requireWorkspaceMemberAsync(
+        session.user.id,
+        parsed.data.workspaceId,
       );
+      if (forbidden) return forbidden;
 
-    const isMember = await authorization.requireWorkspaceMember(
-      session.user.id,
-      parsed.data.workspaceId,
-    );
-    if (!isMember) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    return NextResponse.json(
-      await listCustomTools(parsed.data.workspaceId, session.user.id),
-    );
-  } catch (error) {
-    logHandledError("Failed to list custom tools", {}, error as Error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
+      return NextResponse.json(
+        await listCustomTools(parsed.data.workspaceId, session.user.id),
+      );
+    },
+    { logLabel: "Failed to list custom tools" },
+  );
 }

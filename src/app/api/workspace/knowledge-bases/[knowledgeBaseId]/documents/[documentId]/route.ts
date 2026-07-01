@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { logHandledError } from "@/lib/logger";
-import { getSession } from "@/modules/auth/session";
+import {
+  handleRoute,
+  requireWorkspacePermissionAsync,
+} from "@/lib/route-handler";
 import { archiveDocument } from "@/modules/knowledge/use-cases";
-import { authorization } from "@/server/domain/services/authorization";
 
 const querySchema = z.object({ workspaceId: z.uuid() });
 
@@ -13,44 +14,37 @@ export async function DELETE(
     params,
   }: { params: Promise<{ knowledgeBaseId: string; documentId: string }> },
 ) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const parsed = querySchema.safeParse({
-      workspaceId: new URL(req.url).searchParams.get("workspaceId"),
-    });
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
-
-    const permission = await authorization.requirePermission(
-      { principalType: "user", principalId: session.user.id },
-      "knowledgeBases.manage",
-      "workspace",
-      parsed.data.workspaceId,
-    );
-    if (!permission.granted) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const { knowledgeBaseId, documentId } = await params;
-    await archiveDocument({
-      documentId,
-      knowledgeBaseId,
-      workspaceId: parsed.data.workspaceId,
-      userId: session.user.id,
-    });
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    logHandledError("Failed to archive document", {}, error as Error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
+  return handleRoute(
+    req,
+    async ({ session }) => {
+      const parsed = querySchema.safeParse({
+        workspaceId: new URL(req.url).searchParams.get("workspaceId"),
+      });
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      }
+      const forbidden = await requireWorkspacePermissionAsync(
+        session.user.id,
+        parsed.data.workspaceId,
+        "knowledgeBases.manage",
+      );
+      if (forbidden) return forbidden;
+      const { knowledgeBaseId, documentId } = await params;
+      await archiveDocument({
+        documentId,
+        knowledgeBaseId,
+        workspaceId: parsed.data.workspaceId,
+        userId: session.user.id,
+      });
+      return NextResponse.json({ ok: true });
+    },
+    {
+      logLabel: "Failed to archive document",
+      expectedError: (error) => {
+        const msg =
+          error instanceof Error ? error.message : "Internal server error";
+        return NextResponse.json({ error: msg }, { status: 400 });
       },
-      { status: 400 },
-    );
-  }
+    },
+  );
 }
