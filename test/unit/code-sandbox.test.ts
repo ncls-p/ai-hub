@@ -1,19 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import http, { type Server } from "node:http";
+import os from "node:os";
+import path from "node:path";
 
-const opensandboxMock = vi.hoisted(() => ({
-	create: vi.fn(),
-	connectionConfig: vi.fn(function ConnectionConfig(
-		this: { options?: unknown },
-		options,
-	) {
-		this.options = options;
-	}),
-}));
-
-vi.mock("@alibaba-group/opensandbox", () => ({
-	ConnectionConfig: opensandboxMock.connectionConfig,
-	Sandbox: { create: opensandboxMock.create },
-}));
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/modules/chat/attachments", () => ({
 	createChatAttachment: vi.fn(async (input: { fileName: string }) => ({
@@ -54,93 +44,132 @@ vi.mock("@/modules/chat/attachments", () => ({
 type ExecuteCodeSandbox =
 	typeof import("@/modules/tool/code-sandbox")["executeCodeSandbox"];
 
-type FakeFile = {
-	path: string;
-	content: string | Buffer;
-	mimeSize?: number;
+type RunnerRequest = {
+	language: "python" | "node" | "bash";
+	code: string;
+	stdin?: string;
+	timeoutMs?: number;
+	files?: Array<{ path: string; contentBase64?: string; content?: string }>;
 };
 
-function fakeSandbox(options: {
-	exitCode?: number | null;
-	stdout?: string;
-	stderr?: string;
-	files?: FakeFile[];
-}) {
-	const writtenFiles = new Map<string, Buffer>();
-	const outputFiles = new Map(
-		(options.files ?? []).map((file) => [
-			file.path,
-			Buffer.isBuffer(file.content)
-				? file.content
-				: Buffer.from(file.content, "utf8"),
-		]),
-	);
-	const sandbox = {
-		files: {
-			createDirectories: vi.fn().mockResolvedValue(undefined),
-			writeFiles: vi.fn().mockImplementation(async (entries) => {
-				for (const entry of entries) {
-					writtenFiles.set(entry.path, Buffer.from(entry.data));
-				}
-			}),
-			listDirectory: vi.fn().mockImplementation(async () =>
-				[...outputFiles.entries()].map(([filePath, bytes]) => ({
-					path: filePath,
-					type: "file",
-					size: bytes.byteLength,
-				})),
-			),
-			readBytes: vi.fn().mockImplementation(async (filePath) => {
-				const bytes = outputFiles.get(filePath);
-				if (!bytes) throw new Error(`Missing fake file: ${filePath}`);
-				return bytes;
-			}),
-		},
-		commands: {
-			run: vi.fn().mockResolvedValue({
-				logs: {
-					stdout: [{ text: options.stdout ?? "" }],
-					stderr: [{ text: options.stderr ?? "" }],
-				},
-				result: [],
-				exitCode: options.exitCode === undefined ? 0 : options.exitCode,
-				complete: { executionTimeMs: 12, timestamp: Date.now() },
-			}),
-		},
-		kill: vi.fn().mockResolvedValue(undefined),
-		close: vi.fn().mockResolvedValue(undefined),
-		writtenFiles,
-	};
-	return sandbox;
+type RunnerResponse = Record<string, unknown>;
+
+type RunnerHandler = (request: RunnerRequest) => RunnerResponse;
+
+let server: Server | undefined;
+let socketDir: string | undefined;
+let socketPath: string | undefined;
+let requests: RunnerRequest[] = [];
+
+const validEnv = {
+	NODE_ENV: "test",
+	BETTER_AUTH_SECRET: "test-secret",
+	BETTER_AUTH_URL: "http://localhost:3000",
+	BETTER_AUTH_TRUSTED_ORIGINS: "http://localhost:3000",
+	DATABASE_URL: "postgres://localhost/test",
+	APP_ENCRYPTION_KEY:
+		"0000000000000000000000000000000000000000000000000000000000000000",
+	OBJECT_STORAGE_BUCKET: "test",
+	OBJECT_STORAGE_ACCESS_KEY_ID: "test",
+	OBJECT_STORAGE_SECRET_ACCESS_KEY: "test",
+};
+
+function listen(server: Server, socketPath: string) {
+	return new Promise<void>((resolve, reject) => {
+		server.once("error", reject);
+		server.listen(socketPath, () => {
+			server.off("error", reject);
+			resolve();
+		});
+	});
+}
+
+function close(server: Server) {
+	return new Promise<void>((resolve) => {
+		server.close(() => resolve());
+	});
+}
+
+async function startFakeRunner(handler: RunnerHandler) {
+	socketDir = mkdtempSync(path.join(os.tmpdir(), "ai-hub-runner-test-"));
+	socketPath = path.join(socketDir, "sandbox.sock");
+	requests = [];
+	server = http.createServer((request, response) => {
+		if (request.method === "GET" && request.url === "/health") {
+			response.writeHead(200, { "Content-Type": "application/json" });
+			response.end(JSON.stringify({ status: "ok" }));
+			return;
+		}
+		if (request.method !== "POST" || request.url !== "/run") {
+			response.writeHead(404, { "Content-Type": "application/json" });
+			response.end(JSON.stringify({ error: "Not found" }));
+			return;
+		}
+		const chunks: Buffer[] = [];
+		request.on("data", (chunk: Buffer) => chunks.push(chunk));
+		request.on("end", () => {
+			const payload = JSON.parse(
+				Buffer.concat(chunks).toString("utf8"),
+			) as RunnerRequest;
+			requests.push(payload);
+			const body = JSON.stringify(handler(payload));
+			response.writeHead(200, {
+				"Content-Type": "application/json",
+				"Content-Length": Buffer.byteLength(body),
+			});
+			response.end(body);
+		});
+	});
+	await listen(server, socketPath);
+	process.env.SANDBOX_RUNNER_SOCKET = socketPath;
+	return socketPath;
 }
 
 async function loadSandboxModule() {
 	vi.resetModules();
+	Object.assign(process.env, validEnv);
 	return import("@/modules/tool/code-sandbox");
 }
 
-describe("OpenSandbox code sandbox", () => {
-	beforeEach(() => {
-		opensandboxMock.create.mockReset();
-		opensandboxMock.connectionConfig.mockClear();
-		process.env.OPENSANDBOX_DOMAIN = "opensandbox-server:8090";
-		process.env.OPENSANDBOX_PROTOCOL = "http";
-		process.env.OPENSANDBOX_API_KEY = "test-opensandbox-key";
-		process.env.OPENSANDBOX_IMAGE = "opensandbox/code-interpreter:v1.1.0";
-		process.env.OPENSANDBOX_USE_SERVER_PROXY = "false";
-	});
+beforeEach(() => {
+	Object.assign(process.env, validEnv);
+	delete process.env.SANDBOX_RUNNER_SOCKET;
+	requests = [];
+});
 
-	it("runs Node.js code through OpenSandbox and returns generated files", async () => {
-		const sandbox = fakeSandbox({
+afterEach(async () => {
+	if (server) await close(server);
+	server = undefined;
+	if (socketDir) rmSync(socketDir, { recursive: true, force: true });
+	socketDir = undefined;
+	socketPath = undefined;
+	delete process.env.SANDBOX_RUNNER_SOCKET;
+	vi.resetModules();
+});
+
+describe("code sandbox runner client", () => {
+	it("runs Node.js code through the sandbox runner and returns generated files", async () => {
+		await startFakeRunner(() => ({
+			ok: true,
+			language: "node",
+			exitCode: 0,
+			signal: null,
+			timedOut: false,
+			durationMs: 12,
 			stdout: "1,4,9\n",
+			stderr: "",
+			truncated: false,
 			files: [
 				{
-					path: "/workspace/result.txt",
-					content: "squares=1,4,9",
+					path: "result.txt",
+					size: 13,
+					mimeType: "text/plain",
+					textPreview: "squares=1,4,9",
+					modified: true,
+					contentBase64: Buffer.from("squares=1,4,9").toString("base64"),
 				},
 			],
-		});
-		opensandboxMock.create.mockResolvedValue(sandbox);
+		}));
 		const { executeCodeSandbox } = await loadSandboxModule();
 
 		const result = await (executeCodeSandbox as ExecuteCodeSandbox)({
@@ -162,31 +191,19 @@ describe("OpenSandbox code sandbox", () => {
 				modified: true,
 			}),
 		);
-		expect(opensandboxMock.connectionConfig).toHaveBeenCalledWith(
-			expect.objectContaining({
-				domain: "opensandbox-server:8090",
-				useServerProxy: false,
-			}),
-		);
-		expect(opensandboxMock.create).toHaveBeenCalledWith(
-			expect.objectContaining({
-				image: "opensandbox/code-interpreter:v1.1.0",
-				metadata: expect.objectContaining({ language: "node" }),
-			}),
-		);
-		expect(sandbox.writtenFiles.has("/workspace/main.mjs")).toBe(true);
-		expect(
-			sandbox.writtenFiles.get("/workspace/data/input.txt")?.toString(),
-		).toBe("hello");
-		expect(sandbox.commands.run).toHaveBeenCalledWith(
-			expect.stringContaining("node --no-warnings main.mjs"),
-			expect.objectContaining({ workingDirectory: "/workspace" }),
-		);
-		expect(sandbox.kill).toHaveBeenCalled();
-		expect(sandbox.close).toHaveBeenCalled();
+		expect(result.files[0]).not.toHaveProperty("contentBase64");
+		expect(requests).toHaveLength(1);
+		expect(requests[0]).toMatchObject({
+			language: "node",
+			timeoutMs: 15_000,
+		});
+		expect(requests[0]?.files?.[0]).toEqual({
+			path: "data/input.txt",
+			contentBase64: Buffer.from("hello").toString("base64"),
+		});
 	});
 
-	it("rejects unsafe input file paths before creating a sandbox", async () => {
+	it("rejects unsafe input file paths before contacting the runner", async () => {
 		const { executeCodeSandbox } = await loadSandboxModule();
 
 		const result = await (executeCodeSandbox as ExecuteCodeSandbox)({
@@ -197,11 +214,17 @@ describe("OpenSandbox code sandbox", () => {
 
 		expect(result.ok).toBe(false);
 		expect(result.error).toMatch(/Path traversal/i);
-		expect(opensandboxMock.create).not.toHaveBeenCalled();
+		expect(requests).toHaveLength(0);
 	});
 
-	it("returns an actionable error when OpenSandbox is unavailable", async () => {
-		opensandboxMock.create.mockRejectedValue(new Error("connect ECONNREFUSED"));
+	it("returns an actionable error when the sandbox runner is unavailable", async () => {
+		const missingSocketDir = mkdtempSync(
+			path.join(os.tmpdir(), "ai-hub-missing-runner-"),
+		);
+		process.env.SANDBOX_RUNNER_SOCKET = path.join(
+			missingSocketDir,
+			"missing.sock",
+		);
 		const { executeCodeSandbox } = await loadSandboxModule();
 
 		const result = await (executeCodeSandbox as ExecuteCodeSandbox)({
@@ -210,22 +233,63 @@ describe("OpenSandbox code sandbox", () => {
 		});
 
 		expect(result.ok).toBe(false);
-		expect(result.stderr).toContain("OpenSandbox unavailable");
-		expect(result.stderr).toContain(
-			"docker compose -f docker-compose.dev.yml up -d opensandbox-server",
-		);
+		expect(result.stderr).toContain("Sandbox runner unavailable");
+		expect(result.stderr).toContain("missing.sock");
+		rmSync(missingSocketDir, { recursive: true, force: true });
 	});
 
 	it("runs Python with stdin, base64 files, attachment text, and persisted outputs", async () => {
-		const sandbox = fakeSandbox({
-			stdout: "py ok\n",
-			files: [
-				{ path: "/workspace/report.txt", content: "generated report" },
-				{ path: "/workspace/data.bin", content: Buffer.from("bin") },
-				{ path: "/workspace/home/ignored.txt", content: "ignore" },
-			],
+		await startFakeRunner((request) => {
+			expect(request.stdin).toBe("hello stdin");
+			expect(request.timeoutMs).toBe(120_000);
+			expect(request.files).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						path: "data.bin",
+						contentBase64: Buffer.from("bin").toString("base64"),
+					}),
+					expect.objectContaining({
+						path: "attachments/Source File.txt",
+						contentBase64: Buffer.from("input").toString("base64"),
+					}),
+					expect.objectContaining({
+						path: "attachments/Source File.extracted.txt",
+						contentBase64: Buffer.from("extracted text").toString("base64"),
+					}),
+				]),
+			);
+			return {
+				ok: true,
+				language: "python",
+				exitCode: 0,
+				signal: null,
+				timedOut: false,
+				durationMs: 42,
+				stdout: "py ok\n",
+				stderr: "",
+				truncated: false,
+				files: [
+					{
+						path: "report.txt",
+						size: 16,
+						mimeType: "text/plain",
+						textPreview: "generated report",
+						modified: true,
+						contentBase64: Buffer.from("generated report").toString(
+							"base64",
+						),
+					},
+					{
+						path: "data.bin",
+						size: 3,
+						mimeType: "application/octet-stream",
+						fromInput: true,
+						modified: false,
+						contentBase64: Buffer.from("bin").toString("base64"),
+					},
+				],
+			};
 		});
-		opensandboxMock.create.mockResolvedValue(sandbox);
 		const { executeCodeSandbox } = await loadSandboxModule();
 
 		const result = await (executeCodeSandbox as ExecuteCodeSandbox)(
@@ -261,35 +325,34 @@ describe("OpenSandbox code sandbox", () => {
 				modified: false,
 			}),
 		);
-		expect(sandbox.writtenFiles.get("/workspace/.stdin")?.toString()).toBe(
-			"hello stdin",
-		);
-		expect(
-			sandbox.writtenFiles
-				.get("/workspace/attachments/Source File.txt")
-				?.toString(),
-		).toBe("input");
-		expect(
-			sandbox.writtenFiles
-				.get("/workspace/attachments/Source File.extracted.txt")
-				?.toString(),
-		).toBe("extracted text");
-		expect(sandbox.commands.run).toHaveBeenCalledWith(
-			expect.stringContaining("python3 -I main.py < .stdin"),
-			expect.objectContaining({ timeoutSeconds: 120 }),
-		);
 	});
 
 	it("reports execution errors, timeouts, binary previews, and oversized collected files", async () => {
-		const sandbox = fakeSandbox({
+		await startFakeRunner(() => ({
+			ok: false,
+			language: "bash",
 			exitCode: null,
+			signal: "SIGKILL",
+			timedOut: true,
+			durationMs: 250,
+			stdout: "",
 			stderr: "execution timed out",
+			truncated: false,
 			files: [
-				{ path: "/workspace/big.txt", content: Buffer.alloc(1_000_001, "a") },
-				{ path: "/workspace/image.bin", content: Buffer.from([0, 1, 2, 3]) },
+				{
+					path: "big.txt",
+					size: 1_000_001,
+					mimeType: "text/plain",
+					skipped: "too_large",
+				},
+				{
+					path: "image.bin",
+					size: 4,
+					mimeType: "application/octet-stream",
+					contentBase64: Buffer.from([0, 1, 2, 3]).toString("base64"),
+				},
 			],
-		});
-		opensandboxMock.create.mockResolvedValue(sandbox);
+		}));
 		const { executeCodeSandbox } = await loadSandboxModule();
 
 		const result = await (executeCodeSandbox as ExecuteCodeSandbox)({
@@ -310,11 +373,8 @@ describe("OpenSandbox code sandbox", () => {
 				mimeType: "application/octet-stream",
 			}),
 		);
-		expect(sandbox.commands.run).toHaveBeenCalledWith(
-			expect.stringContaining(
-				"bash --noprofile --norc -e -u -o pipefail main.sh",
-			),
-			expect.any(Object),
+		expect(result.files.find((file) => file.path === "image.bin")).not.toHaveProperty(
+			"contentBase64",
 		);
 	});
 
@@ -375,6 +435,6 @@ describe("OpenSandbox code sandbox", () => {
 			ok: false,
 			error: "Sandbox attachment access requires a workspace context.",
 		});
-		expect(opensandboxMock.create).not.toHaveBeenCalled();
+		expect(requests).toHaveLength(0);
 	});
 });

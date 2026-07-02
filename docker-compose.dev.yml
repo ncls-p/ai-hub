@@ -95,25 +95,42 @@ services:
       SEARXNG_BASE_URL: http://localhost:${AI_HUB_DEV_SEARXNG_PORT:-18088}/
     restart: unless-stopped
 
-  opensandbox-server:
-    image: opensandbox/server:latest
+  sandbox-runner:
+    build:
+      context: .
+      target: sandbox-runner
+    image: ${AI_HUB_SANDBOX_IMAGE:-ai-hub-sandbox-runner:local}
     restart: unless-stopped
-    ports:
-      - "${AI_HUB_DEV_OPENSANDBOX_PORT:-18090}:8090"
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=128m,mode=1777
+      - /sandbox-runs:rw,nosuid,nodev,size=512m,exec,mode=700
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./opensandbox/config.dev.toml:/etc/opensandbox/config.toml:ro
-      - opensandbox-dev-data:/root/.opensandbox
+      - ./.data/sandbox-runner:/run/sandbox
     environment:
-      SANDBOX_CONFIG_PATH: /etc/opensandbox/config.toml
-      OPENSANDBOX_SERVER_API_KEY: ${OPENSANDBOX_API_KEY:-ai-hub-dev-opensandbox-key}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      SANDBOX_RUNNER_SOCKET: /run/sandbox/sandbox.sock
+      SANDBOX_RUN_ROOT: /sandbox-runs
+      SANDBOX_DEFAULT_TIMEOUT_MS: 15000
+      SANDBOX_MAX_TIMEOUT_MS: 120000
+      SANDBOX_SOCKET_GID: ${SANDBOX_SOCKET_GID:-1000}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - KILL
+    pids_limit: 128
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          'python -c "import urllib.request; urllib.request.urlopen(''http://127.0.0.1:8090/health'', timeout=3).read()"',
+          "node -e \"const http=require('http');const req=http.request({socketPath:process.env.SANDBOX_RUNNER_SOCKET||'/run/sandbox/sandbox.sock',path:'/health'},res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));req.end();\"",
         ]
       interval: 30s
       timeout: 5s
@@ -123,5 +140,4 @@ services:
 volumes:
   postgres-dev-data:
   dragonfly-dev-data:
-  opensandbox-dev-data:
   rustfs-dev-data:

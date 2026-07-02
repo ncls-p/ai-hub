@@ -55,6 +55,74 @@ RUN apt-get update \
   && npm install --global "npm@${NPM_VERSION}" --no-audit --no-fund \
   && test "$(npm --version)" = "${NPM_VERSION}"
 
+FROM node:22-bookworm-slim AS sandbox-runner
+
+ARG NPM_VERSION=11.18.0
+
+WORKDIR /opt/sandbox
+
+ENV NODE_ENV=production \
+    SANDBOX_RUNNER_SOCKET=/run/sandbox/sandbox.sock \
+    SANDBOX_RUN_ROOT=/sandbox-runs \
+    SANDBOX_RUN_UID=10001 \
+    SANDBOX_RUN_GID=10001 \
+    SANDBOX_SOCKET_GID=1001 \
+    SANDBOX_DEFAULT_TIMEOUT_MS=15000 \
+    SANDBOX_MAX_TIMEOUT_MS=120000 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    NEXT_TELEMETRY_DISABLED=1
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    coreutils \
+    curl \
+    file \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
+    libmagic1 \
+    libxml2 \
+    libxslt1.1 \
+    procps \
+    python3 \
+    python3-pip \
+    python3-setuptools \
+    python3-wheel \
+    util-linux \
+  && rm -rf /var/lib/apt/lists/* \
+  && npm install --global "npm@${NPM_VERSION}" --no-audit --no-fund \
+  && test "$(npm --version)" = "${NPM_VERSION}" \
+  && groupadd --system --gid 10001 sandbox \
+  && useradd --system --uid 10001 --gid sandbox --home-dir /nonexistent --shell /usr/sbin/nologin sandbox
+
+COPY sandbox-runner/python-requirements.txt /tmp/sandbox-python-requirements.txt
+RUN python3 -m pip install --break-system-packages --no-cache-dir --prefer-binary \
+    -r /tmp/sandbox-python-requirements.txt \
+  && rm -f /tmp/sandbox-python-requirements.txt
+
+COPY sandbox-runner/node-packages.txt /tmp/sandbox-node-packages.txt
+RUN npm init -y \
+  && sed '/^[[:space:]]*#/d;/^[[:space:]]*$/d' /tmp/sandbox-node-packages.txt \
+    | xargs npm install --omit=dev --no-audit --no-fund \
+  && rm -f /tmp/sandbox-node-packages.txt \
+  && npm cache clean --force
+
+COPY scripts/sandbox-runner.mjs /opt/sandbox/sandbox-runner.mjs
+
+RUN chmod 0755 /opt/sandbox/sandbox-runner.mjs \
+  && mkdir -p /run/sandbox /sandbox-runs \
+  && chown root:1001 /run/sandbox \
+  && chmod 0770 /run/sandbox \
+  && chown sandbox:sandbox /sandbox-runs \
+  && chmod 0700 /sandbox-runs
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "const http=require('http');const req=http.request({socketPath:process.env.SANDBOX_RUNNER_SOCKET||'/run/sandbox/sandbox.sock',path:'/health'},res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));req.end();"
+
+CMD ["node", "/opt/sandbox/sandbox-runner.mjs"]
+
 FROM base AS deps
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci --no-audit --no-fund

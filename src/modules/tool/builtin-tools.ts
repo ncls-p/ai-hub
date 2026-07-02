@@ -234,7 +234,7 @@ export const builtInTools = [
     name: "run_code_sandbox",
     displayName: "Code sandbox",
     description:
-      "Run Python, Node.js, or Bash in a wiped sandbox with internet access, broad data/science/office/media libraries, and safe uploaded-document access.",
+      "Run Python, Node.js, or Bash in a wiped sandbox with broad data/science/document libraries and safe uploaded-document access.",
     riskLevel: "high",
     category: "Code",
     inputSchema: codeSandboxInputSchema,

@@ -342,7 +342,7 @@ jobs:
           fi
 
           sandbox_changed=false
-          if changes_match '^(opensandbox/|scripts/build-opensandbox-image\.sh$)'; then
+          if changes_match '^(Dockerfile$|sandbox-runner/|scripts/sandbox-runner\.mjs$|scripts/build-sandbox-runner-image\.sh$)'; then
             sandbox_changed=true
           fi
 
@@ -556,7 +556,7 @@ jobs:
           PY
 
   build_sandbox_image:
-    name: Build OpenSandbox image
+    name: Build sandbox runner image
     runs-on: ubuntu-latest
     needs: plan_images
     permissions:
@@ -580,7 +580,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push OpenSandbox code image
+      - name: Build and push sandbox runner image
         env:
           SANDBOX_IMAGE: ${{ needs.plan_images.outputs.sandbox_image }}
           SANDBOX_LATEST: ${{ needs.plan_images.outputs.sandbox_latest }}
@@ -592,13 +592,13 @@ jobs:
           fi
           docker buildx build \
             --platform linux/amd64 \
-            --file opensandbox/Dockerfile.code-interpreter \
+            --target sandbox-runner \
             --tag "${SANDBOX_IMAGE}" \
             "${latest_tag_args[@]}" \
-            --cache-from type=gha,scope=ai-hub-sandbox \
-            --cache-to type=gha,mode=max,scope=ai-hub-sandbox \
+            --cache-from type=gha,scope=ai-hub-sandbox-runner \
+            --cache-to type=gha,mode=max,scope=ai-hub-sandbox-runner \
             --push \
-            opensandbox
+            .
 
   deploy:
     name: Deploy to Coolify
@@ -639,9 +639,6 @@ jobs:
           AI_HUB_MIGRATOR_IMAGE: ${{ needs.plan_images.outputs.migrator_image }}
           AI_HUB_SEARXNG_IMAGE: ${{ needs.plan_images.outputs.searxng_image }}
           AI_HUB_SANDBOX_IMAGE: ${{ needs.plan_images.outputs.sandbox_image }}
-          OPENSANDBOX_API_KEY: ${{ secrets.OPENSANDBOX_API_KEY }}
-          OPENSANDBOX_IMAGE: ${{ needs.plan_images.outputs.sandbox_image }}
-          OPENSANDBOX_USE_SERVER_PROXY: ${{ vars.OPENSANDBOX_USE_SERVER_PROXY || 'false' }}
           TARGET_ENV_NAME: ${{ needs.prepare.outputs.target_env_name }}
           AI_HUB_PUBLIC_HOST: ${{ needs.prepare.outputs.public_host }}
           AI_HUB_PUBLIC_URL: ${{ needs.prepare.outputs.public_url }}
@@ -748,16 +745,6 @@ jobs:
                 | awk '{print $1}'
             )"
           fi
-          OPENSANDBOX_IMAGE="${OPENSANDBOX_IMAGE:-$AI_HUB_SANDBOX_IMAGE}"
-          OPENSANDBOX_USE_SERVER_PROXY="${OPENSANDBOX_USE_SERVER_PROXY:-false}"
-          if [[ -z "${OPENSANDBOX_API_KEY:-}" ]]; then
-            OPENSANDBOX_API_KEY="$(
-              printf '%s:%s:%s' "${APP_ENCRYPTION_KEY}" "${COOLIFY_SERVICE_NAME}" "opensandbox" \
-                | sha256sum \
-                | awk '{print $1}'
-            )"
-          fi
-          validate_secret_length OPENSANDBOX_API_KEY "${OPENSANDBOX_API_KEY}" 32
           BETTER_AUTH_URL="${AI_HUB_PUBLIC_URL}"
           BETTER_AUTH_TRUSTED_ORIGINS="${AI_HUB_PUBLIC_URL}"
 
@@ -915,9 +902,6 @@ jobs:
               --arg code_workspace_storage_prefix "${CODE_WORKSPACE_STORAGE_PREFIX}" \
               --arg searxng_secret "${SEARXNG_SECRET}" \
               --arg searxng_settings_revision "${SEARXNG_SETTINGS_REVISION:-local}" \
-              --arg opensandbox_api_key "${OPENSANDBOX_API_KEY}" \
-              --arg opensandbox_image "${OPENSANDBOX_IMAGE}" \
-              --arg opensandbox_use_server_proxy "${OPENSANDBOX_USE_SERVER_PROXY}" \
               --arg allow_personal_workspaces "${ALLOW_PERSONAL_WORKSPACES}" \
               --arg workspace_monthly_token_limit "${WORKSPACE_MONTHLY_TOKEN_LIMIT}" \
               --argjson is_preview "${IS_PREVIEW}" \
@@ -940,9 +924,6 @@ jobs:
                 {key: "CODE_WORKSPACE_STORAGE_PREFIX", value: $code_workspace_storage_prefix},
                 {key: "SEARXNG_SECRET", value: $searxng_secret},
                 {key: "SEARXNG_SETTINGS_REVISION", value: $searxng_settings_revision},
-                {key: "OPENSANDBOX_API_KEY", value: $opensandbox_api_key},
-                {key: "OPENSANDBOX_IMAGE", value: $opensandbox_image},
-                {key: "OPENSANDBOX_USE_SERVER_PROXY", value: $opensandbox_use_server_proxy},
                 {key: "ALLOW_PERSONAL_WORKSPACES", value: $allow_personal_workspaces},
                 {key: "WORKSPACE_MONTHLY_TOKEN_LIMIT", value: $workspace_monthly_token_limit}
               ] | map(. + {is_preview: $is_preview, is_literal: true, is_multiline: false, is_shown_once: false}))}'
@@ -951,10 +932,10 @@ jobs:
 
           echo "Using Coolify service UUID ${SERVICE_UUID}"
           echo "Using SearXNG image ${AI_HUB_SEARXNG_IMAGE}"
-          echo "Using OpenSandbox image ${OPENSANDBOX_IMAGE}"
+          echo "Using sandbox runner image ${AI_HUB_SANDBOX_IMAGE}"
           api GET "/deploy?uuid=${SERVICE_UUID}&force=true" >/dev/null
 
-          long_running='["app", "worker", "rustfs", "dragonflydb", "searxng", "opensandbox-server"]'
+          long_running='["app", "worker", "rustfs", "dragonflydb", "searxng", "sandbox-runner"]'
           success=false
           for attempt in $(seq 1 60); do
             STATUS_JSON="$(api GET "/services/${SERVICE_UUID}")"
@@ -1009,8 +990,7 @@ jobs:
             echo "- Worker image: \`${AI_HUB_WORKER_IMAGE}\`"
             echo "- Migrator image: \`${AI_HUB_MIGRATOR_IMAGE}\`"
             echo "- SearXNG image: \`${AI_HUB_SEARXNG_IMAGE}\`"
-            echo "- OpenSandbox image: \`${OPENSANDBOX_IMAGE}\`"
-            echo "- Built OpenSandbox image: \`${AI_HUB_SANDBOX_IMAGE}\`"
+            echo "- Sandbox runner image: \`${AI_HUB_SANDBOX_IMAGE}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   cleanup_preview:

@@ -26,7 +26,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,md}\"",
     "analyze": "ANALYZE=true next build",
-    "sandbox:build": "bash scripts/build-opensandbox-image.sh",
+    "sandbox:build": "bash scripts/build-sandbox-runner-image.sh",
     "lockfile:check": "node scripts/check-lockfile.mjs"
   },
   "dependencies": {
@@ -34,7 +34,6 @@
     "@ai-sdk/openai-compatible": "^3.0.1",
     "@ai-sdk/policy-opa": "^1.0.4",
     "@ai-sdk/provider": "^4.0.0",
-    "@alibaba-group/opensandbox": "^0.1.9",
     "@aws-sdk/client-s3": "^3.800.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@next/env": "^16.2.6",

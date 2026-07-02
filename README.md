@@ -16,7 +16,7 @@ AI Hub provides a full stack — from authentication and workspace isolation to 
 | **Cache** | DragonflyDB / Redis |
 | **Storage** | S3-compatible (RustFS) |
 | **AI** | AI SDK 7 — `streamText`, tool calling, OPA policy gates |
-| **Sandbox** | OpenSandbox (Docker-isolated code execution) |
+| **Sandbox** | Custom sandbox runner (Unix-socket code execution) |
 | **MCP** | Model Context Protocol client and server registry |
 | **Search** | SearXNG-backed web search tool |
 
@@ -75,7 +75,7 @@ docs/                         Architecture and product plans
 
 - **Node.js** ≥ 22.9.0
 - **npm** (project manager: `npm@11.18.0`)
-- **Docker** + **Docker Compose** (for Postgres, DragonflyDB, RustFS, OpenSandbox)
+- **Docker** + **Docker Compose** (for Postgres, DragonflyDB, RustFS, SearXNG, sandbox runner)
 
 ### Quick start
 
@@ -108,7 +108,7 @@ The dev compose stack starts:
 | PostgreSQL + pgvector | 15432 | Primary database |
 | DragonflyDB | 6379 | Cache layer |
 | RustFS | 13900 | S3-compatible object storage |
-| OpenSandbox | 18090 | Isolated code execution |
+| Sandbox runner | Unix socket (`.data/sandbox-runner/sandbox.sock`) | Isolated code execution |
 | SearXNG | 18088 | Web search |
 
 ### Useful commands
@@ -127,7 +127,7 @@ npm run test:coverage    # Vitest with coverage
 npm run db:generate      # Generate Drizzle migration files
 npm run db:push          # Push schema changes directly (dev only)
 npm run db:studio        # Drizzle GUI
-npm run sandbox:build    # Build the OpenSandbox Docker image
+npm run sandbox:build    # Build the sandbox runner Docker image
 npm run analyze          # Next.js bundle analyzer
 npm run format           # Prettier
 ```
@@ -155,7 +155,7 @@ See `.env.example` for the full reference. Key categories:
 |---|---|
 | `GITHUB_APP_*` | GitHub App credentials for agent publishing |
 | `SEARXNG_URL` | SearXNG endpoint for web search tool |
-| `OPENSANDBOX_*` | Code execution sandbox configuration |
+| `SANDBOX_RUNNER_SOCKET` | Unix socket path for code execution sandbox |
 | `AI_HUB_TOOL_POLICY_OPA_URL` | OPA endpoint for tool approval policies |
 | `WORKSPACE_MONTHLY_TOKEN_LIMIT` | Per-workspace monthly token quota |
 | `ALLOW_PERSONAL_WORKSPACES` | Set to `false` to disable personal workspaces |
@@ -284,9 +284,9 @@ Services started:
 | **rustfs** | `rustfs/rustfs` | internal (`:9000`) |
 | **rustfs-init** | `aws-cli` | one-shot (creates S3 bucket) |
 | **searxng** | `searxng` target | internal (`:8080`) |
-| **opensandbox-server** | `opensandbox/server` | internal (`:8090`) |
+| **sandbox-runner** | `sandbox-runner` target | Unix socket (`/run/sandbox/sandbox.sock`) |
 
-Startup order: `postgres` + `rustfs` + `dragonflydb` → `rustfs-init` + `searxng` + `opensandbox-server` → `migrate` → `app` + `worker`.
+Startup order: `postgres` + `rustfs` + `dragonflydb` → `rustfs-init` + `searxng` + `sandbox-runner` → `migrate` → `app` + `worker`.
 
 All long-running services have health checks. The `app` and `worker` containers won't start until their dependencies are healthy.
 
@@ -301,7 +301,7 @@ Production compose sets soft and hard resource limits per service:
 | **postgres** | 1.0 | 1G | 0.25 | 256M |
 | **dragonflydb** | 1.0 | 1G | 0.25 | 256M |
 | **rustfs** | 1.0 | 1G | 0.25 | 256M |
-| **opensandbox-server** | 1.0 | 1G | 0.10 | 256M |
+| **sandbox-runner** | 1.0 | 2G | 0.10 | 512M |
 
 ### Docker volumes
 
@@ -312,7 +312,7 @@ Production compose uses named volumes for persistent data:
 | `postgres-prod-data` | postgres | Database files |
 | `dragonfly-prod-data` | dragonflydb | Cache persistence |
 | `rustfs-prod-data` | rustfs | Object storage files |
-| `opensandbox-prod-data` | opensandbox-server | Sandbox state |
+| `sandbox-runner-socket` | app / worker / sandbox-runner | Shared Unix socket |
 
 When migrating between Coolify projects, stop the old service, copy volumes to the new ones, then redeploy.
 
@@ -360,7 +360,6 @@ GitHub repository **secrets**:
 | `OBJECT_STORAGE_ACCESS_KEY_ID` | S3 access key |
 | `OBJECT_STORAGE_SECRET_ACCESS_KEY` | S3 secret key (≥ 16 chars) |
 | `SEARXNG_SECRET` | SearXNG secret (≥ 32 chars) |
-| `OPENSANDBOX_API_KEY` | OpenSandbox API key (≥ 32 chars) |
 | `TRAEFIK_BASIC_AUTH_USERS` | PR preview auth (format: `user:hashed_password`) |
 
 GitHub repository **variables**:
@@ -375,7 +374,6 @@ GitHub repository **variables**:
 | `CODE_WORKSPACE_STORAGE_PREFIX` | `code-workspaces` | S3 prefix for code workspaces |
 | `ALLOW_PERSONAL_WORKSPACES` | `true` | Allow personal workspace creation |
 | `WORKSPACE_MONTHLY_TOKEN_LIMIT` | — | Token quota per workspace |
-| `OPENSANDBOX_USE_SERVER_PROXY` | `false` | Enable OpenSandbox proxy routing |
 
 #### Coolify stack
 

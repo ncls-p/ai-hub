@@ -1,8 +1,6 @@
-# Packages installed globally and exposed to /workspace/node_modules by the sandbox runner.
+# Packages installed under /opt/sandbox/node_modules for Node.js sandbox runs.
 typescript
 tsx
-prettier
-eslint@9
 axios
 node-fetch
 cheerio
@@ -30,4 +28,5 @@ marked
 js-yaml
 @xmldom/xmldom
 xml2js
-ytdl-core
+d3
+mathjs

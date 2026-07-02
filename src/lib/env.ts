@@ -37,11 +37,10 @@ export const baseEnvSchema = z.object({
   OBJECT_STORAGE_SECRET_ACCESS_KEY: z.string().min(1),
   OBJECT_STORAGE_FORCE_PATH_STYLE: z.string().default("true"),
   SEARXNG_URL: z.url().default("http://localhost:18088"),
-  OPENSANDBOX_DOMAIN: z.string().min(1).default("localhost:18090"),
-  OPENSANDBOX_PROTOCOL: z.enum(["http", "https"]).default("http"),
-  OPENSANDBOX_API_KEY: z.string().optional(),
-  OPENSANDBOX_IMAGE: z.string().min(1).default("ai-hub/code-interpreter:local"),
-  OPENSANDBOX_USE_SERVER_PROXY: z.string().default("false"),
+  SANDBOX_RUNNER_SOCKET: z
+    .string()
+    .min(1)
+    .default("/run/sandbox/sandbox.sock"),
   ALLOW_PERSONAL_WORKSPACES: z.string().default("true"),
   DATABASE_SSL_REJECT_UNAUTHORIZED: z.string().default("true"),
   WORKSPACE_MONTHLY_TOKEN_LIMIT: z.string().optional(),
@@ -107,11 +106,7 @@ const ENV_DEFAULTS: EnvSource = {
   OBJECT_STORAGE_SECRET_ACCESS_KEY: "",
   OBJECT_STORAGE_FORCE_PATH_STYLE: "true",
   SEARXNG_URL: "http://localhost:18088",
-  OPENSANDBOX_DOMAIN: "localhost:18090",
-  OPENSANDBOX_PROTOCOL: "http",
-  OPENSANDBOX_API_KEY: undefined,
-  OPENSANDBOX_IMAGE: "ai-hub/code-interpreter:local",
-  OPENSANDBOX_USE_SERVER_PROXY: "false",
+  SANDBOX_RUNNER_SOCKET: "/run/sandbox/sandbox.sock",
   ALLOW_PERSONAL_WORKSPACES: "true",
   DATABASE_SSL_REJECT_UNAUTHORIZED: "true",
   WORKSPACE_MONTHLY_TOKEN_LIMIT: undefined,
