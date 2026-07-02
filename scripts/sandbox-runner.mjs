@@ -66,6 +66,21 @@ const maxOutputFileSizeBytes = Number(
 const maxCpuSeconds = Number(process.env.SANDBOX_MAX_CPU_SECONDS ?? 120);
 const canUsePrlimit = process.platform === "linux";
 
+function log(level, message, data = {}) {
+	const payload = {
+		ts: new Date().toISOString(),
+		lvl: level,
+		msg: message,
+		...data,
+	};
+	const line = `${JSON.stringify(payload)}\n`;
+	if (level === "error" || level === "warn") {
+		process.stderr.write(line);
+		return;
+	}
+	process.stdout.write(line);
+}
+
 const textExtensions = new Set([
 	".c",
 	".conf",
@@ -579,11 +594,39 @@ async function start() {
 			jsonResponse(response, 404, { error: "Not found" });
 			return;
 		}
+		const executionId =
+			request.headers["x-sandbox-execution-id"]?.toString() ?? randomUUID();
+		const startedAt = Date.now();
 		try {
 			const input = await readJsonBody(request);
+			log("info", "sandbox-runner execution started", {
+				executionId,
+				language: input.language,
+				fileCount: input.files.length,
+				timeoutMs: input.timeoutMs,
+			});
 			const result = await runSandbox(input);
+			log("info", "sandbox-runner execution completed", {
+				executionId,
+				language: result.language,
+				ok: result.ok,
+				exitCode: result.exitCode,
+				signal: result.signal,
+				timedOut: result.timedOut,
+				durationMs: result.durationMs,
+				wallDurationMs: Date.now() - startedAt,
+				stdoutBytes: Buffer.byteLength(result.stdout),
+				stderrBytes: Buffer.byteLength(result.stderr),
+				fileCount: result.files.length,
+				truncated: result.truncated,
+			});
 			jsonResponse(response, 200, result);
 		} catch (error) {
+			log("warn", "sandbox-runner execution rejected", {
+				executionId,
+				durationMs: Date.now() - startedAt,
+				error: error instanceof Error ? error.message : String(error),
+			});
 			jsonResponse(response, 400, {
 				ok: false,
 				error: error instanceof Error ? error.message : String(error),
@@ -598,7 +641,7 @@ async function start() {
 		} else {
 			await chmod(socketPath, 0o600).catch(() => undefined);
 		}
-		console.log(`sandbox-runner listening on ${socketPath}`);
+		log("info", "sandbox-runner listening", { socketPath, runRoot });
 	});
 
 	for (const signal of ["SIGINT", "SIGTERM"]) {
@@ -611,6 +654,9 @@ async function start() {
 }
 
 start().catch((error) => {
-	console.error(error);
+	log("error", "sandbox-runner failed to start", {
+		error: error instanceof Error ? error.message : String(error),
+		stack: error instanceof Error ? error.stack : undefined,
+	});
 	process.exit(1);
 });

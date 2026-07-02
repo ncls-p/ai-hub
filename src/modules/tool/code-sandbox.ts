@@ -3,6 +3,7 @@ import http from "node:http";
 import path from "node:path";
 
 import { env } from "@/lib/env";
+import { logger, logHandledWarning } from "@/lib/logger";
 import { isPathTraversal } from "@/lib/path-utils";
 import {
 	createChatAttachment,
@@ -500,6 +501,7 @@ async function persistSandboxFiles(
 
 async function runSandboxRunner(
 	input: PreparedSandboxRunnerInput,
+	executionId: string,
 ): Promise<CodeSandboxResult> {
 	const body = serializeSandboxRunnerRequest(input);
 	const socketPath = resolveSandboxRunnerSocket();
@@ -512,6 +514,7 @@ async function runSandboxRunner(
 				headers: {
 					"Content-Type": "application/json",
 					"Content-Length": Buffer.byteLength(body),
+					"X-Sandbox-Execution-Id": executionId,
 				},
 				timeout: requestTimeoutMs(input),
 			},
@@ -592,10 +595,22 @@ export async function executeCodeSandbox(
 	input: CodeSandboxRequest,
 	context?: CodeSandboxExecutionContext,
 ): Promise<CodeSandboxResult> {
+	const executionId = crypto.randomUUID();
+	const startedAt = Date.now();
 	let runnerInput: PreparedSandboxRunnerInput;
 	try {
 		runnerInput = await prepareSandboxRunnerRequest(input, context);
 	} catch (error) {
+		logHandledWarning("Code sandbox input preparation failed", {
+			executionId,
+			language: input.language,
+			workspaceId: context?.workspaceId,
+			userId: context?.userId,
+			fileCount: input.files?.length ?? 0,
+			attachmentCount: input.attachments?.length ?? 0,
+			durationMs: Date.now() - startedAt,
+			error: error instanceof Error ? error.message : String(error),
+		});
 		return failedSandboxResult(
 			input,
 			error instanceof Error
@@ -604,6 +619,32 @@ export async function executeCodeSandbox(
 		);
 	}
 
-	const result = await runSandboxRunner(runnerInput);
-	return persistSandboxFiles(result, context);
+	logger.info("Code sandbox execution started", {
+		executionId,
+		language: runnerInput.language,
+		workspaceId: context?.workspaceId,
+		userId: context?.userId,
+		fileCount: runnerInput.files.length,
+		timeoutMs: clampTimeoutMs(runnerInput.timeoutMs),
+	});
+	const result = await runSandboxRunner(runnerInput, executionId);
+	const persisted = await persistSandboxFiles(result, context);
+	logger.info("Code sandbox execution completed", {
+		executionId,
+		language: persisted.language,
+		workspaceId: context?.workspaceId,
+		userId: context?.userId,
+		ok: persisted.ok,
+		exitCode: persisted.exitCode,
+		signal: persisted.signal,
+		timedOut: persisted.timedOut,
+		durationMs: persisted.durationMs,
+		wallDurationMs: Date.now() - startedAt,
+		stdoutBytes: Buffer.byteLength(persisted.stdout),
+		stderrBytes: Buffer.byteLength(persisted.stderr),
+		fileCount: persisted.files.length,
+		persistedFileCount: persisted.files.filter((file) => file.attachment).length,
+		runcated: persisted.truncated,
+	});
+	return persisted;
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logHandledWarning } from "@/lib/logger";
 import { db } from "@/server/infrastructure/db";
 import { users } from "@/server/infrastructure/db/schema-tables";
 
@@ -12,9 +13,13 @@ export async function GET() {
   try {
     await db.select().from(users).limit(0);
     result.database = "connected";
-  } catch {
+  } catch (error) {
     result.status = "degraded";
     result.database = "disconnected";
+    logHandledWarning("Health check degraded", {
+      database: "disconnected",
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   return NextResponse.json(result, {

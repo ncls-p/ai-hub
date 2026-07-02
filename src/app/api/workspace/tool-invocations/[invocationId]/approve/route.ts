@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { decryptValue, encryptValue } from "@/lib/crypto";
+import { logger, logHandledError } from "@/lib/logger";
 import { getSession } from "@/modules/auth/session";
 import { executeCustomToolWorkflow } from "@/modules/custom-tools/use-cases";
 import { executeMcpTool } from "@/modules/mcp/executor";
@@ -70,17 +71,30 @@ async function executeInvocation(
 }
 
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ invocationId: string }> },
 ) {
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+  const startedAt = Date.now();
   try {
     const session = await getSession();
     if (!session) {
+      logger.warn("Tool invocation approval rejected", {
+        requestId,
+        reason: "no_session",
+        durationMs: Date.now() - startedAt,
+      });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const parsed = invocationParamsSchema.safeParse(await params);
     if (!parsed.success) {
+      logger.warn("Tool invocation approval rejected", {
+        requestId,
+        userId: session.user.id,
+        reason: "invalid_request",
+        durationMs: Date.now() - startedAt,
+      });
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
@@ -101,6 +115,13 @@ export async function POST(
     const invocation = row?.invocation;
 
     if (!invocation) {
+      logger.warn("Tool invocation approval rejected", {
+        requestId,
+        userId: session.user.id,
+        invocationId: parsed.data.invocationId,
+        reason: "not_found",
+        durationMs: Date.now() - startedAt,
+      });
       return NextResponse.json(
         { error: "Invocation not found" },
         { status: 404 },
@@ -120,17 +141,42 @@ export async function POST(
       invocation.workspaceId,
     );
     if (!permissionGranted) {
+      logger.warn("Tool invocation approval rejected", {
+        requestId,
+        userId: session.user.id,
+        invocationId: invocation.id,
+        toolName: invocation.toolName,
+        reason: "missing_permission",
+        durationMs: Date.now() - startedAt,
+      });
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (invocation.status !== "awaiting_approval") {
+      logger.warn("Tool invocation approval rejected", {
+        requestId,
+        userId: session.user.id,
+        invocationId: invocation.id,
+        currentStatus: invocation.status,
+        reason: "not_awaiting_approval",
+        durationMs: Date.now() - startedAt,
+      });
       return NextResponse.json(
         { error: "Invocation is not awaiting approval" },
         { status: 409 },
       );
     }
 
-    const startedAt = Date.now();
+    logger.info("Tool invocation approval started", {
+      requestId,
+      userId: session.user.id,
+      invocationId: invocation.id,
+      toolName: invocation.toolName,
+      toolSource: invocation.toolSource,
+      workspaceId: invocation.workspaceId,
+    });
+
+    const execStartedAt = Date.now();
     const result = await executeInvocation(invocation, session.user.id);
     if (result instanceof NextResponse) return result;
 
@@ -139,7 +185,7 @@ export async function POST(
       .set({
         outputJsonEncrypted: await encryptValue(JSON.stringify(result)),
         status: "success",
-        latencyMs: Date.now() - startedAt,
+        latencyMs: Date.now() - execStartedAt,
         approvedByUserId: session.user.id,
         completedAt: new Date(),
       })
@@ -160,8 +206,24 @@ export async function POST(
       },
     });
 
+    logger.info("Tool invocation approval completed", {
+      requestId,
+      userId: session.user.id,
+      invocationId: invocation.id,
+      toolName: invocation.toolName,
+      toolSource: invocation.toolSource,
+      workspaceId: invocation.workspaceId,
+      latencyMs: Date.now() - execStartedAt,
+      durationMs: Date.now() - startedAt,
+    });
+
     return NextResponse.json({ ok: true, output: result });
-  } catch {
+  } catch (error) {
+    logHandledError(
+      "Tool invocation approval failed",
+      { requestId, durationMs: Date.now() - startedAt },
+      error as Error,
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

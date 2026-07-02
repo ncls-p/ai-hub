@@ -18,6 +18,12 @@ vi.mock("@/server/domain/services/authorization", () => ({
 }));
 
 vi.mock("@/lib/logger", () => ({
+	logger: {
+		info: vi.fn(),
+		warn: vi.fn(),
+		error: vi.fn(),
+		debug: vi.fn(),
+	},
 	logHandledError: vi.fn(),
 }));
 
@@ -40,6 +46,8 @@ import type { NextRequest } from "next/server";
 describe("route-handler – handleRoute", async () => {
 	const { handleRoute } = await import("@/lib/route-handler");
 	const mockReq = {
+		headers: new Headers({ "x-request-id": "test-request-id" }),
+		method: "GET",
 		nextUrl: new URL("http://localhost"),
 	} as unknown as NextRequest;
 
@@ -62,6 +70,7 @@ describe("route-handler – handleRoute", async () => {
 		expect(handler).toHaveBeenCalledWith({
 			session,
 			request: expect.anything(),
+			requestId: "test-request-id",
 		});
 	});
 
@@ -169,6 +178,8 @@ describe("route-handler – requireWorkspaceMemberAsync", async () => {
 describe("route-handler – handleAdminRoute", async () => {
 	const { handleAdminRoute } = await import("@/lib/route-handler");
 	const mockReq = {
+		headers: new Headers({ "x-request-id": "admin-request-id" }),
+		method: "GET",
 		nextUrl: new URL("http://localhost"),
 	} as unknown as NextRequest;
 
@@ -208,6 +219,7 @@ describe("route-handler – handleAdminRoute", async () => {
 		expect(handler).toHaveBeenCalledWith({
 			session,
 			request: expect.anything(),
+			requestId: "admin-request-id",
 		});
 	});
 

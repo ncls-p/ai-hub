@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { after, NextRequest, NextResponse } from "next/server";
 import { fallbackSystemPrompt } from "@/lib/copy-defaults";
 import { encryptValue } from "@/lib/crypto";
-import { logHandledWarning } from "@/lib/logger";
+import { logger, logHandledError, logHandledWarning } from "@/lib/logger";
 import { requireWorkspacePermissionAsync } from "@/lib/route-handler";
 import {
 	getActorUserId,
@@ -72,22 +72,46 @@ export async function POST(
 	req: NextRequest,
 	{ params }: { params: Promise<{ agentId: string }> },
 ) {
+	const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+	const requestStartedAt = Date.now();
+	const jsonResponse = (body: unknown, status: number) =>
+		NextResponse.json(body, {
+			status,
+			headers: { "x-request-id": requestId },
+		});
+	const rejectChatRequest = (
+		status: number,
+		reason: string,
+		body: unknown,
+		context: Record<string, unknown> = {},
+	) => {
+		logger.warn("Chat request rejected", {
+			requestId,
+			status,
+			reason,
+			durationMs: Date.now() - requestStartedAt,
+			...context,
+		});
+		return jsonResponse(body, status);
+	};
 	let userMessageId: string | undefined;
 	let assistantMessageId: string | undefined;
 
 	try {
 		const auth = await resolveAuthContext();
 		if (!auth) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+			return rejectChatRequest(401, "no_session", { error: "Unauthorized" });
 		}
 		const actorUserId = getActorUserId(auth);
 
 		const { agentId } = await params;
 		const parsed = chatRequestSchema.safeParse(await req.json());
 		if (!parsed.success) {
-			return NextResponse.json(
+			return rejectChatRequest(
+				400,
+				"invalid_input",
 				{ error: "Invalid input", details: parsed.error.issues },
-				{ status: 400 },
+				{ agentId, userId: actorUserId, issues: parsed.error.issues.length },
 			);
 		}
 
@@ -111,13 +135,28 @@ export async function POST(
 			.limit(1);
 
 		if (!agent) {
-			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+			return rejectChatRequest(
+				404,
+				"agent_not_found",
+				{ error: "Agent not found" },
+				{ agentId, userId: actorUserId },
+			);
 		}
 		if (!canUseAgent(agent, actorUserId)) {
-			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+			return rejectChatRequest(
+				404,
+				"agent_not_available_for_user",
+				{ error: "Agent not found" },
+				{ agentId, userId: actorUserId, workspaceId: agent.workspaceId },
+			);
 		}
 		if (auth.type === "api_key" && auth.workspaceId !== agent.workspaceId) {
-			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+			return rejectChatRequest(
+				403,
+				"api_key_workspace_mismatch",
+				{ error: "Forbidden" },
+				{ agentId, userId: actorUserId, workspaceId: agent.workspaceId },
+			);
 		}
 
 		const forbidden = await requireWorkspacePermissionAsync(
@@ -125,18 +164,32 @@ export async function POST(
 			agent.workspaceId,
 			"agents.chat",
 		);
-		if (forbidden) return forbidden;
+		if (forbidden) {
+			logger.warn("Chat request rejected", {
+				requestId,
+				status: forbidden.status,
+				reason: "missing_workspace_permission",
+				agentId,
+				workspaceId: agent.workspaceId,
+				userId: actorUserId,
+				durationMs: Date.now() - requestStartedAt,
+			});
+			forbidden.headers.set("x-request-id", requestId);
+			return forbidden;
+		}
 
 		const quota = await assertWorkspaceWithinTokenQuota(agent.workspaceId);
 		if (!quota.allowed) {
-			return NextResponse.json(
+			return rejectChatRequest(
+				429,
+				"quota_exceeded",
 				{
 					error: quota.message,
 					code: "quota_exceeded",
 					used: quota.used,
 					limit: quota.limit,
 				},
-				{ status: 429 },
+				{ agentId, workspaceId: agent.workspaceId, userId: actorUserId },
 			);
 		}
 
@@ -150,9 +203,16 @@ export async function POST(
 				metadata.workspaceId !== agent.workspaceId ||
 				metadata.createdByUserId !== actorUserId
 			) {
-				return NextResponse.json(
+				return rejectChatRequest(
+					404,
+					"code_workspace_not_found",
 					{ error: "Code workspace not found" },
-					{ status: 404 },
+					{
+						agentId,
+						workspaceId: agent.workspaceId,
+						userId: actorUserId,
+						codeWorkspaceId,
+					},
 				);
 			}
 			codeWorkspaceAttachment = codeWorkspaceArtifact(
@@ -169,9 +229,16 @@ export async function POST(
 				metadata.workspaceId !== agent.workspaceId ||
 				metadata.createdByUserId !== actorUserId
 			) {
-				return NextResponse.json(
+				return rejectChatRequest(
+					404,
+					"attachment_not_found",
 					{ error: "Attachment not found" },
-					{ status: 404 },
+					{
+						agentId,
+						workspaceId: agent.workspaceId,
+						userId: actorUserId,
+						attachmentId,
+					},
 				);
 			}
 			messageAttachments.push(publicChatAttachment(metadata));
@@ -195,34 +262,58 @@ export async function POST(
 			conversation = existing ?? null;
 
 			if (!conversation && resendFromMessageId) {
-				return NextResponse.json(
+				return rejectChatRequest(
+					404,
+					"conversation_not_found",
 					{ error: "Conversation not found" },
-					{ status: 404 },
+					{
+						agentId,
+						workspaceId: agent.workspaceId,
+						userId: actorUserId,
+						conversationId: existingConversationId,
+						resendFromMessageId,
+					},
 				);
 			}
 		}
 
 		if (!conversation && resendFromMessageId) {
-			return NextResponse.json(
+			return rejectChatRequest(
+				400,
+				"resend_without_conversation",
 				{ error: "Cannot resend without an existing conversation" },
-				{ status: 400 },
+				{
+					agentId,
+					workspaceId: agent.workspaceId,
+					userId: actorUserId,
+					resendFromMessageId,
+				},
 			);
 		}
 
 		const version = await getActiveVersion(agentId);
 
 		if (!version) {
-			return NextResponse.json(
+			return rejectChatRequest(
+				400,
+				"no_active_agent_version",
 				{ error: "No active agent version configured" },
-				{ status: 400 },
+				{ agentId, workspaceId: agent.workspaceId, userId: actorUserId },
 			);
 		}
 
 		const providerConfig = await resolveProviderForVersion(version);
 		if (!providerConfig || !providerConfig.modelId) {
-			return NextResponse.json(
+			return rejectChatRequest(
+				400,
+				"no_provider_model",
 				{ error: "No provider model configured for this agent version" },
-				{ status: 400 },
+				{
+					agentId,
+					workspaceId: agent.workspaceId,
+					userId: actorUserId,
+					agentVersionId: version.id,
+				},
 			);
 		}
 
@@ -244,9 +335,17 @@ export async function POST(
 
 		// Existing conversations can reference archived/deleted versions; fail safely.
 		if (version.agentId !== agentId) {
-			return NextResponse.json(
+			return rejectChatRequest(
+				400,
+				"invalid_conversation_version",
 				{ error: "Invalid conversation version" },
-				{ status: 400 },
+				{
+					agentId,
+					workspaceId: agent.workspaceId,
+					userId: actorUserId,
+					agentVersionId: version.id,
+					conversationId: conversation.id,
+				},
 			);
 		}
 
@@ -259,9 +358,17 @@ export async function POST(
 			});
 
 			if (!existingUserMessage) {
-				return NextResponse.json(
+				return rejectChatRequest(
+					404,
+					"message_not_found_for_resend",
 					{ error: "Message not found" },
-					{ status: 404 },
+					{
+						agentId,
+						workspaceId: agent.workspaceId,
+						userId: actorUserId,
+						conversationId: conversation.id,
+						resendFromMessageId,
+					},
 				);
 			}
 
@@ -453,6 +560,24 @@ export async function POST(
 			: { tools: {}, toolApproval: undefined };
 		const tools: ToolSet = boundToolConfig.tools;
 		const availableToolNames = Object.keys(tools);
+		logger.info("Chat request accepted", {
+			requestId,
+			agentId,
+			agentVersionId: version.id,
+			workspaceId: agent.workspaceId,
+			userId: actorUserId,
+			conversationId: conversation.id,
+			assistantMessageId: assistantMessage.id,
+			userMessageId: userMessage.id,
+			createdConversation,
+			streamProtocol: useAiSdkUIStream ? "ai-sdk-ui" : "data-stream",
+			attachmentCount: messageAttachments.length,
+			hasCodeWorkspaceAttachment: Boolean(codeWorkspaceAttachment),
+			knowledgeHitCount: citations.length,
+			toolCount: availableToolNames.length,
+			maxToolCalls,
+			durationMs: Date.now() - requestStartedAt,
+		});
 		const versionToolChoice = version.toolChoice;
 		const configuredToolChoice: "auto" | "required" | "none" | undefined =
 			availableToolNames.length > 0
@@ -845,6 +970,18 @@ export async function POST(
 					latencyMs: Date.now() - startedAt,
 					status: "success",
 				});
+				logger.info("Chat stream completed", {
+					requestId,
+					agentId,
+					agentVersionId: version.id,
+					workspaceId: agent.workspaceId,
+					userId: actorUserId,
+					conversationId: conversation.id,
+					assistantMessageId: assistantMessage.id,
+					inputTokens: totalUsage.inputTokens,
+					outputTokens: totalUsage.outputTokens,
+					latencyMs: Date.now() - startedAt,
+				});
 				enqueueEvent({ type: "done" });
 			} catch (error) {
 				if (streamAbortController.signal.aborted) {
@@ -852,6 +989,16 @@ export async function POST(
 						.update(messages)
 						.set({ status: "completed", completedAt: new Date() })
 						.where(eq(messages.id, assistantMessage.id));
+					logger.info("Chat stream aborted by client", {
+						requestId,
+						agentId,
+						agentVersionId: version.id,
+						workspaceId: agent.workspaceId,
+						userId: actorUserId,
+						conversationId: conversation.id,
+						assistantMessageId: assistantMessage.id,
+						latencyMs: Date.now() - startedAt,
+					});
 					enqueueEvent({ type: "done", stopped: true });
 				} else {
 					// Chat stream failed — message already marked failed below
@@ -870,6 +1017,20 @@ export async function POST(
 						latencyMs: Date.now() - startedAt,
 						status: "failed",
 					});
+					logHandledError(
+						"Chat stream failed",
+						{
+							requestId,
+							agentId,
+							agentVersionId: version.id,
+							workspaceId: agent.workspaceId,
+							userId: actorUserId,
+							conversationId: conversation.id,
+							assistantMessageId: assistantMessage.id,
+							latencyMs: Date.now() - startedAt,
+						},
+						error as Error,
+					);
 					enqueueEvent({
 						type: "error",
 						error: error instanceof Error ? error.message : String(error),
@@ -884,6 +1045,7 @@ export async function POST(
 			"X-Conversation-Id": conversation.id,
 			"X-Message-Id": assistantMessage.id,
 			"X-User-Message-Id": userMessage.id,
+			"X-Request-Id": requestId,
 		};
 
 		return useAiSdkUIStream
@@ -905,14 +1067,26 @@ export async function POST(
 				.where(eq(messages.id, userMessageId));
 		}
 
-		return NextResponse.json(
+		logHandledError(
+			"Chat request failed",
+			{
+				requestId,
+				status: 500,
+				userMessageId,
+				assistantMessageId,
+				durationMs: Date.now() - requestStartedAt,
+			},
+			error as Error,
+		);
+
+		return jsonResponse(
 			{
 				error: "Internal server error",
 				...(process.env.NODE_ENV !== "production" && error instanceof Error
 					? { detail: error.message }
 					: {}),
 			},
-			{ status: 500 },
+			500,
 		);
 	}
 }
