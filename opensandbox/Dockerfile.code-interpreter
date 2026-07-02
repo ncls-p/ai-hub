@@ -1,49 +1,29 @@
 # syntax=docker/dockerfile:1
 
 # AI Hub's batteries-included OpenSandbox image.
-# It keeps outbound internet available (network policy is controlled by the app),
-# and preinstalls common data/science/office/media packages so agents do not
-# waste turns on missing imports like openpyxl/xlsxwriter/matplotlib.
+#
+# sdcb/code-interpreter already ships a broad AI code-execution stack
+# (LibreOffice, ffmpeg, pandoc, poppler, ImageMagick, Python, Node, .NET and
+# common document/data packages). Layer only the AI Hub-specific gaps on top
+# instead of starting from the heavier upstream OpenSandbox code-interpreter
+# image.
 
-FROM opensandbox/code-interpreter:v1.1.0
+FROM sdcb/code-interpreter:r-46
 
 SHELL ["/bin/bash", "-lc"]
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHON_VERSION=3.11 \
-    NODE_VERSION=22 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
-# System tools for document conversion, archives, PDF/image processing, OCR,
-# video/audio manipulation, and general internet/file workflows.
+# Tools not present in sdcb/code-interpreter but expected by generated code and
+# the smoke tests for this sandbox image.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
-        curl \
-        wget \
-        git \
         jq \
-        zip \
-        unzip \
-        p7zip-full \
-        file \
-        libmagic1 \
-        shared-mime-info \
-        ffmpeg \
-        pandoc \
-        poppler-utils \
         qpdf \
-        ghostscript \
-        imagemagick \
         tesseract-ocr \
-        libreoffice \
-        libreoffice-writer \
-        libreoffice-calc \
-        libreoffice-impress \
-        fonts-dejavu \
-        fonts-liberation \
-        fontconfig \
         libgl1 \
         libglib2.0-0 \
         libpango-1.0-0 \
@@ -51,18 +31,24 @@ RUN apt-get update \
         libgdk-pixbuf-2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# The sdcb base currently ships Ubuntu's Node 18. AI Hub runs generated Node
+# snippets on Node 22; some prebuilt packages such as sharp require >=20.9.
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && node --version \
+    && npm --version
+
 COPY python-requirements.txt /tmp/ai-hub-python-requirements.txt
 COPY node-packages.txt /tmp/ai-hub-node-packages.txt
 
-# Python runtime used by src/modules/tool/code-sandbox.ts.
-RUN source /opt/code-interpreter/code-interpreter-env.sh python "${PYTHON_VERSION}" \
-    && python3 -m pip install --break-system-packages --upgrade pip setuptools wheel \
-    && python3 -m pip install --break-system-packages -r /tmp/ai-hub-python-requirements.txt
+# sdcb/code-interpreter's Python stack is installed in the system interpreter
+# (Python 3.12 at r-46). Install the remaining AI Hub package set there so the
+# app's `python3 -I ...` execution path sees a complete environment.
+RUN python3 -m pip install --break-system-packages -r /tmp/ai-hub-python-requirements.txt
 
-# Node runtime used by src/modules/tool/code-sandbox.ts.
 RUN --mount=type=cache,target=/root/.npm \
-    source /opt/code-interpreter/code-interpreter-env.sh node "${NODE_VERSION}" \
-    && npm config set fetch-retries 5 \
+    npm config set fetch-retries 5 \
     && npm config set fetch-retry-factor 2 \
     && npm config set fetch-retry-mintimeout 20000 \
     && npm config set fetch-retry-maxtimeout 120000 \
@@ -78,26 +64,29 @@ RUN --mount=type=cache,target=/root/.npm \
         sleep "$((attempt * 20))"; \
       done
 
-# Common output path used by many generated code snippets. The runtime also
-# recreates this symlink per execution in case the base image changes.
+# Common output path used by many generated code snippets.
 RUN mkdir -p /workspace /mnt \
     && ln -sfn /workspace /mnt/data
 
-# Fast build-time smoke tests for the imports that most often break generated code.
-RUN source /opt/code-interpreter/code-interpreter-env.sh python "${PYTHON_VERSION}" \
-    && python3 - <<'PY'
+# Fast build-time smoke tests for the imports and binaries most likely to break
+# generated code.
+RUN python3 - <<'PY'
+import duckdb
+import fitz
 import matplotlib
 import numpy
 import openpyxl
 import pandas
 import pptx
+import pyarrow
 import xlsxwriter
-import fitz
 print("python smoke ok")
 PY
 
-RUN source /opt/code-interpreter/code-interpreter-env.sh node "${NODE_VERSION}" \
-    && export NODE_PATH="$(npm root -g)" \
-    && node -e "require('xlsx'); require('exceljs'); require('pptxgenjs'); console.log('node smoke ok')"
+RUN export NODE_PATH="$(npm root -g)" \
+    && node -e "require('xlsx'); require('exceljs'); require('pptxgenjs'); require('sharp'); console.log('node smoke ok')" \
+    && jq --version \
+    && qpdf --version \
+    && tesseract --version | head -1
 
 WORKDIR /workspace

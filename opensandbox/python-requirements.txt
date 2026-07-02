@@ -1,6 +1,6 @@
 # Broad, commonly used packages for AI Hub's OpenSandbox code tool.
 # Keep this list unpinned so rebuilding refreshes CVE fixes and common wheels.
-# The Dockerfile installs these into the Python version used by src/modules/tool/code-sandbox.ts (3.11).
+# The Dockerfile installs these into the Python version used by src/modules/tool/code-sandbox.ts.
 
 # Dataframes, Excel, analytics
 numpy
