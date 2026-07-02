@@ -197,9 +197,13 @@ services:
   dragonflydb:
     image: docker.dragonflydb.io/dragonflydb/dragonfly
     restart: unless-stopped
-    command: ["--requirepass", "${DRAGONFLY_PASSWORD:?set DRAGONFLY_PASSWORD}"]
+    command:
+      - "--requirepass"
+      - "${DRAGONFLY_PASSWORD:?set DRAGONFLY_PASSWORD}"
+      - "--maxmemory=${DRAGONFLY_MAXMEMORY:-256mb}"
     environment:
       DRAGONFLY_PASSWORD: ${DRAGONFLY_PASSWORD:?set DRAGONFLY_PASSWORD}
+      DRAGONFLY_MAXMEMORY: ${DRAGONFLY_MAXMEMORY:-256mb}
     volumes:
       - dragonfly-prod-data:/data
     deploy:
