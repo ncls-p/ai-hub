@@ -31,7 +31,6 @@ import { generateChatAutomationArtifacts } from "@/modules/chat/automation";
 import { consumeSkipNextChatSuggestions } from "@/modules/chat/suggestion-skip";
 import {
   codeWorkspaceArtifact,
-  createCodeWorkspaceFromFiles,
   getCodeWorkspace,
 } from "@/modules/code-workspace/storage";
 import { searchBoundKnowledgeBases } from "@/modules/knowledge/use-cases";
@@ -60,13 +59,10 @@ import {
   buildBoundTools,
   chatRequestSchema,
   codeWorkspaceCreateToolNames,
-  codeWorkspaceEditToolNames,
   defaultMaxOutputTokens,
   defaultMaxToolCalls,
   findUserMessageForResend,
   isFirstUserMessageInConversation,
-  parseCodeWorkspaceFileFences,
-  shouldEnableCodeWorkspaceCreation,
   streamToolCallId,
   streamToolInputDelta,
 } from "./route-support";
@@ -428,13 +424,7 @@ export async function POST(
       0,
       Math.min(20, version.maxToolCalls ?? defaultMaxToolCalls),
     );
-    const wantsCodeWorkspaceCreation =
-      !codeWorkspaceAttachment && shouldEnableCodeWorkspaceCreation(content);
-    const shouldUseToolCalling =
-      maxToolCalls > 0 && !wantsCodeWorkspaceCreation;
-    const autoCodeWorkspaceToolNames = codeWorkspaceAttachment
-      ? codeWorkspaceEditToolNames
-      : [];
+    const shouldUseToolCalling = maxToolCalls > 0;
     const skillsPrompt = shouldUseToolCalling
       ? await buildSkillsRegistryPrompt(version.id)
       : null;
@@ -448,7 +438,6 @@ export async function POST(
           messageId: assistantMessage.id,
           userId: actorUserId,
           maxToolCalls,
-          autoCodeWorkspaceToolNames,
           hasSkills: Boolean(skillsPrompt),
           approvalPolicy,
           emitEvent: enqueueEvent,
@@ -536,16 +525,12 @@ export async function POST(
       guardrails?.enabled && guardrails.blockedTopics?.length
         ? `Avoid and refuse requests about these blocked topics: ${guardrails.blockedTopics.join(", ")}.`
         : null;
-    const codeWorkspaceTextProtocolGuidance = wantsCodeWorkspaceCreation
-      ? 'The user wants a static HTML/CSS/JS code workspace. Do not call tools for this request. Generate the project files as markdown code fences with a path attribute so the app can turn them into a live workspace automatically. Use exactly this shape for each file: ```html path="index.html"\n...\n```, ```css path="styles.css"\n...\n```, and ```js path="script.js"\n...\n```. Include one HTML entry file. Keep prose short.'
-      : null;
     const localeCookie = (await cookies()).get("NEXT_LOCALE")?.value ?? "en";
     const systemPrompt = [
       version.systemPrompt?.trim() || fallbackSystemPrompt(localeCookie),
       skillsPrompt,
       responseFormatGuidance,
       guardrailGuidance,
-      codeWorkspaceTextProtocolGuidance,
       toolGuidance,
       ragContext
         ? `Use the following knowledge base excerpts when relevant:\n\n${ragContext}`
@@ -796,19 +781,6 @@ export async function POST(
           )
           .join("\n")
           .trim();
-        if (wantsCodeWorkspaceCreation) {
-          const generatedFiles = parseCodeWorkspaceFileFences(assistantText);
-          if (generatedFiles) {
-            const artifact = await createCodeWorkspaceFromFiles({
-              workspaceId: agent.workspaceId,
-              userId: actorUserId,
-              title: conversation.title || "Generated code workspace",
-              files: generatedFiles,
-            });
-            await appendStreamedMetadataPart("file", artifact);
-            enqueueEvent({ type: "file", artifact });
-          }
-        }
         postCompletionAutomationRef.current = async () => {
           const shouldSkipSuggestions = consumeSkipNextChatSuggestions(
             conversation.id,

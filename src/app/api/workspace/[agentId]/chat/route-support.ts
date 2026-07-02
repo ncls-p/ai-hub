@@ -7,7 +7,6 @@ import { executeCustomToolWorkflow } from "@/modules/custom-tools/use-cases";
 import { executeMcpTool } from "@/modules/mcp/executor";
 import {
   getBuiltInTool,
-  getBuiltInToolByName,
   requiresApproval,
 } from "@/modules/tool/builtin-tools";
 import {
@@ -98,36 +97,6 @@ export function streamToolInputDelta(part: unknown) {
     : typeof record.inputTextDelta === "string"
       ? record.inputTextDelta
       : "";
-}
-
-export function shouldEnableCodeWorkspaceCreation(content: string) {
-  const normalized = content.toLowerCase();
-  const wantsBuild =
-    /(cr[eé]e|g[eé]n[eè]re|fabrique|construis|build|create|make|code|develop|d[eé]veloppe|impl[eé]mente)/i.test(
-      normalized,
-    );
-  const targetIsStaticWeb =
-    /(html|css|javascript|\bjs\b|site web|website|landing page|page web|web app|app web|interface|frontend|maquette|demo|démo|preview|portfolio)/i.test(
-      normalized,
-    );
-  return wantsBuild && targetIsStaticWeb;
-}
-
-export function parseCodeWorkspaceFileFences(content: string) {
-  const files: { path: string; content: string }[] = [];
-  const fencePattern =
-    /```[^\n`]*(?:path|file|filename)=(?:"([^"]+)"|'([^']+)'|([^\s`]+))[^\n`]*\n([\s\S]*?)```/g;
-  for (const match of content.matchAll(fencePattern)) {
-    const filePath = match[1] ?? match[2] ?? match[3];
-    const fileContent = match[4] ?? "";
-    if (!filePath) continue;
-    files.push({
-      path: filePath.trim(),
-      content: fileContent.replace(/\n$/, ""),
-    });
-  }
-  if (!files.some((file) => /\.html?$/i.test(file.path))) return null;
-  return files;
 }
 
 // --- Execute handlers extracted from loops to avoid function-in-loop ---
@@ -465,33 +434,12 @@ export async function buildBoundTools(input: {
   messageId: string;
   userId: string;
   maxToolCalls: number;
-  autoCodeWorkspaceToolNames?: string[];
   approvalPolicy?: AiHubToolApprovalPolicy | null;
   hasSkills?: boolean;
   emitEvent?: (event: Record<string, unknown>) => void;
   onApprovalRequired?: (event: ToolApprovalRequiredEvent) => void;
 }) {
   const bindings = await getToolBindingsForVersion(input.agentVersionId);
-  const autoCodeWorkspaceToolNames = input.autoCodeWorkspaceToolNames ?? [];
-  const boundBuiltinToolIds = new Set(
-    bindings
-      .filter((binding) => binding.toolSource === BUILTIN_TOOL_SOURCE)
-      .map((binding) => binding.toolId),
-  );
-  for (const toolName of autoCodeWorkspaceToolNames) {
-    const definition = getBuiltInToolByName(toolName);
-    if (!definition || boundBuiltinToolIds.has(definition.id)) continue;
-    boundBuiltinToolIds.add(definition.id);
-    bindings.push({
-      id: definition.id,
-      agentVersionId: input.agentVersionId,
-      toolSource: BUILTIN_TOOL_SOURCE,
-      toolId: definition.id,
-      requireApproval: requiresApproval(definition.riskLevel),
-      riskLevel: definition.riskLevel,
-      createdAt: new Date(),
-    });
-  }
   const tools: ToolSet = {};
   const toolApprovalMetadata = new Map<string, BoundToolApprovalMetadata>();
   let executedToolCallCount = 0;
