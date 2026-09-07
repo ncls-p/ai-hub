@@ -61,8 +61,11 @@ test.describe("api keys page", () => {
     expect(workspacesResponse.ok()).toBeTruthy();
     const workspaces = (await workspacesResponse.json()) as Array<{
       workspace: { id: string };
+      isActive: boolean;
     }>;
-    const workspaceId = workspaces[0]?.workspace.id;
+    const workspaceId = (
+      workspaces.find((row) => row.isActive) ?? workspaces[0]
+    )?.workspace.id;
     expect(workspaceId).toBeTruthy();
 
     const createResponse = await page.request.post("/api/workspace/api-keys", {
@@ -124,8 +127,11 @@ test.describe("api keys page", () => {
     const workspacesResponse = await page.request.get("/api/workspaces");
     const workspaces = (await workspacesResponse.json()) as Array<{
       workspace: { id: string };
+      isActive: boolean;
     }>;
-    const workspaceId = workspaces[0]?.workspace.id;
+    const workspaceId = (
+      workspaces.find((row) => row.isActive) ?? workspaces[0]
+    )?.workspace.id;
     expect(workspaceId).toBeTruthy();
 
     const scopeResponse = await page.request.get(

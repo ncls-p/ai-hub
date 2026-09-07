@@ -5,8 +5,9 @@ test("switches between visual and agentic editing while keeping live changes", a
 }) => {
   const workspaces = (await (
     await page.request.get("/api/workspaces")
-  ).json()) as Array<{ workspace: { id: string } }>;
-  const workspaceId = workspaces[0]!.workspace.id;
+  ).json()) as Array<{ workspace: { id: string }; isActive: boolean }>;
+  const workspaceId = (workspaces.find((row) => row.isActive) ?? workspaces[0])!
+    .workspace.id;
   const createResponse = await page.request.post("/api/workspace/workflows", {
     data: { workspaceId, name: `Agentic E2E ${Date.now()}` },
   });

@@ -14,8 +14,10 @@ test("official OpenAI and Anthropic SDKs use Maiah as a scoped model proxy", asy
   expect(workspacesResponse.ok()).toBe(true);
   const workspaces = (await workspacesResponse.json()) as Array<{
     workspace: { id: string };
+    isActive: boolean;
   }>;
-  const workspaceId = workspaces[0]?.workspace.id;
+  const workspaceId = (workspaces.find((row) => row.isActive) ?? workspaces[0])
+    ?.workspace.id;
   if (!workspaceId) throw new Error("E2E workspace is missing");
 
   const modelName = `proxy-e2e-${Date.now()}`;

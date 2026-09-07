@@ -13,8 +13,9 @@ test("executes JavaScript and Python workflow steps in the local sandbox", async
 
   const workspaces = (await (
     await page.request.get("/api/workspaces")
-  ).json()) as Array<{ workspace: { id: string } }>;
-  const workspaceId = workspaces[0]!.workspace.id;
+  ).json()) as Array<{ workspace: { id: string }; isActive: boolean }>;
+  const workspaceId = (workspaces.find((row) => row.isActive) ?? workspaces[0])!
+    .workspace.id;
   const createResponse = await page.request.post("/api/workspace/workflows", {
     data: { workspaceId, name: `Sandbox E2E ${Date.now()}` },
   });

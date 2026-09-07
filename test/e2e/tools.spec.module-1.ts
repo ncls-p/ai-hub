@@ -261,8 +261,11 @@ test.describe("tools hub page", () => {
     expect(workspacesResponse.ok()).toBe(true);
     const workspaces = (await workspacesResponse.json()) as Array<{
       workspace: { id: string };
+      isActive: boolean;
     }>;
-    const workspaceId = workspaces[0]?.workspace.id;
+    const workspaceId = (
+      workspaces.find((row) => row.isActive) ?? workspaces[0]
+    )?.workspace.id;
     if (!workspaceId) throw new Error("E2E workspace is missing");
 
     let serverId: string | undefined;
