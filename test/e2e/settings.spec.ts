@@ -13,8 +13,10 @@ test.describe("settings page", () => {
   test("loads settings page", async ({ page }) => {
     const workspaces = (await (
       await page.request.get("/api/workspaces")
-    ).json()) as Array<{ workspace: { name: string } }>;
-    const projectName = workspaces[0]?.workspace.name;
+    ).json()) as Array<{ workspace: { name: string }; isActive: boolean }>;
+    const projectName = (
+      workspaces.find((row) => row.isActive) ?? workspaces[0]
+    )?.workspace.name;
     await page.goto("/en/settings");
     await expect(page).toHaveURL(/\/en\/settings/);
 
@@ -49,8 +51,10 @@ test.describe("settings page", () => {
   test("persists organization logo and preset theme", async ({ page }) => {
     const workspaces = (await (
       await page.request.get("/api/workspaces")
-    ).json()) as Array<{ workspace: { id: string } }>;
-    const workspaceId = workspaces[0]?.workspace.id;
+    ).json()) as Array<{ workspace: { id: string }; isActive: boolean }>;
+    const workspaceId = (
+      workspaces.find((row) => row.isActive) ?? workspaces[0]
+    )?.workspace.id;
     if (!workspaceId) throw new Error("E2E workspace is missing");
 
     const resetBranding = () =>
@@ -116,8 +120,10 @@ test.describe("settings page", () => {
     test.setTimeout(120_000);
     const workspaces = (await (
       await page.request.get("/api/workspaces")
-    ).json()) as Array<{ workspace: { id: string } }>;
-    const workspaceId = workspaces[0]?.workspace.id;
+    ).json()) as Array<{ workspace: { id: string }; isActive: boolean }>;
+    const workspaceId = (
+      workspaces.find((row) => row.isActive) ?? workspaces[0]
+    )?.workspace.id;
     if (!workspaceId) throw new Error("E2E workspace is missing");
 
     try {
