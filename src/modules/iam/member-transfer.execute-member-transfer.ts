@@ -1,3 +1,4 @@
+import { findSystemRole } from "./use-cases.iam-operation-error";
 import { policyMutation } from "./policy-mutation";
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -7,7 +8,6 @@ import { db } from "@/server/infrastructure/db";
 import {
   organizationMembers,
   roleBindings,
-  roles,
   teamMembers,
   teams,
   workspaceMembers,
@@ -35,18 +35,12 @@ export const executeMemberTransfer = policyMutation(
     }
     const userIds = preview.members.map(({ userId }) => userId);
     const crossOrganization = preview.destination.crossOrganization;
-    const [memberRole] = crossOrganization
-      ? await db
-          .select({ id: roles.id })
-          .from(roles)
-          .where(
-            and(eq(roles.name, "organization.user"), eq(roles.isSystem, true)),
-          )
-          .limit(1)
-      : [{ id: "" }];
-    if (crossOrganization && !memberRole) {
-      throw new IamOperationError("Destination member role is unavailable");
-    }
+    const memberRole = crossOrganization
+      ? await findSystemRole(
+          "organization.user",
+          preview.destination.organizationId,
+        )
+      : { id: "" };
     const sourceOrganizationWorkspaces =
       crossOrganization && input.mode === "move"
         ? await db

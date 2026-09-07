@@ -83,6 +83,7 @@ describe("ensurePrimaryWorkspaceForUser", () => {
       .mockResolvedValueOnce([{ roleName: "workspace.admin" }]) // getWorkspaceRoleName
       .mockResolvedValueOnce([primaryWorkspace]) // updateWorkspaceMemberRole workspace lookup
       .mockResolvedValueOnce([memberRole]) // getSystemWorkspaceRole
+      .mockResolvedValueOnce([]) // no scoped customization
       .mockResolvedValueOnce([fakeMember]); // member lookup
 
     await ensurePrimaryWorkspaceForUser({

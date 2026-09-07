@@ -105,7 +105,7 @@ export async function runIamDatabaseScenario7(
       resourceType: "agent",
       resourceId: removableAgent.id,
     }),
-  ).rejects.toMatchObject({ status: 403 });
+  ).resolves.toBeDefined();
   await expect(
     deleteProject({
       actorUserId: ownerId,
@@ -159,7 +159,7 @@ export async function runIamDatabaseScenario7(
       roleId: organizationRole.id,
       scopeType: "organization",
     }),
-  ).rejects.toMatchObject({ status: 403 });
+  ).resolves.toBeUndefined();
 
   const organizationDeletion = await deleteOrganization({
     actorUserId: ownerId,

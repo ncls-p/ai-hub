@@ -39,6 +39,7 @@ describe("updateWorkspaceMemberRole", () => {
     dbModule._chain.limit
       .mockResolvedValueOnce([fakeWorkspace])
       .mockResolvedValueOnce([fakeRole])
+      .mockResolvedValueOnce([]) // no scoped customization
       .mockResolvedValueOnce([]);
 
     await expect(
@@ -55,6 +56,7 @@ describe("updateWorkspaceMemberRole", () => {
     dbModule._chain.limit
       .mockResolvedValueOnce([fakeWorkspace])
       .mockResolvedValueOnce([fakeRole])
+      .mockResolvedValueOnce([]) // no scoped customization
       .mockResolvedValueOnce([fakeMember]);
 
     await updateWorkspaceMemberRole({

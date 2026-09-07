@@ -1,6 +1,7 @@
+import { hasAnotherActiveOwner } from "./organization-owner";
 import { policyMutation } from "./policy-mutation";
 import { requireSubordinatePrincipal } from "./delegation";
-import { and, count, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { audit } from "@/server/domain/services/audit";
 import { authorization } from "@/server/domain/services/authorization";
@@ -79,18 +80,12 @@ export const removeRoleAssignment = policyMutation(
     });
 
     if (binding.role.name === "organization.owner") {
-      const [{ value }] = await db
-        .select({ value: count() })
-        .from(roleBindings)
-        .where(
-          and(
-            eq(roleBindings.roleId, binding.role.id),
-            eq(roleBindings.principalType, "user"),
-            eq(roleBindings.resourceType, "organization"),
-            eq(roleBindings.resourceId, organization.id),
-          ),
-        );
-      if (value <= 1) {
+      if (
+        !(await hasAnotherActiveOwner(
+          organization.id,
+          binding.binding.principalId,
+        ))
+      ) {
         throw new IamOperationError(
           "Assign another organization owner before removing this access",
           409,

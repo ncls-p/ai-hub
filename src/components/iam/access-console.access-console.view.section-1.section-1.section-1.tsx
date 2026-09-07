@@ -73,18 +73,18 @@ export function AccessRolesSection1({
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="overflow-x-auto border-y border-border/60">
-          <table className="w-full min-w-[52rem] text-left">
-            <thead className="bg-muted/35 text-xs font-medium text-muted-foreground">
+        <div className="@container min-w-0 border-y border-border/60">
+          <table className="w-full table-fixed text-left @max-3xl:block">
+            <thead className="@max-3xl:sr-only bg-muted/35 text-xs font-medium text-muted-foreground">
               <tr>
-                <th className="px-6 py-3">{t("roleColumn")}</th>
+                <th className="w-2/5 px-6 py-3">{t("roleColumn")}</th>
                 <th className="px-3 py-3">{t("scope")}</th>
                 <th className="px-3 py-3">{t("permissionsColumn")}</th>
                 <th className="px-3 py-3">{t("assignmentsColumn")}</th>
                 <th className="w-32 px-6 py-3 text-right">{t("actions")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60">
+            <tbody className="divide-y divide-border/60 @max-3xl:block">
               {filteredRoles.slice(0, visibleRoleCount).map((role) => {
                 const assignmentCount = snapshot.assignments.filter(
                   (item) => item.roleId === role.id,
@@ -93,10 +93,10 @@ export function AccessRolesSection1({
                 return (
                   <tr
                     key={role.id}
-                    className="align-top transition-colors hover:bg-muted/20"
+                    className="align-top transition-colors hover:bg-muted/20 @max-3xl:grid @max-3xl:grid-cols-2 @max-3xl:p-4"
                   >
-                    <td className="px-6 py-4">
-                      <div className="min-w-64">
+                    <td className="px-6 py-4 @max-3xl:col-span-2 @max-3xl:px-0 @max-3xl:py-2">
+                      <div className="min-w-0 break-words [overflow-wrap:anywhere]">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">
                             {roleLabel(role.name, role.displayName)}
@@ -152,7 +152,7 @@ export function AccessRolesSection1({
                         count: assignmentCount,
                       })}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 @max-3xl:col-span-2 @max-3xl:px-0 @max-3xl:py-2">
                       <div className="flex justify-end gap-1">
                         <Button
                           type="button"

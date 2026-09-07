@@ -69,6 +69,7 @@ export function AccessPeopleTransferBranch1({
         <Button
           type="button"
           size="sm"
+          variant="outline"
           onClick={() => {
             setBulkAssignmentIds([]);
             setAssignment({
@@ -104,6 +105,10 @@ export function AccessPeopleTransferBranch1({
                   }
                 : {
                     action: "assignRole",
+                    replaceExisting:
+                      assignment.principalType === "user" &&
+                      assignment.scopeType === "workspace" &&
+                      model.snapshot.actions.workspace["roles.revoke"],
                     workspaceId,
                     ...assignment,
                   },
@@ -198,6 +203,13 @@ export function AccessPeopleTransferBranch1({
                 </FieldDescription>
               ) : null}
             </Field>
+            {assignment.principalType === "user" &&
+            assignment.scopeType === "workspace" &&
+            model.snapshot.actions.workspace["roles.revoke"] ? (
+              <p className="text-sm text-muted-foreground">
+                {t("simpleAccess.replaceProjectRole")}
+              </p>
+            ) : null}
             <details className="rounded-lg border p-3">
               <summary className="cursor-pointer text-sm font-medium">
                 {t("simpleAccess.advancedScope")}

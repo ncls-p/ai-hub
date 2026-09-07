@@ -1,6 +1,7 @@
+import { hasAnotherActiveOwner } from "./organization-owner";
 import { policyMutation } from "./policy-mutation";
 import { requireManageableOrganizationMember } from "./organization-member-delegation";
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { logger } from "@/lib/logger";
 import { audit } from "@/server/domain/services/audit";
@@ -60,18 +61,7 @@ export const removeOrganizationMember = policyMutation(
       )
       .limit(1);
     if (ownerBinding) {
-      const [{ value }] = await db
-        .select({ value: count() })
-        .from(roleBindings)
-        .where(
-          and(
-            eq(roleBindings.roleId, ownerRole.id),
-            eq(roleBindings.principalType, "user"),
-            eq(roleBindings.resourceType, "organization"),
-            eq(roleBindings.resourceId, organization.id),
-          ),
-        );
-      if (value <= 1) {
+      if (!(await hasAnotherActiveOwner(organization.id, input.userId))) {
         throw new IamOperationError(
           "Assign another organization owner before removing this member",
           409,

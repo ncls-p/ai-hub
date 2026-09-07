@@ -30,6 +30,14 @@ test.describe("members page", () => {
       .getByRole("option", { name: "Lifecycle browser project", exact: true })
       .click();
 
+    if (
+      !(await page
+        .getByRole("button", { name: "Manage", exact: true })
+        .isVisible())
+    )
+      await page
+        .getByText("Project and organization settings", { exact: true })
+        .click();
     await page.getByRole("button", { name: "Manage", exact: true }).click();
     await page.getByRole("menuitem", { name: "Rename project" }).click();
     const renameDialog = page.getByRole("dialog", { name: "Rename project" });
@@ -43,6 +51,14 @@ test.describe("members page", () => {
       "Lifecycle browser project renamed",
     );
 
+    if (
+      !(await page
+        .getByRole("button", { name: "Manage", exact: true })
+        .isVisible())
+    )
+      await page
+        .getByText("Project and organization settings", { exact: true })
+        .click();
     await page.getByRole("button", { name: "Manage", exact: true }).click();
     await page.getByRole("menuitem", { name: "Delete project" }).click();
     const deleteDialog = page.getByRole("dialog", {
@@ -129,7 +145,7 @@ test.describe("members page", () => {
     await accessDialog.getByRole("combobox", { name: "Grant to" }).click();
     await page.getByRole("option", { name: "Team", exact: true }).click();
     await accessDialog
-      .getByRole("combobox", { name: "Member or team" })
+      .getByRole("combobox", { name: "Person or team" })
       .click();
     await page.getByRole("option", { name: teamName, exact: true }).click();
     await accessDialog

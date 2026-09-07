@@ -1,3 +1,4 @@
+import { visibleScopedRoles } from "./standard-role";
 import { roleCapabilities, subordinateMemberIds } from "./access-capabilities";
 import { and, asc, eq, isNull, or } from "drizzle-orm";
 
@@ -51,7 +52,7 @@ export async function getAccessConsoleSnapshot(input: {
     memberRows,
     teamRows,
     teamMemberRows,
-    roleRows,
+    allRoleRows,
     bindingRows,
     effectivePermissions,
     organizationPermissions,
@@ -144,6 +145,7 @@ export async function getAccessConsoleSnapshot(input: {
     ),
   ]);
 
+  const roleRows = visibleScopedRoles(allRoleRows);
   const memberNames = new Map(
     memberRows.map((member) => [
       member.userId,
@@ -193,6 +195,7 @@ export async function getAccessConsoleSnapshot(input: {
         roleRows,
         organizationPermissions,
         effectivePermissions,
+        organization.id,
       ),
       subordinateMemberIds(
         input.userId,

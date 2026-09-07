@@ -39,11 +39,14 @@ test.describe("members page", () => {
     ).toBeVisible();
   });
 
-  test("shows the organization to project inheritance path", async ({
+  test("explains organization inheritance in project settings", async ({
     page,
   }) => {
     await page.goto("/en/members");
 
+    await page
+      .getByText("Project and organization settings", { exact: true })
+      .click();
     await expect(
       page.getByText(/Organization roles apply to every project/i),
     ).toBeVisible({ timeout: 10_000 });
@@ -75,7 +78,7 @@ test.describe("members page", () => {
     await page.getByRole("button", { name: "Grant selected" }).click();
     const dialog = page.getByRole("dialog", { name: "Grant access" });
     await expect(
-      dialog.getByRole("combobox", { name: "Member or team" }),
+      dialog.getByRole("combobox", { name: "Person or team" }),
     ).toHaveCount(0);
     await dialog.getByRole("combobox", { name: "Role" }).click();
     await page

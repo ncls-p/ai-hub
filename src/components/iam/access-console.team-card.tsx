@@ -1,5 +1,7 @@
 "use client";
 
+import { TeamEditDialog } from "./team-edit-dialog";
+
 import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
@@ -36,6 +38,7 @@ export function TeamCard({
   onAdd,
   onRemove,
   onDelete,
+  onEdit,
 }: {
   team: AccessTeam;
   members: AccessMember[];
@@ -45,6 +48,7 @@ export function TeamCard({
   onAdd: (userId: string) => Promise<boolean>;
   onRemove: (userId: string) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
+  onEdit: (value: { name: string; description: string }) => Promise<boolean>;
 }) {
   const t = useTranslations("access");
   const [userId, setUserId] = useState("");
@@ -61,15 +65,24 @@ export function TeamCard({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{team.name}</CardTitle>
+      <CardHeader className="grid-cols-1">
+        <CardTitle className="break-words [overflow-wrap:anywhere]">
+          {team.name}
+        </CardTitle>
         <CardDescription>
           {team.description || t("noTeamDescription")}
         </CardDescription>
-        <CardAction className="flex items-center gap-1">
+        <CardAction className="col-start-1 row-start-auto flex flex-wrap items-center gap-2">
           <Badge variant="secondary">
             {t("memberCount", { count: team.members.length })}
           </Badge>
+          {canManage ? (
+            <TeamEditDialog
+              team={team}
+              pending={Boolean(pending)}
+              onSave={onEdit}
+            />
+          ) : null}
           {canDelete ? (
             <ConfirmRemovalButton
               pending={pending === `delete-team-${team.id}`}
@@ -87,8 +100,16 @@ export function TeamCard({
             <p className="text-sm text-muted-foreground">{t("emptyTeam")}</p>
           ) : (
             team.members.map((member) => (
-              <span key={member.id} className="flex items-center gap-0.5">
-                <Badge variant="outline">{member.name}</Badge>
+              <span
+                key={member.id}
+                className="flex min-w-0 max-w-full items-center gap-0.5"
+              >
+                <Badge
+                  variant="outline"
+                  className="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
+                >
+                  {member.name}
+                </Badge>
                 {canManage ? (
                   <ConfirmRemovalButton
                     pending={
@@ -130,10 +151,7 @@ export function TeamCard({
                 </SelectContent>
               </Select>
             </Field>
-            <Button
-              type="submit"
-              disabled={!userId || pending === `team-${team.id}`}
-            >
+            <Button type="submit" disabled={!userId || Boolean(pending)}>
               {pending === `team-${team.id}` ? (
                 <Spinner data-icon="inline-start" />
               ) : (

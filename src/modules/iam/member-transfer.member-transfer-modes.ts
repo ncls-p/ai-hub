@@ -1,3 +1,4 @@
+import { visibleScopedRoles } from "./standard-role";
 import { and, eq, isNull, or } from "drizzle-orm";
 
 import { authorization } from "@/server/domain/services/authorization";
@@ -118,11 +119,12 @@ export async function listDestinationRoles(
   workspaceId: string,
   organizationId: string,
 ) {
-  return db
+  const rows = await db
     .select({
       id: roles.id,
       name: roles.name,
       displayName: roles.displayName,
+      isSystem: roles.isSystem,
     })
     .from(roles)
     .where(
@@ -143,4 +145,9 @@ export async function listDestinationRoles(
         ),
       ),
     );
+  return visibleScopedRoles(rows).map(({ id, name, displayName }) => ({
+    id,
+    name,
+    displayName,
+  }));
 }

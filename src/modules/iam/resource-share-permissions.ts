@@ -2,7 +2,11 @@ import {
   resourceDefinition,
   type AccessResourceType,
 } from "@/server/domain/entities/access-resource";
-import { SYSTEM_ROLES } from "@/server/domain/entities/iam";
+import {
+  findSystemRole,
+  rolePermissions,
+} from "./use-cases.iam-operation-error";
+import { findAccessResource } from "@/server/infrastructure/db/access-resource-repository";
 import { withFreshAuthorization } from "@/server/domain/services/authorization.fresh-context";
 import { expandPermissionGrants } from "./permission-matching";
 import { requireDelegablePermissions } from "./use-cases.iam-operation-error";
@@ -18,9 +22,13 @@ export async function requireResourceSharePermissions(input: {
     input.resourceType === "agent"
       ? "workspace.agent_user"
       : "workspace.viewer";
-  const role = SYSTEM_ROLES.find((entry) => entry.name === name)!;
+  const workspaceId =
+    input.workspaceId ??
+    (await findAccessResource(input.resourceType, input.resourceId))
+      ?.workspaceId;
+  const role = await findSystemRole(name, workspaceId);
   const domains = resourceDefinition(input.resourceType)!.permissionDomains;
-  const permissions = expandPermissionGrants(role.permissions).filter(
+  const permissions = expandPermissionGrants(rolePermissions(role)).filter(
     (permission) => domains.includes(permission.split(".")[0]),
   );
   await withFreshAuthorization(() =>

@@ -72,7 +72,11 @@ export async function runIamDatabaseScenario4(
       roleId: viewerRole[0].id,
       mode: "move",
     }),
-  ).rejects.toMatchObject({ status: 403 });
+  ).resolves.toMatchObject({
+    blockers: expect.arrayContaining([
+      "You cannot move your own account out of this organization.",
+    ]),
+  });
   await assignRole({
     actorUserId: ownerId,
     workspaceId: firstProjectId,

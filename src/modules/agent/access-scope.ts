@@ -1,3 +1,7 @@
+import {
+  resolveStandardRole,
+  standardRoleName,
+} from "@/modules/iam/standard-role";
 import { requireResourceSharePermissions } from "@/modules/iam/resource-share-permissions";
 import { listResourceShareTargets } from "@/modules/iam/resource-sharing";
 import { authorization } from "@/server/domain/services/authorization";
@@ -173,7 +177,7 @@ export async function applyAgentAccessSelection(
     );
 
   const affectedUserIds = await applySingleAgentAccessSelection(
-    input,
+    { ...input, workspaceId: scope.workspaceId },
     executor,
   );
   const groupId =
@@ -187,7 +191,7 @@ export async function applyAgentAccessSelection(
 
   if (groupId) {
     const roleRows = await executor
-      .select({ id: roles.id, name: roles.name })
+      .select()
       .from(roles)
       .where(
         and(
@@ -195,10 +199,26 @@ export async function applyAgentAccessSelection(
           inArray(roles.name, ["workspace.agent_user", "workspace.viewer"]),
         ),
       );
-    const agentUserRole = roleRows.find(
+    const defaultAgentUserRole = roleRows.find(
       ({ name }) => name === "workspace.agent_user",
     );
-    const viewerRole = roleRows.find(({ name }) => name === "workspace.viewer");
+    const defaultViewerRole = roleRows.find(
+      ({ name }) => name === "workspace.viewer",
+    );
+    const agentUserRole = defaultAgentUserRole
+      ? await resolveStandardRole(
+          defaultAgentUserRole,
+          "workspace",
+          scope.workspaceId,
+        )
+      : undefined;
+    const viewerRole = defaultViewerRole
+      ? await resolveStandardRole(
+          defaultViewerRole,
+          "workspace",
+          scope.workspaceId,
+        )
+      : undefined;
     if (!agentUserRole || !viewerRole) {
       throw new AgentAccessError(
         "Assistant dependency roles are unavailable",
@@ -268,14 +288,15 @@ export async function applyAgentAccessSelection(
 
 async function applySingleAgentAccessSelection(
   input: {
+    workspaceId: string;
     agentId: string;
     userId: string;
     selection: AgentAccessSelection;
   },
   executor: AccessExecutor,
 ) {
-  const [useRole] = await executor
-    .select({ id: roles.id })
+  const [defaultUseRole] = await executor
+    .select()
     .from(roles)
     .where(
       and(
@@ -285,6 +306,9 @@ async function applySingleAgentAccessSelection(
       ),
     )
     .limit(1);
+  const useRole = defaultUseRole
+    ? await resolveStandardRole(defaultUseRole, "workspace", input.workspaceId)
+    : undefined;
   if (!useRole)
     throw new AgentAccessError("Assistant access role is unavailable", 500);
 
@@ -388,9 +412,11 @@ export async function getAgentAccessSelection(
         eq(roleBindings.resourceType, "agent"),
         eq(roleBindings.resourceId, agent.id),
         eq(roleBindings.principalType, "group"),
-        eq(roles.name, "workspace.agent_user"),
+        inArray(roles.name, [
+          "workspace.agent_user",
+          standardRoleName("workspace.agent_user"),
+        ]),
         eq(roles.scopeType, "workspace"),
-        eq(roles.isSystem, true),
       ),
     )
     .limit(1);

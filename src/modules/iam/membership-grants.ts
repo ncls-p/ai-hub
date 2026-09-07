@@ -1,4 +1,4 @@
-import { SYSTEM_ROLES } from "@/server/domain/entities/iam";
+import { findSystemRole } from "./use-cases.iam-operation-error";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/server/infrastructure/db";
 import {
@@ -20,8 +20,9 @@ export async function requireDelegableMembership(input: {
     actorUserId: input.actorUserId,
     resourceType: "organization",
     resourceId: input.organizationId,
-    permissions: SYSTEM_ROLES.find(({ name }) => name === "organization.user")!
-      .permissions,
+    permissions: rolePermissions(
+      await findSystemRole("organization.user", input.organizationId),
+    ),
   });
   const projects = await db
     .select({ id: workspaces.id })

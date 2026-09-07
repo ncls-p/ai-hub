@@ -1,3 +1,5 @@
+import { customizeStandardRole } from "./customize-standard-role";
+import { standardRoleKey } from "./standard-role";
 import { policyMutation } from "./policy-mutation";
 import { groupUserIds, requireManageableRole } from "./delegation";
 import { and, count, eq, ne } from "drizzle-orm";
@@ -38,15 +40,15 @@ export const updateCustomRole = policyMutation(
       .limit(1);
     if (
       !role ||
-      role.isSystem ||
-      !(
-        (role.scopeType === "organization" &&
-          role.ownerResourceType === "organization" &&
-          role.ownerResourceId === organization.id) ||
-        (role.scopeType === "workspace" &&
-          role.ownerResourceType === "workspace" &&
-          role.ownerResourceId === input.workspaceId)
-      )
+      (!role.isSystem &&
+        !(
+          (role.scopeType === "organization" &&
+            role.ownerResourceType === "organization" &&
+            role.ownerResourceId === organization.id) ||
+          (role.scopeType === "workspace" &&
+            role.ownerResourceType === "workspace" &&
+            role.ownerResourceId === input.workspaceId)
+        ))
     ) {
       throw new IamOperationError("Custom role not found", 404);
     }
@@ -93,16 +95,22 @@ export const updateCustomRole = policyMutation(
         scopeType === "organization" ? organization.id : input.workspaceId,
       permissions: [...rolePermissions(role), ...permissions],
     });
-    await requireManageableRole(input);
+    if (!role.isSystem) await requireManageableRole(input);
 
-    const name = customRoleName(input.displayName);
+    const name =
+      !role.isSystem && standardRoleKey(role)
+        ? role.name
+        : customRoleName(input.displayName);
     const [existingRole] = await db
       .select({ id: roles.id })
       .from(roles)
       .where(
         and(
-          eq(roles.ownerResourceType, role.ownerResourceType),
-          eq(roles.ownerResourceId, role.ownerResourceId),
+          eq(roles.ownerResourceType, scopeType),
+          eq(
+            roles.ownerResourceId,
+            scopeType === "organization" ? organization.id : input.workspaceId,
+          ),
           eq(roles.name, name),
           ne(roles.id, role.id),
         ),
@@ -130,17 +138,26 @@ export const updateCustomRole = policyMutation(
       .map(({ principalId }) => principalId);
     const teamUserIds = (await Promise.all(teamIds.map(groupUserIds))).flat();
 
-    const [updated] = await db
-      .update(roles)
-      .set({
-        name,
-        displayName: input.displayName.trim(),
-        description: input.description?.trim() || null,
-        permissionsJson: permissions,
-        updatedAt: new Date(),
-      })
-      .where(eq(roles.id, role.id))
-      .returning();
+    const updated = role.isSystem
+      ? await customizeStandardRole({
+          ...input,
+          organizationId: organization.id,
+          role,
+          permissions,
+        })
+      : (
+          await db
+            .update(roles)
+            .set({
+              name,
+              displayName: input.displayName.trim(),
+              description: input.description?.trim() || null,
+              permissionsJson: permissions,
+              updatedAt: new Date(),
+            })
+            .where(eq(roles.id, role.id))
+            .returning()
+        )[0];
 
     await Promise.all(
       [...new Set([...directUserIds, ...teamUserIds])].map((userId) =>
@@ -158,7 +175,8 @@ export const updateCustomRole = policyMutation(
         scopeType === "organization" ? organization.id : input.workspaceId,
       outcome: "success",
       metadata: {
-        roleId: role.id,
+        roleId: updated.id,
+        sourceRoleId: role.isSystem ? role.id : undefined,
         scopeType,
         permissionCount: permissions.length,
       },
@@ -181,7 +199,7 @@ export const deleteCustomRole = policyMutation(
       .limit(1);
     if (
       !role ||
-      role.isSystem ||
+      Boolean(standardRoleKey(role)) ||
       !(
         (role.scopeType === "organization" &&
           role.ownerResourceType === "organization" &&

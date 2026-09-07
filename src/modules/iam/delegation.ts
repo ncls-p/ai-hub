@@ -1,3 +1,4 @@
+import { isOrganizationOwner } from "./organization-owner";
 import { and, eq } from "drizzle-orm";
 import {
   authorization,
@@ -80,6 +81,14 @@ export async function requireSubordinatePrincipal(input: {
       "This principal cannot be administered here",
       403,
     );
+  if (
+    await isOrganizationOwner(
+      input.actorUserId,
+      input.resourceType,
+      input.resourceId,
+    )
+  )
+    return;
   const actorPermissions = await authorization.listPermissions(
     { principalType: "user", principalId: input.actorUserId },
     input.resourceType,

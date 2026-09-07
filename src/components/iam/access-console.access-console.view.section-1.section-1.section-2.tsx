@@ -62,11 +62,11 @@ export function AccessRolesSection2({
     snapshot.actions.organization["roles.create"];
   const canCreateProjectRole = snapshot.actions.workspace["roles.create"];
   return (
-    <CardHeader>
+    <CardHeader className="grid-cols-1! sm:grid-cols-[1fr_auto]!">
       <CardTitle>{t("rolesTitle")}</CardTitle>
       <CardDescription>{t("rolesDescription")}</CardDescription>
       <>
-        <CardAction>
+        <CardAction className="col-start-1 row-start-auto sm:col-start-2 sm:row-start-1">
           <Dialog
             open={roleOpen}
             onOpenChange={(open) => {
@@ -119,7 +119,12 @@ export function AccessRolesSection2({
                 </DialogTitle>
                 <DialogDescription>
                   {roleEditorReadOnly
-                    ? t("builtInRoleDescription")
+                    ? t(
+                        snapshot.roles.find((role) => role.id === editingRoleId)
+                          ?.name === "organization.owner"
+                          ? "simpleAccess.ownerProtected"
+                          : "simpleAccess.roleReadOnly",
+                      )
                     : editingRoleId
                       ? t("editRoleDescription")
                       : t("createRoleDescription")}
@@ -246,7 +251,7 @@ export function AccessRolesSection2({
                     }
                   />
                 </FieldGroup>
-                <DialogFooter className="sticky bottom-0">
+                <DialogFooter className="sticky bottom-0 bg-background pt-3">
                   {roleEditorReadOnly &&
                   canCustomizeViewedRole &&
                   canDelegateViewedRole ? (

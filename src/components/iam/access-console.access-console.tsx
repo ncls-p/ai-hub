@@ -191,6 +191,8 @@ export function useAccessConsoleController({
       snapshot?.roles.filter(
         (role) =>
           role.scopeType === assignment.scopeType &&
+          (assignment.scopeType !== "workspace" ||
+            role.permissions.includes("workspaces.get")) &&
           snapshot.assignableRoleIds.includes(role.id),
       ) ?? [],
     [assignment.scopeType, snapshot],

@@ -1,3 +1,4 @@
+import { resolveStandardRole } from "./standard-role";
 import { policyMutation } from "./policy-mutation";
 import { requireSubordinatePrincipal } from "./delegation";
 import { eq } from "drizzle-orm";
@@ -56,12 +57,15 @@ export const assignResourceRoleToPrincipals = policyMutation(
     }
 
     const { organization } = await getWorkspaceScope(input.workspaceId);
-    const [resource, role] = await Promise.all([
+    const [resource, foundRole] = await Promise.all([
       findAccessResource(input.resourceType, input.resourceId),
       db.select().from(roles).where(eq(roles.id, input.roleId)).limit(1),
     ]).then(
       ([foundResource, roleRows]) => [foundResource, roleRows[0]] as const,
     );
+    const role = foundRole
+      ? await resolveStandardRole(foundRole, "workspace", input.workspaceId)
+      : undefined;
     if (!resource || resource.workspaceId !== input.workspaceId) {
       throw new IamOperationError("Resource not found in this project", 404);
     }
@@ -130,13 +134,18 @@ export const assignResourceRoleToPrincipals = policyMutation(
           409,
         );
       }
+      const scopedViewerRole = await resolveStandardRole(
+        viewerRole,
+        "workspace",
+        input.workspaceId,
+      );
       await requireDelegablePermissions({
         actorUserId: input.actorUserId,
         resourceType: "workspace",
         resourceId: input.workspaceId,
-        permissions: rolePermissions(viewerRole),
+        permissions: rolePermissions(scopedViewerRole),
       });
-      dependencyRole = viewerRole;
+      dependencyRole = scopedViewerRole;
     }
 
     const targetScopes = await Promise.all(

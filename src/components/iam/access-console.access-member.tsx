@@ -20,6 +20,7 @@ export type PlatformAccessUser = {
 
 export type AccessTeam = {
   id: string;
+  updatedAt?: string;
   name: string;
   description: string | null;
   members: Array<{

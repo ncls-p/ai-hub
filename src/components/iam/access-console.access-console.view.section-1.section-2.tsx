@@ -59,11 +59,11 @@ export function AccessMainSection2({
     <TabsContent value="teams">
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="lg:col-span-2">
-          <CardHeader>
+          <CardHeader className="grid-cols-1! sm:grid-cols-[1fr_auto]!">
             <CardTitle>{t("teamsTitle")}</CardTitle>
             <CardDescription>{t("teamsDescription")}</CardDescription>
             {model.snapshot.actions.organization["teams.create"] ? (
-              <CardAction>
+              <CardAction className="col-start-1 row-start-auto sm:col-start-2 sm:row-start-1">
                 <Dialog open={teamOpen} onOpenChange={setTeamOpen}>
                   <DialogTrigger asChild>
                     <Button type="button" size="sm">
@@ -192,6 +192,19 @@ export function AccessMainSection2({
               canManage={canManageTeams}
               canDelete={model.snapshot.actions.organization["teams.delete"]}
               pending={pendingAction}
+              onEdit={(value) =>
+                mutate(
+                  `edit-team-${team.id}`,
+                  {
+                    action: "updateTeam",
+                    workspaceId,
+                    teamId: team.id,
+                    expectedUpdatedAt: team.updatedAt,
+                    ...value,
+                  },
+                  t("simpleAccess.teamUpdated"),
+                )
+              }
               onAdd={(userId) =>
                 mutate(
                   `team-${team.id}`,

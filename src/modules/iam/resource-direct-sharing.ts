@@ -1,3 +1,4 @@
+import { resolveStandardRole } from "./standard-role";
 import { resourceDefinition } from "@/server/domain/entities/access-resource";
 import { expandPermissionGrants } from "./permission-matching";
 import { requireSubordinatePrincipal } from "./delegation";
@@ -134,6 +135,7 @@ async function ensureKnowledgeEditorRole(actorUserId: string) {
 async function sharingRoles(
   resourceType: DirectlyShareableResourceType,
   actorUserId: string,
+  workspaceId: string,
 ) {
   const roleRows = await db
     .select()
@@ -165,7 +167,13 @@ async function sharingRoles(
       ? (roleRows.find(({ name }) => name === KNOWLEDGE_EDITOR_ROLE_NAME) ??
         (await ensureKnowledgeEditorRole(actorUserId)))
       : undefined;
-  return { rootRole, viewerRole, editorRole };
+  return {
+    rootRole: await resolveStandardRole(rootRole, "workspace", workspaceId),
+    viewerRole: await resolveStandardRole(viewerRole, "workspace", workspaceId),
+    editorRole: editorRole
+      ? await resolveStandardRole(editorRole, "workspace", workspaceId)
+      : undefined,
+  };
 }
 
 function directShareRoleIds(
@@ -192,7 +200,11 @@ export async function getDirectResourceSharing(input: {
   resourceId: string;
 }) {
   const { organization } = await sharingContext(input);
-  const sharing = await sharingRoles(input.resourceType, input.actorUserId);
+  const sharing = await sharingRoles(
+    input.resourceType,
+    input.actorUserId,
+    input.workspaceId,
+  );
   const [members, bindings] = await Promise.all([
     db
       .select({ id: users.id, name: users.name, email: users.email })
@@ -284,7 +296,11 @@ export const replaceDirectResourceSharing = policyMutation(
     }));
     const userIds = shares.map(({ userId }) => userId);
     const { organization } = await sharingContext(input, true);
-    const sharing = await sharingRoles(input.resourceType, input.actorUserId);
+    const sharing = await sharingRoles(
+      input.resourceType,
+      input.actorUserId,
+      input.workspaceId,
+    );
     const { rootRole, viewerRole, editorRole } = sharing;
     if (userIds.length > 0) {
       const validMembers = await db

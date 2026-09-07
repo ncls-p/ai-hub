@@ -1,3 +1,5 @@
+import { resolveStandardRole, standardRoleName } from "./standard-role";
+import { findAccessResource } from "@/server/infrastructure/db/access-resource-repository";
 import { requireResourceSharePermissions } from "./resource-share-permissions";
 import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
@@ -40,9 +42,11 @@ export async function getResourceAccessSelection(input: {
         eq(roleBindings.resourceType, input.resourceType),
         eq(roleBindings.resourceId, input.resourceId),
         eq(roleBindings.principalType, "group"),
-        eq(roles.name, "workspace.viewer"),
+        inArray(roles.name, [
+          "workspace.viewer",
+          standardRoleName("workspace.viewer"),
+        ]),
         eq(roles.scopeType, "workspace"),
-        eq(roles.isSystem, true),
       ),
     )
     .limit(1);
@@ -64,8 +68,8 @@ export async function applyResourceAccessSelection(input: {
       ...input,
       actorUserId: input.userId,
     });
-  const [viewerRole] = await db
-    .select({ id: roles.id })
+  const [defaultViewerRole] = await db
+    .select()
     .from(roles)
     .where(
       and(
@@ -75,6 +79,18 @@ export async function applyResourceAccessSelection(input: {
       ),
     )
     .limit(1);
+  const resource = await findAccessResource(
+    input.resourceType,
+    input.resourceId,
+  );
+  const viewerRole =
+    defaultViewerRole && resource
+      ? await resolveStandardRole(
+          defaultViewerRole,
+          "workspace",
+          resource.workspaceId,
+        )
+      : undefined;
   if (!viewerRole) throw new Error("Resource access role is unavailable");
 
   const previousTeams = await db

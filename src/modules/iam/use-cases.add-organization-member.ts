@@ -77,7 +77,10 @@ export const addOrganizationMember = policyMutation(
         ...input,
         organizationId: organization.id,
       });
-    const memberRole = await findSystemRole("organization.user");
+    const memberRole = await findSystemRole(
+      "organization.user",
+      organization.id,
+    );
 
     await requireDelegablePermissions({
       ...input,

@@ -14,6 +14,22 @@ const workspaceQuerySchema = z.object({
 
 export const mutationSchema = z.discriminatedUnion("action", [
   z.object({
+    action: z.literal("createAccount"),
+    workspaceId: z.uuid(),
+    name: z.string().trim().min(1).max(255),
+    email: z.email(),
+    password: z.string().min(8).max(128),
+    projectRoleId: z.uuid().optional(),
+  }),
+  z.object({
+    action: z.literal("updateTeam"),
+    workspaceId: z.uuid(),
+    teamId: z.uuid(),
+    name: z.string().trim().min(2).max(255),
+    description: z.string().trim().max(500).optional(),
+    expectedUpdatedAt: z.iso.datetime().optional(),
+  }),
+  z.object({
     action: z.literal("createOrganization"),
     organizationName: z.string().trim().min(2).max(255),
     organizationSlug: z.string().trim().max(128).optional(),
@@ -92,6 +108,7 @@ export const mutationSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("assignRole"),
+    replaceExisting: z.boolean().optional(),
     workspaceId: z.uuid(),
     principalType: z.enum(["user", "group"]),
     principalId: z.uuid(),

@@ -28,7 +28,7 @@ export async function updateWorkspaceMemberRole(input: {
     .limit(1);
   if (!workspace) throw new Error("Workspace not found");
 
-  const role = await getSystemWorkspaceRole(roleName);
+  const role = await getSystemWorkspaceRole(roleName, workspaceId);
   if (!role) throw new Error(`Role not found: ${roleName}`);
 
   const [member] = await db

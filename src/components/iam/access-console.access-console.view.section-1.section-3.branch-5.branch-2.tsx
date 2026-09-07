@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlusIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, UserPlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,6 @@ export function AccessPeopleTransferBranch2({
     accountMode,
     memberEmail,
     memberOpen,
-    platformUsers,
     setAccountForm,
     setAccountMode,
     setMemberEmail,
@@ -54,6 +53,7 @@ export function AccessPeopleTransferBranch2({
     t,
     workspaceId,
   } = model;
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [createdEmail, setCreatedEmail] = useState<string | null>(null);
@@ -62,12 +62,17 @@ export function AccessPeopleTransferBranch2({
     ? snapshot.roles.filter(
         (role) =>
           role.scopeType === "workspace" &&
+          role.permissions.includes("workspaces.get") &&
           snapshot.assignableRoleIds.includes(role.id),
       )
     : [];
   const roleId =
     chosenRoleId ??
-    availableRoles.find((role) => role.name === "workspace.viewer")?.id ??
+    availableRoles.find((role) =>
+      ["workspace.viewer", "custom.standard.workspace.viewer"].includes(
+        role.name,
+      ),
+    )?.id ??
     "none";
   const selectedRole = availableRoles.find((role) => role.id === roleId);
   const email = accountMode === "create" ? accountForm.email : memberEmail;
@@ -82,13 +87,14 @@ export function AccessPeopleTransferBranch2({
         accountMode === "create" &&
         createdEmail !== email.trim().toLowerCase()
       ) {
-        await fetchJson("/api/admin/users", {
+        await fetchJson("/api/workspace/iam", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...accountForm,
-            role: "user",
-            provisionOnly: true,
+            action: "createAccount",
+            workspaceId,
+            projectRoleId: roleId === "none" ? undefined : roleId,
           }),
         });
         setCreatedEmail(email.trim().toLowerCase());
@@ -134,7 +140,7 @@ export function AccessPeopleTransferBranch2({
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" size="sm" variant="outline">
+        <Button type="button" size="sm">
           <UserPlusIcon data-icon="inline-start" />
           {t("addPerson")}
         </Button>
@@ -148,7 +154,7 @@ export function AccessPeopleTransferBranch2({
             })}
           </DialogDescription>
         </DialogHeader>
-        {platformUsers ? (
+        {snapshot.actions.organization["members.create"] ? (
           <Tabs
             value={accountMode}
             onValueChange={(value) => {
@@ -223,7 +229,7 @@ export function AccessPeopleTransferBranch2({
                 </FieldLabel>
                 <Input
                   id="account-password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   required
                   minLength={8}
@@ -237,8 +243,28 @@ export function AccessPeopleTransferBranch2({
                     })
                   }
                 />
+                <Button
+                  className="self-start"
+                  size="sm"
+                  variant="ghost"
+                  type="button"
+                  aria-label={t(
+                    showPassword
+                      ? "simpleAccess.hidePassword"
+                      : "simpleAccess.showPassword",
+                  )}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  {t(
+                    showPassword
+                      ? "simpleAccess.hidePassword"
+                      : "simpleAccess.showPassword",
+                  )}
+                </Button>
                 <FieldDescription>
-                  {t("simpleAccess.standardAccount")}
+                  {t("simpleAccess.passwordHelp")}
                 </FieldDescription>
               </Field>
             ) : null}
@@ -252,7 +278,7 @@ export function AccessPeopleTransferBranch2({
                   onValueChange={setChosenRoleId}
                   disabled={pending}
                 >
-                  <SelectTrigger id="member-project-role">
+                  <SelectTrigger id="member-project-role" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

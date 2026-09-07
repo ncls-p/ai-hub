@@ -1,3 +1,4 @@
+import { resolveStandardRole } from "./standard-role";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/infrastructure/db";
 import { roles } from "@/server/infrastructure/db/schema";
@@ -16,11 +17,13 @@ export async function validateInitialProjectRole(input: {
   projectRoleId?: string;
 }) {
   if (!input.projectRoleId) return null;
-  const [role] = await db
+  let [role] = await db
     .select()
     .from(roles)
     .where(eq(roles.id, input.projectRoleId))
     .limit(1);
+  if (role)
+    role = await resolveStandardRole(role, "workspace", input.workspaceId);
   if (
     !role ||
     role.scopeType !== "workspace" ||

@@ -34,6 +34,30 @@ type Chain = {
 const selectResults: unknown[][] = [];
 const mutationSets: unknown[] = [];
 
+vi.mock("@/server/infrastructure/db/access-resource-repository", () => ({
+  findAccessResource: vi.fn().mockResolvedValue({
+    workspaceId: "workspace-1",
+    organizationId: "organization-1",
+  }),
+}));
+vi.mock(
+  "@/modules/iam/use-cases.iam-operation-error",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("@/modules/iam/use-cases.iam-operation-error")
+      >();
+    const { SYSTEM_ROLES } = await import("@/server/domain/entities/iam");
+    return {
+      ...actual,
+      findSystemRole: vi.fn(async (name: string) => {
+        const role = SYSTEM_ROLES.find((item) => item.name === name)!;
+        return { ...role, permissionsJson: role.permissions };
+      }),
+    };
+  },
+);
+
 vi.mock("@/modules/iam/resource-sharing", () => ({
   listResourceShareTargets: vi.fn().mockResolvedValue([
     { type: "agent", id: "agent-1" },

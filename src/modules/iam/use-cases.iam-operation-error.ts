@@ -1,3 +1,4 @@
+import { resolveStandardRole } from "./standard-role";
 import { SYSTEM_ROLES } from "@/server/domain/entities/iam";
 import type { ResourceType } from "@/server/domain/services/authorization";
 import { and, eq, isNull } from "drizzle-orm";
@@ -112,14 +113,20 @@ export async function invalidateUserOrganizationAccess(
   await authorization.invalidatePrincipalPermissionCache(userId);
 }
 
-export async function findSystemRole(name: string) {
+export async function findSystemRole(name: string, scopeId?: string) {
   const [role] = await db
     .select()
     .from(roles)
     .where(and(eq(roles.name, name), eq(roles.isSystem, true)))
     .limit(1);
   if (!role) throw new IamOperationError(`System role unavailable: ${name}`);
-  return role;
+  return scopeId
+    ? resolveStandardRole(
+        role,
+        role.scopeType === "organization" ? "organization" : "workspace",
+        scopeId,
+      )
+    : role;
 }
 
 export async function createOrganizationWithProject(input: {

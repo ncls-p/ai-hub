@@ -1,3 +1,4 @@
+import { resolveStandardRole } from "./standard-role";
 import { requireDelegableMembership } from "./membership-grants";
 import { requireManageableOrganizationMember } from "./organization-member-delegation";
 import {
@@ -64,6 +65,20 @@ export async function previewMemberTransfer(input: {
     .from(roles)
     .where(eq(roles.id, input.roleId))
     .limit(1);
+  if (
+    destinationRole &&
+    (
+      await resolveStandardRole(
+        destinationRole,
+        "workspace",
+        input.targetWorkspaceId,
+      )
+    ).id !== destinationRole.id
+  )
+    throw new IamOperationError(
+      "This role was customized. Reload access and select the current role.",
+      409,
+    );
   const roleIsCompatible =
     destinationRole?.scopeType === "workspace" &&
     (destinationRole.isSystem ||

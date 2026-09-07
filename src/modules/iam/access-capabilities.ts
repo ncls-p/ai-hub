@@ -1,3 +1,5 @@
+import { standardRoleKey } from "./standard-role";
+import { isOrganizationOwner } from "./organization-owner";
 import { authorization } from "@/server/domain/services/authorization";
 import { requireManageableRole } from "./delegation";
 import {
@@ -22,16 +24,22 @@ export async function roleCapabilities(
   roleRows: ScopedRole[],
   organization: string[],
   workspace: string[],
+  organizationId: string,
 ) {
+  const owner = await isOrganizationOwner(
+    userId,
+    "organization",
+    organizationId,
+  );
   const result = new Map<string, { canUpdate: boolean; canDelete: boolean }>();
   for (const role of roleRows) {
     const permissions =
       role.scopeType === "organization" ? organization : workspace;
     const canDelegate =
-      !role.isSystem &&
+      (!role.isSystem || (owner && role.name !== "organization.owner")) &&
       canDelegatePermissionSet(permissions, rolePermissions(role));
     let canManage = canDelegate;
-    if (canManage) {
+    if (canManage && !role.isSystem) {
       try {
         await requireManageableRole({ actorUserId: userId, roleId: role.id });
       } catch (error) {
@@ -44,6 +52,7 @@ export async function roleCapabilities(
         canManage &&
         permissions.some((grant) => matchesPermission(grant, "roles.update")),
       canDelete:
+        !standardRoleKey(role) &&
         canManage &&
         permissions.some((grant) => matchesPermission(grant, "roles.delete")),
     });
@@ -58,6 +67,8 @@ export async function subordinateMemberIds(
   resourceId: string,
   actor: string[],
 ) {
+  if (await isOrganizationOwner(userId, scope, resourceId))
+    return members.map((member) => member.userId);
   const ids = await Promise.all(
     members.map(async (member) => {
       if (member.userId === userId) return null;

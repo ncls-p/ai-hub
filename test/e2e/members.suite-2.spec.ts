@@ -42,9 +42,9 @@ test.describe("members page", () => {
     });
     await roleRow.getByRole("button", { name: /permissions/i }).click();
     const roleDialog = page.getByRole("dialog", {
-      name: /Project Viewer permissions/,
+      name: /Edit Project Viewer/,
     });
-    await expect(roleDialog.getByLabel("Role name")).toBeDisabled();
+    await expect(roleDialog.getByLabel("Role name")).toBeEnabled();
     await roleDialog
       .getByRole("textbox", { name: "Search permissions" })
       .fill("workspaces.get");
@@ -52,9 +52,9 @@ test.describe("members page", () => {
       name: "View projects",
     });
     await expect(permission).toBeChecked();
-    await expect(permission).toBeDisabled();
+    await expect(permission).toBeEnabled();
     await expect(
-      roleDialog.getByRole("button", { name: "Duplicate and customize" }),
+      roleDialog.getByRole("button", { name: "Save role" }),
     ).toBeVisible();
   });
 
