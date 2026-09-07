@@ -1,11 +1,17 @@
 "use client";
 
-import { KeyRoundIcon, SaveIcon } from "lucide-react";
+import { SaveIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type SyntheticEvent, useState } from "react";
 import { toast } from "sonner";
 
-import { AdvancedSection } from "@/components/ui/advanced-section";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,6 +34,7 @@ export function SettingsPasswordCard() {
 
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loading) return;
     setError("");
     setSuccess("");
 
@@ -79,114 +86,113 @@ export function SettingsPasswordCard() {
   }
 
   return (
-    <AdvancedSection
-      icon={KeyRoundIcon}
-      label={t("passwordTitle")}
-      hint={t("passwordDescription")}
-    >
-      <p className="mb-4 max-w-xl text-sm text-muted-foreground">
-        {t("passwordDescription")}
-      </p>
-      <form
-        className="flex max-w-xl flex-col gap-4"
-        onSubmit={handleSubmit}
-        aria-busy={loading}
-      >
-        {error ? (
-          <Alert id={feedbackId} variant="destructive">
-            <AlertTitle>{t("passwordUpdateFailed")}</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        ) : null}
-        {success ? (
-          <Alert id={feedbackId}>
-            <AlertTitle>{t("passwordUpdated")}</AlertTitle>
-            <AlertDescription>
-              {t("passwordUpdatedDescription")}
-            </AlertDescription>
-          </Alert>
-        ) : null}
+    <Card className="border-0 rounded-none shadow-none bg-transparent">
+      <CardHeader className="px-0">
+        <CardTitle>{t("passwordTitle")}</CardTitle>
+        <CardDescription>{t("passwordDescription")}</CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">
+        <form
+          className="flex max-w-xl flex-col gap-4"
+          onSubmit={handleSubmit}
+          aria-busy={loading}
+        >
+          {error ? (
+            <Alert id={feedbackId} variant="destructive">
+              <AlertTitle>{t("passwordUpdateFailed")}</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+          {success ? (
+            <Alert id={feedbackId}>
+              <AlertTitle>{t("passwordUpdated")}</AlertTitle>
+              <AlertDescription>
+                {t("passwordUpdatedDescription")}
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
-        <Field>
-          <FieldLabel htmlFor="current-password">
-            {t("currentPassword")}
-          </FieldLabel>
-          <FieldContent>
-            <Input
-              id="current-password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error || success ? feedbackId : undefined}
-            />
-          </FieldContent>
-        </Field>
-
-        <div className="grid gap-4 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="new-password">{t("newPassword")}</FieldLabel>
-            <FieldContent>
-              <Input
-                id="new-password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error || success ? feedbackId : undefined}
-              />
-            </FieldContent>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="confirm-password">
-              {t("confirmPassword")}
+            <FieldLabel htmlFor="current-password">
+              {t("currentPassword")}
             </FieldLabel>
             <FieldContent>
               <Input
-                id="confirm-password"
+                id="current-password"
                 type="password"
-                autoComplete="new-password"
-                minLength={8}
+                autoComplete="current-password"
                 required
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error || success ? feedbackId : undefined}
               />
             </FieldContent>
           </Field>
-        </div>
 
-        <label className="flex items-start gap-3 rounded-xl border bg-background p-3 text-sm">
-          <Checkbox
-            checked={revokeOtherSessions}
-            onCheckedChange={(checked) =>
-              setRevokeOtherSessions(checked === true)
-            }
-            aria-label={t("revokeOtherSessions")}
-          />
-          <span>
-            <span className="font-medium">{t("revokeOtherSessions")}</span>
-            <span className="mt-1 block text-xs text-muted-foreground">
-              {t("revokeOtherSessionsHint")}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="new-password">{t("newPassword")}</FieldLabel>
+              <FieldContent>
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error || success ? feedbackId : undefined}
+                />
+              </FieldContent>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="confirm-password">
+                {t("confirmPassword")}
+              </FieldLabel>
+              <FieldContent>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error || success ? feedbackId : undefined}
+                />
+              </FieldContent>
+            </Field>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-xl border bg-background p-3 text-sm">
+            <Checkbox
+              checked={revokeOtherSessions}
+              onCheckedChange={(checked) =>
+                setRevokeOtherSessions(checked === true)
+              }
+              aria-label={t("revokeOtherSessions")}
+            />
+            <span>
+              <span className="font-medium">{t("revokeOtherSessions")}</span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {t("revokeOtherSessionsHint")}
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
 
-        <Button type="submit" className="w-fit" disabled={loading}>
-          {loading ? (
-            <Spinner data-icon="inline-start" />
-          ) : (
-            <SaveIcon data-icon="inline-start" aria-hidden="true" />
-          )}
-          {loading ? t("updatingPassword") : t("updatePassword")}
-        </Button>
-      </form>
-    </AdvancedSection>
+          <Button type="submit" className="w-fit" disabled={loading}>
+            {loading ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <SaveIcon data-icon="inline-start" aria-hidden="true" />
+            )}
+            {loading ? t("updatingPassword") : t("updatePassword")}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

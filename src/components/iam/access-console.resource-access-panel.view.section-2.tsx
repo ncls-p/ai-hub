@@ -1,6 +1,6 @@
 import { PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -16,6 +16,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectGroup,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -31,6 +32,8 @@ export function ResourceAccessPanelSection2({
     assignmentQuery,
     details,
     detailsLoading,
+    detailsError,
+    loadDetails,
     filteredGroupedAssignments,
     filteredPrincipals,
     includeDependencies,
@@ -55,13 +58,13 @@ export function ResourceAccessPanelSection2({
     <Dialog
       open={Boolean(selected)}
       onOpenChange={(open) => {
-        if (!open) {
+        if (!open && !pending) {
           setSelected(null);
           setDetails(null);
         }
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="max-h-[90vh] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             {selected
@@ -72,7 +75,22 @@ export function ResourceAccessPanelSection2({
             {t("resourceAccessDescription")}
           </DialogDescription>
         </DialogHeader>
-        {detailsLoading || !details ? (
+        {detailsError ? (
+          <Alert variant="destructive">
+            <AlertTitle>{t("resourcesLoadFailed")}</AlertTitle>
+            <AlertDescription>
+              {detailsError}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={detailsLoading}
+                onClick={() => selected && void loadDetails(selected)}
+              >
+                {t("retry")}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : detailsLoading || !details ? (
           <div className="flex min-h-48 items-center justify-center">
             <Spinner />
             <span className="sr-only">{t("loadingResources")}</span>
@@ -81,10 +99,10 @@ export function ResourceAccessPanelSection2({
           <div className="flex flex-col gap-5">
             {details.capabilities.canManageResourceAccess ? (
               <form
-                className="grid gap-3 rounded-xl bg-muted/35 p-4 md:grid-cols-3"
+                className="grid min-w-0 grid-cols-1 gap-4 border-b pb-5 sm:grid-cols-2"
                 onSubmit={assignResourceRole}
               >
-                <Field>
+                <Field className="min-w-0">
                   <FieldLabel htmlFor="resource-principal-type">
                     {t("principalType")}
                   </FieldLabel>
@@ -102,12 +120,14 @@ export function ResourceAccessPanelSection2({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="user">{t("member")}</SelectItem>
-                      <SelectItem value="group">{t("team")}</SelectItem>
+                      <SelectGroup>
+                        <SelectItem value="user">{t("member")}</SelectItem>
+                        <SelectItem value="group">{t("team")}</SelectItem>
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field>
+                <Field className="min-w-0 sm:col-span-2 sm:row-start-2">
                   <FieldLabel htmlFor="resource-principal">
                     {t("principal")}
                   </FieldLabel>
@@ -120,7 +140,7 @@ export function ResourceAccessPanelSection2({
                   />
                   <div
                     id="resource-principal"
-                    className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2"
+                    className="max-h-40 flex flex-col gap-1 overflow-y-auto rounded-md border p-2"
                   >
                     {filteredPrincipals.map((principal) => {
                       const id =
@@ -156,23 +176,25 @@ export function ResourceAccessPanelSection2({
                     })}
                   </div>
                 </Field>
-                <Field>
+                <Field className="min-w-0">
                   <FieldLabel htmlFor="resource-role">{t("role")}</FieldLabel>
                   <Select value={roleId} onValueChange={setRoleId}>
                     <SelectTrigger id="resource-role" className="w-full">
                       <SelectValue placeholder={t("choose")} />
                     </SelectTrigger>
                     <SelectContent>
-                      {details.roles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          {role.displayName}
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        {details.roles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.displayName}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </Field>
                 {selected?.type === "agent" ? (
-                  <label className="flex items-start gap-2 md:col-span-3">
+                  <label className="flex items-start gap-2 sm:col-span-2">
                     <Checkbox
                       aria-label={t("shareAgentDependencies")}
                       checked={includeDependencies}
@@ -191,10 +213,10 @@ export function ResourceAccessPanelSection2({
                   </label>
                 ) : null}
                 <Button
-                  className="md:col-span-3 md:justify-self-end"
+                  className="sm:col-span-2 sm:justify-self-end"
                   type="submit"
                   disabled={
-                    principalIds.length === 0 || !roleId || pending === "assign"
+                    principalIds.length === 0 || !roleId || Boolean(pending)
                   }
                 >
                   {pending === "assign" ? (
@@ -221,25 +243,29 @@ export function ResourceAccessPanelSection2({
               />
             </div>
 
-            <div className="overflow-hidden rounded-xl border">
-              <table className="w-full text-left">
-                <thead className="bg-muted/45 text-xs text-muted-foreground">
+            <div className="@container min-w-0 border-y">
+              <table className="w-full table-fixed text-left @max-xl:block">
+                <thead className="text-xs text-muted-foreground @max-xl:sr-only">
                   <tr>
                     <th className="px-4 py-3 font-medium">{t("principal")}</th>
                     <th className="px-4 py-3 font-medium">{t("role")}</th>
-                    <th className="px-4 py-3 font-medium">{t("scope")}</th>
                     <th className="px-4 py-3 text-right font-medium">
                       {t("actions")}
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y @max-xl:block">
                   {filteredGroupedAssignments.map(([principalKey, group]) => (
-                    <tr key={principalKey}>
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{group.principalName}</div>
+                    <tr
+                      key={principalKey}
+                      className="@max-xl:grid @max-xl:grid-cols-[minmax(0,1fr)_auto]"
+                    >
+                      <td className="px-4 py-3 @max-xl:col-span-2">
+                        <div className="break-words [overflow-wrap:anywhere] font-medium">
+                          {group.principalName}
+                        </div>
                         {group.principalDetail ? (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="break-all text-xs text-muted-foreground">
                             {group.principalDetail}
                           </div>
                         ) : null}
@@ -247,29 +273,21 @@ export function ResourceAccessPanelSection2({
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1.5">
                           {group.assignments.map((assignment) => (
-                            <Badge key={assignment.id} variant="outline">
-                              {assignment.roleName}
-                            </Badge>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1.5">
-                          {group.assignments.map((assignment) => (
-                            <Badge
+                            <span
                               key={assignment.id}
-                              variant={
-                                assignment.scope === "resource"
-                                  ? "default"
-                                  : "secondary"
-                              }
+                              className="flex min-w-0 flex-col gap-1"
                             >
-                              {assignment.scope === "resource"
-                                ? t("resourceScope")
-                                : assignment.scope === "organization"
-                                  ? t("organizationScope")
-                                  : t("projectScope")}
-                            </Badge>
+                              <span className="text-sm break-words [overflow-wrap:anywhere]">
+                                {assignment.roleName}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {assignment.scope === "resource"
+                                  ? t("resourceScope")
+                                  : assignment.scope === "organization"
+                                    ? t("organizationScope")
+                                    : t("projectScope")}
+                              </span>
+                            </span>
                           ))}
                         </div>
                       </td>
@@ -292,7 +310,7 @@ export function ResourceAccessPanelSection2({
                                     role: assignment.roleName,
                                     name: assignment.principalName,
                                   })}
-                                  disabled={pending === assignment.id}
+                                  disabled={Boolean(pending)}
                                   onClick={() =>
                                     void removeResourceAssignment(assignment.id)
                                   }
@@ -317,7 +335,7 @@ export function ResourceAccessPanelSection2({
                     <tr>
                       <td
                         className="px-4 py-8 text-center text-sm text-muted-foreground"
-                        colSpan={4}
+                        colSpan={3}
                       >
                         {t("noResourceAccessResults")}
                       </td>

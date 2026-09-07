@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { applyOrganizationTheme } from "@/components/organization-theme";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,7 +51,7 @@ async function readLogo(file: File) {
   });
 }
 
-export function OrganizationBrandingCard() {
+function OrganizationBrandingContent() {
   const t = useTranslations("settings.branding");
   const { workspaceId, refresh } = useWorkspace();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +64,8 @@ export function OrganizationBrandingCard() {
     copyOrganizationHero(),
   );
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -84,10 +87,10 @@ export function OrganizationBrandingCard() {
         );
       })
       .catch((error: Error) => {
-        if (error.name !== "AbortError") toast.error(t("loadFailed"));
+        if (error.name !== "AbortError") setLoadError(true);
       });
     return () => controller.abort();
-  }, [t, workspaceId]);
+  }, [t, workspaceId, retry]);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -134,6 +137,24 @@ export function OrganizationBrandingCard() {
     }
   }
 
+  if (loadError)
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>{t("loadFailed")}</AlertTitle>
+        <AlertDescription>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setLoadError(false);
+              setRetry((value) => value + 1);
+            }}
+          >
+            {t("retry")}
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
   if (!branding) return <Skeleton className="h-80 rounded-2xl" />;
   const savedHero = branding.heroConfig ?? DEFAULT_ORGANIZATION_HERO;
   const dirty =
@@ -246,4 +267,16 @@ export function OrganizationBrandingCard() {
       </div>
     </section>
   );
+}
+
+export function OrganizationBrandingCard() {
+  const { workspaceId, isLoading } = useWorkspace();
+  const t = useTranslations("settings.branding");
+  if (isLoading && !workspaceId)
+    return <Skeleton className="h-80 rounded-2xl" />;
+  if (!workspaceId)
+    return (
+      <p className="text-sm text-muted-foreground">{t("noOrganization")}</p>
+    );
+  return <OrganizationBrandingContent key={workspaceId} />;
 }

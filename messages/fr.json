@@ -105,8 +105,8 @@
     "access": "Accès",
     "usage": "Consommation",
     "activityLog": "Historique d’activité",
-    "settings": "Paramètres",
-    "adminSettings": "Paramètres plateforme",
+    "settings": "Mon compte",
+    "adminSettings": "Paramètres de l’application",
     "setup": "Configuration initiale",
     "assistantConfig": "Réglages de l’assistant",
     "workspace": "App",
@@ -2319,8 +2319,8 @@
     }
   },
   "settings": {
-    "title": "Paramètres",
-    "description": "Préférences personnelles de votre compte.",
+    "title": "Paramètres personnels",
+    "description": "Gérez votre compte et votre mot de passe.",
     "languageTitle": "Langue",
     "languageDescription": "Choisissez la langue de l’interface pour votre compte.",
     "adminLinkTitle": "Administration plateforme",
@@ -2385,12 +2385,15 @@
       "saving": "Enregistrement…",
       "saved": "Identité de l’organisation mise à jour",
       "loadFailed": "Impossible de charger l’identité de l’organisation",
-      "saveFailed": "Impossible d’enregistrer l’identité de l’organisation"
-    }
+      "saveFailed": "Impossible d’enregistrer l’identité de l’organisation",
+      "retry": "Réessayer",
+      "noOrganization": "Aucune organisation active. Choisissez un projet depuis le menu de votre compte."
+    },
+    "accountTitle": "Mon compte"
   },
   "admin": {
-    "platformSettingsTitle": "Paramètres plateforme",
-    "platformSettingsDescription": "Inscription, automatisation, intégrations et santé du système.",
+    "platformSettingsTitle": "Paramètres de l’application",
+    "platformSettingsDescription": "Réglages de l’organisation et de la plateforme.",
     "settingsPage": {
       "loadFailed": "Impossible de charger les réglages",
       "loadErrorDescription": "Cette section n’a pas pu être chargée. Aucun réglage n’a été modifié.",
@@ -2891,14 +2894,14 @@
     "readOnlyDescription": "Vous pouvez consulter les accès effectifs, mais seul un administrateur des accès peut les modifier.",
     "tabs": {
       "access": "Attributions",
-      "people": "Personnes et accès",
+      "people": "Personnes",
       "resources": "Ressources",
       "members": "Membres",
       "teams": "Équipes",
       "roles": "Rôles"
     },
-    "assignmentsTitle": "Qui a accès",
-    "assignmentsDescription": "Choisissez qui peut accéder au projet et ce que chaque personne peut faire.",
+    "assignmentsTitle": "Personnes",
+    "assignmentsDescription": "Ajoutez des personnes et choisissez leur rôle dans ce projet.",
     "searchPeople": "Rechercher une personne, un e-mail, un rôle ou une équipe…",
     "searchPrincipal": "Rechercher un membre ou une équipe",
     "selectedCount": "{count, plural, one {# personne sélectionnée} other {# personnes sélectionnées}}",
@@ -3015,7 +3018,7 @@
     "cancel": "Conserver l’accès",
     "confirmRemove": "Retirer l’accès",
     "teamsTitle": "Équipes",
-    "teamsDescription": "Regroupez les membres une fois, puis attribuez des rôles à l’équipe sur plusieurs projets.",
+    "teamsDescription": "Regroupez les personnes pour leur donner les mêmes accès.",
     "searchTeams": "Rechercher une équipe ou un membre…",
     "createTeam": "Créer une équipe",
     "createTeamTitle": "Créer une équipe",
@@ -3041,7 +3044,7 @@
     "deleteTeamDescription": "L’équipe et toutes ses attributions d’accès seront supprimées. Ses membres resteront dans l’organisation.",
     "teamDeleted": "Équipe supprimée",
     "rolesTitle": "Rôles",
-    "rolesDescription": "Un rôle regroupe des droits. Modifiez un rôle existant ou créez-en un pour votre équipe.",
+    "rolesDescription": "Un rôle définit ce qu’une personne peut faire. Utilisez un rôle existant ou créez le vôtre.",
     "createRole": "Créer un rôle personnalisé",
     "createRoleTitle": "Créer un rôle personnalisé",
     "createRoleDescription": "Donnez au rôle un nom orienté résultat, choisissez sa portée, puis sélectionnez uniquement les droits nécessaires.",
@@ -3075,7 +3078,7 @@
     "deleteRoleDescription": "Seuls les rôles sans attribution active peuvent être supprimés.",
     "roleDeleted": "Rôle supprimé",
     "resourcesTitle": "Accès aux ressources",
-    "resourcesDescription": "Recherchez n’importe quelle ressource du projet et gérez ses accès directs et hérités au même endroit.",
+    "resourcesDescription": "Choisissez une ressource pour voir qui y a accès et modifier son partage.",
     "manageScope": "Gérer",
     "projectActions": "Projet actif",
     "organizationActions": "Organisation",
@@ -3217,11 +3220,11 @@
     "resourceAccess": "Accès à la ressource",
     "resourceAccessTitle": "Accès à {name}",
     "resourceAccessDescription": "Sélectionnez un ou plusieurs membres ou équipes. Une ressource privée reste visible uniquement par son propriétaire et les destinataires d’un accès direct.",
-    "shareAgentDependencies": "Partager aussi les dépendances de l’assistant",
-    "shareAgentDependenciesDescription": "Accorde aussi un accès en lecture à ses sources de données actives, serveurs MCP, compétences, outils personnalisés, assistants délégués, fournisseur et modèle. Chaque destinataire conserve ses propres identifiants de connexion.",
-    "searchResourceAccess": "Rechercher dans les accès effectifs…",
+    "shareAgentDependencies": "Inclure les documents et outils de l’assistant",
+    "shareAgentDependenciesDescription": "Permet aussi de consulter les documents, outils et réglages nécessaires à cet assistant. Les identifiants de connexion restent personnels.",
+    "searchResourceAccess": "Rechercher une personne, une équipe ou un rôle…",
     "noResourceAccessResults": "Aucun membre, équipe, rôle ou niveau correspondant.",
-    "grantResourceAccess": "Donner un accès direct",
+    "grantResourceAccess": "Donner accès",
     "resourceAccessGranted": "Accès à la ressource accordé",
     "removeResourceRole": "Retirer le rôle {role} de {name}",
     "resourceScope": "Cette ressource",
@@ -3600,7 +3603,23 @@
       "hidePassword": "Masquer le mot de passe",
       "replaceProjectRole": "Ce choix remplace ses rôles attribués directement dans ce projet. Les accès de l’organisation et des équipes restent applicables.",
       "changeRole": "Modifier le rôle",
-      "projectSettings": "Réglages du projet et de l’organisation"
+      "projectSettings": "Réglages du projet et de l’organisation",
+      "roleNames": {
+        "projectAdmin": "Administrateur",
+        "projectEditor": "Éditeur",
+        "projectViewer": "Lecteur"
+      },
+      "multipleRoles": "Plusieurs rôles",
+      "noDirectRole": "Aucun rôle direct",
+      "changePersonRole": "Rôle de {name} : {role}",
+      "accessDetails": "Détails des accès",
+      "additionalAccess": "Autres accès : voir les détails",
+      "customRoleHelp": "Droits définis dans ce rôle personnalisé.",
+      "teamCount": "{count, plural, =0 {Aucune équipe} one {# équipe} other {# équipes}}",
+      "teamMembers": "Voir les membres",
+      "resourceActions": "Actions pour {name}",
+      "advancedActions": "Autres actions",
+      "ownerAccess": "Propriétaire de l’organisation · contrôle complet"
     },
     "builtInRoleDescriptions": {
       "owner": "Administrer toute l’organisation, y compris sa suppression et sa migration.",
@@ -3635,7 +3654,9 @@
     "accessCheckFailedTitle": "Impossible de vérifier vos droits",
     "accessCheckFailedDescription": "Aucune action sensible n’est disponible tant que la vérification n’a pas abouti.",
     "retryAccess": "Réessayer",
-    "backToChat": "Revenir au chat"
+    "backToChat": "Revenir au chat",
+    "myAccount": "Mon compte",
+    "appSettings": "Paramètres de l’application"
   },
   "auth": {
     "eyebrow": "Espace IA d’entreprise",

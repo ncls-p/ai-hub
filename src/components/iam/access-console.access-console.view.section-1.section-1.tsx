@@ -13,7 +13,7 @@ export function AccessMainSection1({
   const {} = model;
   return (
     <TabsContent value="roles" className="flex flex-col gap-4">
-      <Card>
+      <Card className="rounded-none border-0 bg-transparent shadow-none">
         <AccessRolesSection2 model={model} />
         <AccessRolesSection1 model={model} />
       </Card>

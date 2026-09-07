@@ -62,11 +62,11 @@ export function AccessRolesSection2({
     snapshot.actions.organization["roles.create"];
   const canCreateProjectRole = snapshot.actions.workspace["roles.create"];
   return (
-    <CardHeader className="grid-cols-1! sm:grid-cols-[1fr_auto]!">
+    <CardHeader className="grid-cols-1! px-0 sm:grid-cols-[1fr_auto]!">
       <CardTitle>{t("rolesTitle")}</CardTitle>
       <CardDescription>{t("rolesDescription")}</CardDescription>
       <>
-        <CardAction className="col-start-1 row-start-auto sm:col-start-2 sm:row-start-1">
+        <CardAction className="col-start-1 row-start-auto justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end">
           <Dialog
             open={roleOpen}
             onOpenChange={(open) => {

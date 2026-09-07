@@ -40,16 +40,10 @@ test.describe("settings page", () => {
 
   test("admin settings link exists for admins", async ({ page }) => {
     await page.goto("/en/settings");
-    await page.waitForTimeout(2000);
-
-    // Admin link should be visible for admin users
-    const adminLink = page
-      .getByRole("link", { name: /platform settings|admin/i })
-      .first();
-
-    if (await adminLink.isVisible()) {
-      await expect(adminLink).toBeVisible();
-    }
+    await page.getByRole("button", { name: e2eUser.name, exact: true }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "App settings", exact: true }),
+    ).toBeVisible();
   });
 
   test("persists organization logo and preset theme", async ({ page }) => {
@@ -70,7 +64,7 @@ test.describe("settings page", () => {
       });
     await resetBranding();
     try {
-      await page.goto("/en/settings");
+      await page.goto("/en/admin/settings");
       const branding = page.locator("section").filter({
         has: page.getByRole("heading", { name: "Organization branding" }),
       });
@@ -127,7 +121,7 @@ test.describe("settings page", () => {
     if (!workspaceId) throw new Error("E2E workspace is missing");
 
     try {
-      await page.goto("/en/settings");
+      await page.goto("/en/admin/settings");
       const branding = page.locator("section").filter({
         has: page.getByRole("heading", { name: "Organization branding" }),
       });

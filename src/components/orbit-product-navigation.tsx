@@ -1,6 +1,11 @@
 "use client";
 
-import { ChevronDownIcon, SlidersHorizontalIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  SlidersHorizontalIcon,
+  UserRoundIcon,
+  SettingsIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Fragment, useEffect } from "react";
 
@@ -260,6 +265,18 @@ export function OrbitAccountMenu({ displayName }: { displayName?: string }) {
           <DropdownMenuLabel className="truncate px-2.5 py-2 text-sm font-medium">
             {displayName || tShell("workspace")}
           </DropdownMenuLabel>
+          <DropdownMenuItem asChild>
+            <Link href="/settings">
+              <UserRoundIcon aria-hidden="true" />
+              {tShell("myAccount")}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/admin/settings">
+              <SettingsIcon aria-hidden="true" />
+              {tShell("appSettings")}
+            </Link>
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         {workspacesByOrganization.length > 0 ? (
           <>

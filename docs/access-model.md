@@ -83,7 +83,7 @@ Le propriétaire peut modifier les rôles prédéfinis de son organisation ou du
 - **Créer un compte** : nom, e-mail, mot de passe visible à la demande et rôle expliqué ; Lecteur par défaut. Une création réussie suivie d’un échec d’affectation reste récupérable dans le formulaire.
 - **Équipes** : modification du nom et de la description avec contrôle de version, sans perdre les membres ni les attributions.
 - **Rôles** : catégories à trois niveaux, détails recherchables, explication de l’impact de la sauvegarde et de la protection du propriétaire.
-- Les réglages et la création de projets/organisations sont repliés pour laisser la place aux personnes.
+- Les réglages et la création de projets/organisations se trouvent dans les paramètres de l’application. La gestion des personnes conserve seulement le sélecteur de projet.
 - Tests navigateur aux largeurs 320, 390, 768 et 1440 pixels : absence de débordement et de badges coupés, formulaire mobile, création/affectation et édition d’équipe. Tests PostgreSQL : propriétaire inclus dans ses équipes, personnalisation isolée par projet, affectations existantes/futures, création sans administrateur de plateforme, conflits et dernier propriétaire actif.
 
 ## Migration et exploitation
@@ -96,4 +96,20 @@ Les caches de lecture ordinaires gardent une durée maximale de 60 secondes et l
 
 Le parcours personne → portée → rôle reprend les conventions de [Google Cloud IAM](https://cloud.google.com/iam/docs/granting-changing-revoking-access) et de la [gestion des membres GitHub](https://docs.github.com/en/organizations/managing-membership-in-your-organization/inviting-users-to-join-your-organization). Les rôles standards sont proposés avant la personnalisation, comme dans la [création de rôles Google Cloud](https://docs.cloud.google.com/iam/docs/creating-custom-roles). Le modèle applique ici une restriction supplémentaire de délégation aux personnes moins privilégiées.
 
+Les quatre onglets utilisent des listes sobres et des détails à la demande :
+
+- **Personnes** : rôle de projet modifiable directement, choix décrit en une phrase et rôle actuel coché. Le changement remplace les rôles directs sans supprimer les accès hérités. Les attributions complètes restent dans « Détails des accès ». Une erreur conserve le rôle précédent et permet de réessayer.
+- **Équipes** : nom, description et nombre de membres. La liste des membres et leur ajout se déplient ; le renommage reste directement accessible.
+- **Rôles** : nom, description, portée et modification. Les compteurs de permissions et badges techniques disparaissent de la liste ; l’éditeur et la matrice complète restent disponibles.
+- **Ressources** : recherche, type et partage. Les transferts et suppressions sont dans le menu de la ressource ; les opérations globales dans « Autres actions ». Le partage associe chaque rôle à son origine, avec une disposition adaptée au mobile. Les erreurs de liste et de détail présentent un bouton Réessayer ; les réponses de chargement dépassées sont ignorées.
+
+Vérifications supplémentaires : menu de rôle au clavier, refus API puis nouvelle tentative, persistance du changement après rechargement, erreurs de ressources puis reprise, partage mobile et absence de débordement dans les quatre onglets.
+
 La présentation privilégie également les parcours de [gestion des membres et groupes Notion](https://www.notion.com/help/add-members-admins-guests-and-groups) : personne, rôle expliqué et équipe, avant les détails de permissions.
+
+
+## Paramètres personnels et d’application
+
+Le menu du compte contient toujours « Mon compte », indépendamment des permissions et de la configuration de navigation. `/settings` présente l’identité et le changement de mot de passe sans panneau replié ni réglage d’organisation. Cette page est exclue de la redirection de configuration initiale. Better Auth vérifie la session et le mot de passe actuel ; aucune permission IAM ni fonction d’administration n’est nécessaire.
+
+`/admin/settings` réunit les réglages du projet/de l’organisation et la personnalisation (logo, couleurs, accueil). La page est ouverte aux comptes connectés ; les mutations d’organisation conservent leurs contrôles existants et les réglages globaux ne sont chargés/rendus que pour un administrateur de plateforme. La personnalisation se recharge à chaque changement de projet sans conserver les droits de l’organisation précédente.

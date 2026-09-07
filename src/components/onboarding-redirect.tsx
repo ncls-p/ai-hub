@@ -13,7 +13,7 @@ export function OnboardingRedirect() {
 
   useEffect(() => {
     if (isLoading || !workspaceId) return;
-    if (pathname === "/setup") return;
+    if (pathname === "/setup" || pathname === "/settings") return;
 
     let cancelled = false;
 

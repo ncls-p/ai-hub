@@ -173,7 +173,7 @@ function collectEligibleNavItems(shell: WorkspaceShellState): NavItem[] {
     if (item.href === "/usage") return permissions.canViewUsage;
     if (item.href === "/audit") return permissions.canViewAudit;
     if (item.href === "/members") return permissions.canManageAccess;
-    if (item.href === "/admin/settings") return shell.isAdmin;
+    if (item.href === "/admin/settings") return true;
     return true;
   });
 

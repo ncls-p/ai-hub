@@ -21,7 +21,7 @@ test.describe("members page", () => {
     page,
   }) => {
     await ensureE2ELifecycleProject();
-    await page.goto("/en/members");
+    await page.goto("/en/admin/settings");
     const activeProject = page.getByRole("combobox", {
       name: "Active project",
     });
@@ -95,7 +95,10 @@ test.describe("members page", () => {
     });
     await expect(resourceRow).toBeVisible({ timeout: 10_000 });
     await resourceRow
-      .getByRole("button", { name: "Delete Removable assistant" })
+      .getByRole("button", { name: "Actions for Removable assistant" })
+      .click();
+    await page
+      .getByRole("menuitem", { name: "Delete Removable assistant" })
       .click();
     const deleteDialog = page.getByRole("alertdialog");
     await expect(
@@ -129,6 +132,7 @@ test.describe("members page", () => {
     const teamCard = page
       .locator('[data-slot="card"]')
       .filter({ hasText: teamName });
+    await teamCard.getByText("View members", { exact: true }).click();
     await teamCard.getByRole("combobox").click();
     await page.getByRole("option", { name: e2eMember.name }).click();
     await teamCard.getByRole("button", { name: "Add", exact: true }).click();
@@ -138,7 +142,7 @@ test.describe("members page", () => {
         .filter({ hasText: e2eMember.name }),
     ).toBeVisible();
 
-    await page.getByRole("tab", { name: "People & access" }).click();
+    await page.getByRole("tab", { name: "People", exact: true }).click();
     await page.getByRole("button", { name: "Grant access" }).click();
     const accessDialog = page.getByRole("dialog", { name: "Grant access" });
     await accessDialog.getByText("Advanced: organization or team").click();

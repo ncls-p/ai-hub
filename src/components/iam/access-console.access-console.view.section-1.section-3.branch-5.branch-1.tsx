@@ -69,7 +69,7 @@ export function AccessPeopleTransferBranch1({
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant="ghost"
           onClick={() => {
             setBulkAssignmentIds([]);
             setAssignment({

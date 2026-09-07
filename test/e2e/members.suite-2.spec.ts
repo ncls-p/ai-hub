@@ -40,7 +40,7 @@ test.describe("members page", () => {
     const roleRow = page.locator("tbody tr").filter({
       hasText: "Project Viewer",
     });
-    await roleRow.getByRole("button", { name: /permissions/i }).click();
+    await roleRow.getByRole("button", { name: "Edit", exact: true }).click();
     const roleDialog = page.getByRole("dialog", {
       name: /Edit Project Viewer/,
     });
@@ -80,8 +80,9 @@ test.describe("members page", () => {
     });
     await expect(resourceRow).toBeVisible({ timeout: 10_000 });
     await resourceRow
-      .getByRole("button", { name: "Transfer", exact: true })
+      .getByRole("button", { name: "Actions for Transfer preview assistant" })
       .click();
+    await page.getByRole("menuitem", { name: "Transfer", exact: true }).click();
 
     const dialog = page.getByRole("dialog", {
       name: "Transfer Transfer preview assistant",
@@ -118,6 +119,7 @@ test.describe("members page", () => {
       await page.getByRole("option", { name: "Maiah", exact: true }).click();
     }
     await page.getByRole("tab", { name: "Resources" }).click();
+    await page.getByText("More actions", { exact: true }).click();
     await page
       .getByRole("button", { name: "Move or clone everything" })
       .click();
@@ -152,6 +154,7 @@ test.describe("members page", () => {
       await page.getByRole("option", { name: "Maiah", exact: true }).click();
     }
     await page.getByRole("tab", { name: "Resources" }).click();
+    await page.getByText("More actions", { exact: true }).click();
     await page
       .getByRole("button", { name: "Move or clone everything" })
       .click();

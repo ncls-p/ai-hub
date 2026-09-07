@@ -6,6 +6,7 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 
+import { PersonProjectRole } from "./person-project-role";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,7 +49,7 @@ export function AccessPeopleBranch2({
   return (
     <div className="@container min-w-0 border-y border-border/60">
       <table className="w-full table-fixed text-left @max-3xl:block">
-        <thead className="bg-muted/35 text-xs font-medium text-muted-foreground @max-3xl:sr-only">
+        <thead className="text-xs font-medium text-muted-foreground @max-3xl:sr-only">
           <tr>
             <th className="w-14 px-3 py-3">
               <Checkbox
@@ -68,7 +69,7 @@ export function AccessPeopleBranch2({
               />
             </th>
             <th className="w-1/4 px-3 py-3">{t("personColumn")}</th>
-            <th className="px-3 py-3">{t("accessColumn")}</th>
+            <th className="px-3 py-3">{t("simpleAccess.projectRole")}</th>
             <th className="w-1/6 px-3 py-3">{t("teamsColumn")}</th>
             <th className="w-16 px-3 py-3 text-right">
               <span className="sr-only">{t("actions")}</span>
@@ -85,7 +86,7 @@ export function AccessPeopleBranch2({
             return (
               <tr
                 key={person.userId}
-                className="align-top transition-colors hover:bg-muted/20 @max-3xl:grid @max-3xl:grid-cols-[auto_minmax(0,1fr)_auto] @max-3xl:overflow-hidden @max-3xl:rounded-2xl @max-3xl:border @max-3xl:border-border/70 @max-3xl:bg-background @max-3xl:shadow-sm"
+                className="align-top transition-colors hover:bg-muted/20 @max-3xl:grid @max-3xl:grid-cols-[auto_minmax(0,1fr)_auto] @max-3xl:overflow-hidden @max-3xl:rounded-lg @max-3xl:border @max-3xl:border-border/70 @max-3xl:bg-background"
               >
                 <td className="px-6 py-4 @max-3xl:px-3">
                   <Checkbox
@@ -138,106 +139,114 @@ export function AccessPeopleBranch2({
                   <span className="mb-2 hidden text-xs font-medium text-muted-foreground @max-3xl:block">
                     {t("accessColumn")}
                   </span>
-                  <div className="flex max-w-xl flex-wrap gap-1.5">
-                    {person.platformRole === "admin" ? (
-                      <Badge className="max-w-full whitespace-normal break-words">
-                        <LockKeyholeIcon aria-hidden="true" />
-                        {t("appAdministrator")}
-                      </Badge>
-                    ) : null}
-                    {person.assignments.map((item) => (
-                      <span
-                        key={item.id}
-                        className="inline-flex min-w-0 max-w-full items-center"
-                      >
-                        <Badge
-                          variant={item.inherited ? "secondary" : "outline"}
-                          className="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
-                        >
-                          {roleLabel(item.roleKey, item.roleName)}
-                          {item.roleKey.startsWith("custom.") ? (
-                            <span className="text-[10px] opacity-70">
-                              ·{" "}
-                              {item.scope === "organization"
-                                ? t("organizationShort")
-                                : t("projectShort")}
-                            </span>
-                          ) : null}
+                  <PersonProjectRole model={model} person={person} />
+                  <details className="mt-2">
+                    <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
+                      {t("simpleAccess.accessDetails")}
+                    </summary>
+                    <div className="mt-2 flex max-w-xl flex-wrap gap-1.5">
+                      {person.platformRole === "admin" ? (
+                        <Badge className="max-w-full whitespace-normal break-words">
+                          <LockKeyholeIcon aria-hidden="true" />
+                          {t("appAdministrator")}
                         </Badge>
-                        {model.snapshot.actions[
-                          item.scope === "organization"
-                            ? "organization"
-                            : "workspace"
-                        ]["roles.revoke"] &&
-                        model.snapshot.subordinateIds[
-                          item.scope === "organization"
-                            ? "organization"
-                            : "workspace"
-                        ].includes(person.userId) ? (
-                          <ConfirmRemovalButton
-                            pending={pendingAction === item.id}
-                            label={t("removeAssignment", {
-                              name: item.principalName,
-                            })}
-                            title={t("removeAssignmentTitle", {
-                              name: item.principalName,
-                            })}
-                            description={t("removeAssignmentDescription", {
-                              role: roleLabel(item.roleKey, item.roleName),
-                              scope:
-                                item.scope === "organization"
-                                  ? t("organizationScope")
-                                  : t("projectScope"),
-                            })}
-                            onConfirm={() =>
-                              void mutate(
-                                item.id,
-                                {
-                                  action: "removeAssignment",
-                                  workspaceId,
-                                  bindingId: item.id,
-                                },
-                                t("assignmentRemoved"),
-                              )
-                            }
-                          />
-                        ) : null}
-                      </span>
-                    ))}
-                    {person.assignments.length === 0 &&
-                    person.platformRole !== "admin" ? (
-                      <span className="text-xs text-muted-foreground">
-                        {isMember
-                          ? t("noExplicitAccess")
-                          : t("notInOrganization")}
-                      </span>
-                    ) : null}
-                  </div>
+                      ) : null}
+                      {person.assignments.map((item) => (
+                        <span
+                          key={item.id}
+                          className="inline-flex min-w-0 max-w-full items-center"
+                        >
+                          <Badge
+                            variant={item.inherited ? "secondary" : "outline"}
+                            className="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
+                          >
+                            {roleLabel(item.roleKey, item.roleName)}
+                            {item.roleKey.startsWith("custom.") ? (
+                              <span className="text-[10px] opacity-70">
+                                ·{" "}
+                                {item.scope === "organization"
+                                  ? t("organizationShort")
+                                  : t("projectShort")}
+                              </span>
+                            ) : null}
+                          </Badge>
+                          {model.snapshot.actions[
+                            item.scope === "organization"
+                              ? "organization"
+                              : "workspace"
+                          ]["roles.revoke"] &&
+                          model.snapshot.subordinateIds[
+                            item.scope === "organization"
+                              ? "organization"
+                              : "workspace"
+                          ].includes(person.userId) ? (
+                            <ConfirmRemovalButton
+                              pending={pendingAction === item.id}
+                              label={t("removeAssignment", {
+                                name: item.principalName,
+                              })}
+                              title={t("removeAssignmentTitle", {
+                                name: item.principalName,
+                              })}
+                              description={t("removeAssignmentDescription", {
+                                role: roleLabel(item.roleKey, item.roleName),
+                                scope:
+                                  item.scope === "organization"
+                                    ? t("organizationScope")
+                                    : t("projectScope"),
+                              })}
+                              onConfirm={() =>
+                                void mutate(
+                                  item.id,
+                                  {
+                                    action: "removeAssignment",
+                                    workspaceId,
+                                    bindingId: item.id,
+                                  },
+                                  t("assignmentRemoved"),
+                                )
+                              }
+                            />
+                          ) : null}
+                        </span>
+                      ))}
+                      {person.assignments.length === 0 &&
+                      person.platformRole !== "admin" ? (
+                        <span className="text-xs text-muted-foreground">
+                          {isMember
+                            ? t("noExplicitAccess")
+                            : t("notInOrganization")}
+                        </span>
+                      ) : null}
+                    </div>
+                  </details>
                 </td>
                 <td className="px-3 py-4 @max-3xl:col-span-3 @max-3xl:border-t @max-3xl:border-border/60 @max-3xl:px-4 @max-3xl:py-3">
                   <span className="mb-2 hidden text-xs font-medium text-muted-foreground @max-3xl:block">
                     {t("teamsColumn")}
                   </span>
-                  <div className="flex max-w-xs flex-wrap gap-1">
-                    {person.teams.length === 0 ? (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ) : (
-                      person.teams.slice(0, 3).map((team) => (
-                        <Badge
-                          key={team.id}
-                          variant="outline"
-                          className="max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
-                        >
-                          {team.name}
-                        </Badge>
-                      ))
-                    )}
-                    {person.teams.length > 3 ? (
-                      <Badge variant="secondary">
-                        +{person.teams.length - 3}
-                      </Badge>
-                    ) : null}
-                  </div>
+                  <details className="max-w-full">
+                    <summary className="cursor-pointer py-2 text-sm text-muted-foreground">
+                      {t("simpleAccess.teamCount", {
+                        count: person.teams.length,
+                      })}
+                    </summary>
+                    <div className="flex max-w-xs flex-wrap gap-1">
+                      {person.teams.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        person.teams.map((team) => (
+                          <Badge
+                            key={team.id}
+                            variant="outline"
+                            className="max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
+                          >
+                            {team.name}
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </details>
                 </td>
                 <td className="px-6 py-4 text-right @max-3xl:col-start-3 @max-3xl:row-start-1 @max-3xl:px-3">
                   <DropdownMenu>

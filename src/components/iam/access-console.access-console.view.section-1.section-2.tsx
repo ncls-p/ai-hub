@@ -57,13 +57,13 @@ export function AccessMainSection2({
   } = model;
   return (
     <TabsContent value="teams">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="lg:col-span-2">
-          <CardHeader className="grid-cols-1! sm:grid-cols-[1fr_auto]!">
+      <div className="flex flex-col gap-0">
+        <Card className="rounded-none border-0 bg-transparent shadow-none">
+          <CardHeader className="grid-cols-1! px-0 sm:grid-cols-[1fr_auto]!">
             <CardTitle>{t("teamsTitle")}</CardTitle>
             <CardDescription>{t("teamsDescription")}</CardDescription>
             {model.snapshot.actions.organization["teams.create"] ? (
-              <CardAction className="col-start-1 row-start-auto sm:col-start-2 sm:row-start-1">
+              <CardAction className="col-start-1 row-start-auto justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end">
                 <Dialog open={teamOpen} onOpenChange={setTeamOpen}>
                   <DialogTrigger asChild>
                     <Button type="button" size="sm">

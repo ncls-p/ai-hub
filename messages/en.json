@@ -105,8 +105,8 @@
     "access": "Access",
     "usage": "Consumption",
     "activityLog": "Activity log",
-    "settings": "Settings",
-    "adminSettings": "Platform settings",
+    "settings": "My account",
+    "adminSettings": "App settings",
     "setup": "Setup",
     "assistantConfig": "Assistant settings",
     "workspace": "App",
@@ -2319,8 +2319,8 @@
     }
   },
   "settings": {
-    "title": "Settings",
-    "description": "Personal preferences for your account.",
+    "title": "Personal settings",
+    "description": "Manage your account and password.",
     "languageTitle": "Language",
     "languageDescription": "Choose the interface language for your account.",
     "adminLinkTitle": "Platform administration",
@@ -2385,12 +2385,15 @@
       "saving": "Saving…",
       "saved": "Organization branding updated",
       "loadFailed": "Unable to load organization branding",
-      "saveFailed": "Unable to save organization branding"
-    }
+      "saveFailed": "Unable to save organization branding",
+      "retry": "Retry",
+      "noOrganization": "No active organization. Choose a project from your account menu."
+    },
+    "accountTitle": "My account"
   },
   "admin": {
-    "platformSettingsTitle": "Platform settings",
-    "platformSettingsDescription": "Registration, automation, integrations, and system health.",
+    "platformSettingsTitle": "App settings",
+    "platformSettingsDescription": "Organization and platform settings.",
     "settingsPage": {
       "loadFailed": "Unable to load settings",
       "loadErrorDescription": "This section could not be loaded. No settings were changed.",
@@ -2891,14 +2894,14 @@
     "readOnlyDescription": "You can inspect effective access, but only an access administrator can change it.",
     "tabs": {
       "access": "Assignments",
-      "people": "People & access",
+      "people": "People",
       "resources": "Resources",
       "members": "Members",
       "teams": "Teams",
       "roles": "Roles"
     },
-    "assignmentsTitle": "Who has access",
-    "assignmentsDescription": "Choose who can access the project and what each person can do.",
+    "assignmentsTitle": "People",
+    "assignmentsDescription": "Add people and choose their role in this project.",
     "searchPeople": "Search people, email, role, or team…",
     "searchPrincipal": "Search members or teams",
     "selectedCount": "{count, plural, one {# person selected} other {# people selected}}",
@@ -3015,7 +3018,7 @@
     "cancel": "Keep access",
     "confirmRemove": "Remove access",
     "teamsTitle": "Teams",
-    "teamsDescription": "Group members once, then assign roles to the team across projects.",
+    "teamsDescription": "Group people together to give them the same access.",
     "searchTeams": "Search teams or members…",
     "createTeam": "Create team",
     "createTeamTitle": "Create a team",
@@ -3041,7 +3044,7 @@
     "deleteTeamDescription": "The team and all of its access assignments will be removed. Its members remain in the organization.",
     "teamDeleted": "Team deleted",
     "rolesTitle": "Roles",
-    "rolesDescription": "A role groups permissions together. Edit an existing role or create one for your team.",
+    "rolesDescription": "A role defines what someone can do. Use an existing role or create your own.",
     "createRole": "Create custom role",
     "createRoleTitle": "Create a custom role",
     "createRoleDescription": "Give the role a clear outcome-based name, choose its scope, then select only the permissions it needs.",
@@ -3075,7 +3078,7 @@
     "deleteRoleDescription": "Only roles with no active assignments can be deleted.",
     "roleDeleted": "Role deleted",
     "resourcesTitle": "Resource access",
-    "resourcesDescription": "Search any project resource and manage its direct and inherited access in one place.",
+    "resourcesDescription": "Choose a resource to see who has access and change its sharing.",
     "manageScope": "Manage",
     "projectActions": "Active project",
     "organizationActions": "Organization",
@@ -3217,11 +3220,11 @@
     "resourceAccess": "Resource access",
     "resourceAccessTitle": "Access to {name}",
     "resourceAccessDescription": "Select one or more members or teams. Private resources are visible only to their owner and recipients with direct access.",
-    "shareAgentDependencies": "Also share assistant dependencies",
-    "shareAgentDependenciesDescription": "Also grants read access to its active data sources, MCP servers, skills, custom tools, delegated assistants, provider, and model. Each recipient keeps separate connector credentials.",
-    "searchResourceAccess": "Search effective access…",
+    "shareAgentDependencies": "Include the assistant’s documents and tools",
+    "shareAgentDependenciesDescription": "Also allows viewing the documents, tools and settings this assistant needs. Connection credentials remain personal.",
+    "searchResourceAccess": "Search people, teams or roles…",
     "noResourceAccessResults": "No matching member, team, role, or scope.",
-    "grantResourceAccess": "Grant direct access",
+    "grantResourceAccess": "Share",
     "resourceAccessGranted": "Resource access granted",
     "removeResourceRole": "Remove {role} from {name}",
     "resourceScope": "This resource",
@@ -3600,7 +3603,23 @@
       "hidePassword": "Hide password",
       "replaceProjectRole": "This replaces roles assigned directly in this project. Organization and team access still applies.",
       "changeRole": "Change role",
-      "projectSettings": "Project and organization settings"
+      "projectSettings": "Project and organization settings",
+      "roleNames": {
+        "projectAdmin": "Administrator",
+        "projectEditor": "Editor",
+        "projectViewer": "Viewer"
+      },
+      "multipleRoles": "Multiple roles",
+      "noDirectRole": "No direct role",
+      "changePersonRole": "Role for {name}: {role}",
+      "accessDetails": "Access details",
+      "additionalAccess": "Other access: see details",
+      "customRoleHelp": "Permissions defined by this custom role.",
+      "teamCount": "{count, plural, =0 {No teams} one {# team} other {# teams}}",
+      "teamMembers": "View members",
+      "resourceActions": "Actions for {name}",
+      "advancedActions": "More actions",
+      "ownerAccess": "Organization owner · full control"
     },
     "builtInRoleDescriptions": {
       "owner": "Full organization administration, including deletion and migration.",
@@ -3635,7 +3654,9 @@
     "accessCheckFailedTitle": "Unable to verify your access",
     "accessCheckFailedDescription": "Sensitive actions remain unavailable until this check succeeds.",
     "retryAccess": "Try again",
-    "backToChat": "Back to chat"
+    "backToChat": "Back to chat",
+    "myAccount": "My account",
+    "appSettings": "App settings"
   },
   "auth": {
     "eyebrow": "Enterprise AI Workspace",
