@@ -10,21 +10,13 @@ export function isKnownPermission(permission: string) {
   return KNOWN_PERMISSIONS.has(permission);
 }
 
-function permissionGrantMatches(grant: string, permission: string) {
-  if (grant === "*" || grant === permission) return true;
-  if (!grant.endsWith(".*")) return false;
-  return permission.startsWith(grant.slice(0, -1));
-}
-
-export function expandPermissionGrants(grants: readonly string[]) {
-  return [...KNOWN_PERMISSIONS].filter((permission) =>
-    grants.some((grant) => permissionGrantMatches(grant, permission)),
-  );
-}
+export { expandPermissionGrants } from "./permission-matching";
 
 const ORGANIZATION_ONLY_PERMISSIONS = new Set([
   "organization.get",
   "organization.update",
+  "organization.delete",
+  "organization.transfer",
   "workspaces.create",
   "members.manage",
   "teams.manage",
@@ -36,6 +28,8 @@ export function isPermissionCompatibleWithScope(
 ) {
   return (
     scopeType === "organization" ||
-    !ORGANIZATION_ONLY_PERMISSIONS.has(permission)
+    (!ORGANIZATION_ONLY_PERMISSIONS.has(permission) &&
+      !permission.startsWith("members.") &&
+      !permission.startsWith("teams."))
   );
 }

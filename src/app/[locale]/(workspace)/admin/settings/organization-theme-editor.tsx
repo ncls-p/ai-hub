@@ -212,10 +212,7 @@ export function OrganizationThemeEditor(props: {
   const t = useTranslations("settings.branding");
   const customTheme =
     props.themeConfig ?? copyTheme(ORGANIZATION_THEME_PRESETS.ocean);
-  const previewTheme = resolveOrganizationTheme(
-    props.theme,
-    props.themeConfig,
-  );
+  const previewTheme = resolveOrganizationTheme(props.theme, props.themeConfig);
 
   function selectCustom() {
     if (!props.themeConfig) props.onThemeConfigChange(customTheme);

@@ -34,6 +34,30 @@ type Chain = {
 const selectResults: unknown[][] = [];
 const mutationSets: unknown[] = [];
 
+vi.mock("@/server/infrastructure/db/access-resource-repository", () => ({
+  findAccessResource: vi.fn().mockResolvedValue({
+    workspaceId: "workspace-1",
+    organizationId: "organization-1",
+  }),
+}));
+vi.mock(
+  "@/modules/iam/use-cases.iam-operation-error",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("@/modules/iam/use-cases.iam-operation-error")
+      >();
+    const { SYSTEM_ROLES } = await import("@/server/domain/entities/iam");
+    return {
+      ...actual,
+      findSystemRole: vi.fn(async (name: string) => {
+        const role = SYSTEM_ROLES.find((item) => item.name === name)!;
+        return { ...role, permissionsJson: role.permissions };
+      }),
+    };
+  },
+);
+
 vi.mock("@/modules/iam/resource-sharing", () => ({
   listResourceShareTargets: vi.fn().mockResolvedValue([
     { type: "agent", id: "agent-1" },
@@ -66,6 +90,7 @@ vi.mock("@/server/infrastructure/db", () => ({
 
 vi.mock("@/server/domain/services/authorization", () => ({
   authorization: {
+    listPermissions: vi.fn().mockResolvedValue(["*"]),
     hasPermission: vi.fn(),
     invalidatePermissionCache: vi.fn(),
   },
@@ -352,7 +377,7 @@ describe("scope-aware assistant administration", () => {
       authorizationModule.authorization.hasPermission,
     ).toHaveBeenCalledWith(
       { principalType: "user", principalId: "project-admin" },
-      "roles.manage",
+      "agents.manage",
       "workspace",
       "workspace-1",
     );
@@ -371,7 +396,7 @@ describe("scope-aware assistant administration", () => {
       authorizationModule.authorization.hasPermission,
     ).toHaveBeenCalledWith(
       { principalType: "user", principalId: "organization-admin" },
-      "roles.manage",
+      "agents.manage",
       "organization",
       "organization-1",
     );
@@ -600,5 +625,39 @@ describe("resource provenance", () => {
       scopeName: "Organization",
       ownerName: "Unknown user",
     });
+  });
+});
+
+describe("publishing delegation ceilings", () => {
+  it("rejects publishing before changing bindings when the author lacks usage rights", async () => {
+    selectResults.push([
+      { workspaceId: "workspace-1", organizationId: "organization-1" },
+    ]);
+    vi.mocked(
+      _authorizationModule.authorization.listPermissions,
+    ).mockResolvedValueOnce(["roles.assign", "agents.get"]);
+    await expect(
+      applyAgentAccessSelection({
+        agentId: "agent-1",
+        userId: "restricted",
+        selection: { scope: "project" },
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(dbModule.db.delete).not.toHaveBeenCalled();
+    expect(dbModule.db.insert).not.toHaveBeenCalled();
+  });
+  it("rejects a knowledge share without the corresponding read permission", async () => {
+    vi.mocked(
+      _authorizationModule.authorization.listPermissions,
+    ).mockResolvedValueOnce(["roles.assign"]);
+    await expect(
+      applyResourceAccessSelection({
+        resourceType: "knowledge_base",
+        resourceId: "kb-1",
+        userId: "restricted",
+        selection: { scope: "team", teamId: "team-1" },
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(dbModule.db.delete).not.toHaveBeenCalled();
   });
 });

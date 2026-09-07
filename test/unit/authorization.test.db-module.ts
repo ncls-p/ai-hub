@@ -140,20 +140,20 @@ describe("matchesPermission", () => {
   });
 
   it("lets view grants satisfy read-oriented actions", () => {
-    expect(matchesPermission("tools.view", "tools.get")).toBe(true);
-    expect(matchesPermission("tools.view", "tools.list")).toBe(true);
+    expect(matchesPermission("tools.view", "tools.get")).toBe(false);
+    expect(matchesPermission("tools.view", "tools.list")).toBe(false);
     expect(matchesPermission("tools.view", "tools.view")).toBe(true);
-    expect(matchesPermission("tools.view", "tools.viewAllowed")).toBe(true);
-    expect(matchesPermission("tools.view", "tools.viewLimited")).toBe(true);
-    expect(matchesPermission("tools.view", "tools.viewMetadata")).toBe(true);
-    expect(matchesPermission("tools.view", "tools.viewOwn")).toBe(true);
-    expect(matchesPermission("tools.view", "tools.viewShared")).toBe(true);
+    expect(matchesPermission("tools.view", "tools.viewAllowed")).toBe(false);
+    expect(matchesPermission("tools.view", "tools.viewLimited")).toBe(false);
+    expect(matchesPermission("tools.view", "tools.viewMetadata")).toBe(false);
+    expect(matchesPermission("tools.view", "tools.viewOwn")).toBe(false);
+    expect(matchesPermission("tools.view", "tools.viewShared")).toBe(false);
     expect(matchesPermission("tools.view", "tools.configure")).toBe(false);
   });
 
-  it("handles granted permissions without action as domain wildcards", () => {
-    expect(matchesPermission("agents", "agents.create")).toBe(true);
-    expect(matchesPermission("agents", "agents")).toBe(true);
+  it("rejects malformed permissions without an action", () => {
+    expect(matchesPermission("agents", "agents.create")).toBe(false);
+    expect(matchesPermission("agents", "agents")).toBe(false);
   });
 
   it("does not let a specific grant satisfy a wildcard requirement", () => {

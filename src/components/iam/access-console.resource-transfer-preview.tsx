@@ -74,6 +74,8 @@ const BUILT_IN_ROLE_KEYS = {
   "workspace.admin": "projectAdmin",
   "workspace.member": "projectEditor",
   "workspace.viewer": "projectViewer",
+  "workspace.knowledge_editor": "knowledgeEditor",
+  "workspace.agent_user": "assistantUser",
 } as const;
 
 export function builtInRoleKey(roleName: string) {

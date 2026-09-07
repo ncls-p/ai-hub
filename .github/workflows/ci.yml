@@ -90,6 +90,9 @@ jobs:
       - name: Verify OpenAPI route coverage
         run: npm run openapi:check
 
+      - name: Verify permission inventory
+        run: npm run permissions:check
+
       - name: Lint
         run: npm run lint
 

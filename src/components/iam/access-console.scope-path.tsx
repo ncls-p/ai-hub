@@ -56,13 +56,15 @@ export function ScopePath({ snapshot }: { snapshot: AccessSnapshot }) {
 
 export function MutatingButton({
   pending,
+  disabled,
   children,
 }: {
   pending: boolean;
+  disabled?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={pending || disabled}>
       {pending ? (
         <Spinner data-icon="inline-start" />
       ) : (

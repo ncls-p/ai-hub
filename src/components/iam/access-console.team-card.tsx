@@ -1,5 +1,7 @@
 "use client";
 
+import { TeamEditDialog } from "./team-edit-dialog";
+
 import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
@@ -31,18 +33,22 @@ export function TeamCard({
   team,
   members,
   canManage,
+  canDelete,
   pending,
   onAdd,
   onRemove,
   onDelete,
+  onEdit,
 }: {
   team: AccessTeam;
   members: AccessMember[];
   canManage: boolean;
+  canDelete: boolean;
   pending: string | null;
   onAdd: (userId: string) => Promise<boolean>;
   onRemove: (userId: string) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
+  onEdit: (value: { name: string; description: string }) => Promise<boolean>;
 }) {
   const t = useTranslations("access");
   const [userId, setUserId] = useState("");
@@ -58,17 +64,24 @@ export function TeamCard({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{team.name}</CardTitle>
-        <CardDescription>
-          {team.description || t("noTeamDescription")}
-        </CardDescription>
-        <CardAction className="flex items-center gap-1">
+    <Card className="rounded-none border-0 border-b bg-transparent shadow-none">
+      <CardHeader className="grid-cols-1! px-0 sm:grid-cols-[1fr_auto]!">
+        <CardTitle className="break-words [overflow-wrap:anywhere]">
+          {team.name}
+        </CardTitle>
+        <CardDescription>{team.description}</CardDescription>
+        <CardAction className="col-start-1 row-start-auto flex flex-wrap items-center gap-2 sm:col-start-2 sm:row-start-1">
           <Badge variant="secondary">
             {t("memberCount", { count: team.members.length })}
           </Badge>
           {canManage ? (
+            <TeamEditDialog
+              team={team}
+              pending={Boolean(pending)}
+              onSave={onEdit}
+            />
+          ) : null}
+          {canDelete ? (
             <ConfirmRemovalButton
               pending={pending === `delete-team-${team.id}`}
               label={t("deleteTeam", { name: team.name })}
@@ -79,68 +92,87 @@ export function TeamCard({
           ) : null}
         </CardAction>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-2">
-          {team.members.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("emptyTeam")}</p>
-          ) : (
-            team.members.map((member) => (
-              <span key={member.id} className="flex items-center gap-0.5">
-                <Badge variant="outline">{member.name}</Badge>
-                {canManage ? (
-                  <ConfirmRemovalButton
-                    pending={
-                      pending === `team-member-${team.id}-${member.userId}`
-                    }
-                    label={t("removeTeamMember", { name: member.name })}
-                    title={t("removeTeamMemberTitle", { name: member.name })}
-                    description={t("removeTeamMemberDescription", {
-                      team: team.name,
-                    })}
-                    onConfirm={() => void onRemove(member.userId)}
-                  />
-                ) : null}
-              </span>
-            ))
-          )}
-        </div>
-        {canManage && availableMembers.length > 0 ? (
-          <form
-            className="flex flex-col gap-2 sm:flex-row sm:items-end"
-            onSubmit={submit}
-          >
-            <Field className="flex-1">
-              <FieldLabel htmlFor={`team-member-${team.id}`}>
-                {t("addTeamMember")}
-              </FieldLabel>
-              <Select value={userId} onValueChange={setUserId}>
-                <SelectTrigger id={`team-member-${team.id}`} className="w-full">
-                  <SelectValue placeholder={t("chooseMember")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {availableMembers.map((member) => (
-                      <SelectItem key={member.userId} value={member.userId}>
-                        {member.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Button
-              type="submit"
-              disabled={!userId || pending === `team-${team.id}`}
-            >
-              {pending === `team-${team.id}` ? (
-                <Spinner data-icon="inline-start" />
+      <CardContent className="px-0">
+        <details>
+          <summary className="cursor-pointer py-2 text-sm text-muted-foreground">
+            {t("simpleAccess.teamMembers")}
+          </summary>
+          <div className="flex flex-col gap-4 py-3">
+            <div className="flex flex-wrap gap-2">
+              {team.members.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {t("emptyTeam")}
+                </p>
               ) : (
-                <PlusIcon data-icon="inline-start" aria-hidden="true" />
+                team.members.map((member) => (
+                  <span
+                    key={member.id}
+                    className="flex min-w-0 max-w-full items-center gap-0.5"
+                  >
+                    <Badge
+                      variant="outline"
+                      className="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
+                    >
+                      {member.name}
+                    </Badge>
+                    {canManage ? (
+                      <ConfirmRemovalButton
+                        pending={
+                          pending === `team-member-${team.id}-${member.userId}`
+                        }
+                        label={t("removeTeamMember", { name: member.name })}
+                        title={t("removeTeamMemberTitle", {
+                          name: member.name,
+                        })}
+                        description={t("removeTeamMemberDescription", {
+                          team: team.name,
+                        })}
+                        onConfirm={() => void onRemove(member.userId)}
+                      />
+                    ) : null}
+                  </span>
+                ))
               )}
-              {t("add")}
-            </Button>
-          </form>
-        ) : null}
+            </div>
+            {canManage && availableMembers.length > 0 ? (
+              <form
+                className="flex flex-col gap-2 sm:flex-row sm:items-end"
+                onSubmit={submit}
+              >
+                <Field className="flex-1">
+                  <FieldLabel htmlFor={`team-member-${team.id}`}>
+                    {t("addTeamMember")}
+                  </FieldLabel>
+                  <Select value={userId} onValueChange={setUserId}>
+                    <SelectTrigger
+                      id={`team-member-${team.id}`}
+                      className="w-full"
+                    >
+                      <SelectValue placeholder={t("chooseMember")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {availableMembers.map((member) => (
+                          <SelectItem key={member.userId} value={member.userId}>
+                            {member.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Button type="submit" disabled={!userId || Boolean(pending)}>
+                  {pending === `team-${team.id}` ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <PlusIcon data-icon="inline-start" aria-hidden="true" />
+                  )}
+                  {t("add")}
+                </Button>
+              </form>
+            ) : null}
+          </div>
+        </details>
       </CardContent>
     </Card>
   );

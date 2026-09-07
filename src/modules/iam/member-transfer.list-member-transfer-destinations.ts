@@ -27,7 +27,7 @@ export async function listMemberTransferDestinations(input: {
   if (
     !(await hasPermission(
       input.userId,
-      "roles.manage",
+      "roles.get",
       "workspace",
       input.sourceWorkspaceId,
     ))
@@ -45,7 +45,7 @@ export async function listMemberTransferDestinations(input: {
         const crossOrganization = organization.id !== source.organization.id;
         const allowed = await hasPermission(
           input.userId,
-          "roles.manage",
+          "roles.assign",
           "workspace",
           workspace.id,
         );
@@ -53,7 +53,7 @@ export async function listMemberTransferDestinations(input: {
           !crossOrganization ||
           (await hasPermission(
             input.userId,
-            "members.manage",
+            "members.create",
             "organization",
             organization.id,
           ));

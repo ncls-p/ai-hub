@@ -86,6 +86,7 @@ export const authorization = {
       .select({
         resourceId: roleBindings.resourceId,
         roleName: roles.name,
+        isSystem: roles.isSystem,
         permissionsJson: roles.permissionsJson,
       })
       .from(roleBindings)
@@ -108,6 +109,7 @@ export const authorization = {
           const permissions: Permission[] = [];
           addRolePermissions(permissions, {
             name: binding.roleName,
+            isSystem: binding.isSystem,
             permissionsJson: binding.permissionsJson,
           });
           return permissions.some((granted) =>

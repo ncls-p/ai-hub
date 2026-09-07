@@ -83,6 +83,7 @@ describe("authorization.checkPermission", () => {
         {
           roles: {
             name: "workspace.member",
+            isSystem: true,
             permissionsJson: ["agents.create", "agents.create", "custom.do"],
           },
         },
@@ -108,11 +109,7 @@ describe("authorization.checkPermission", () => {
     expect(result.granted).toBe(true);
     expect(cache.set).toHaveBeenCalledWith(
       "perm:user:user-1:workspace:ws-1",
-      expect.arrayContaining([
-        "agents.create",
-        "tools.executeRestricted",
-        "custom.do",
-      ]),
+      expect.arrayContaining(["agents.create", "tools.executeRestricted"]),
       60,
     );
   });

@@ -1,3 +1,4 @@
+import { needsFreshAuthorization } from "./authorization.fresh-context";
 import type { AccessResourceType } from "@/server/domain/entities/access-resource";
 import { cache } from "@/server/infrastructure/cache";
 import { db } from "@/server/infrastructure/db";
@@ -27,6 +28,7 @@ async function resolvePermissionsUncached(
   resourceType: ResourceType,
   resourceId: string,
   cacheKey: string,
+  fresh = false,
 ): Promise<Permission[]> {
   let organizationId: string | null =
     resourceType === "organization" ? resourceId : null;
@@ -40,14 +42,14 @@ async function resolvePermissionsUncached(
       .where(eq(workspaces.id, resourceId))
       .limit(1);
     if (!workspace) {
-      await cache.set(cacheKey, [], PERMISSION_CACHE_TTL);
+      if (!fresh) await cache.set(cacheKey, [], PERMISSION_CACHE_TTL);
       return [];
     }
     organizationId = workspace.organizationId;
   } else if (resourceType !== "organization") {
     const resource = await findAccessResource(resourceType, resourceId);
     if (!resource) {
-      await cache.set(cacheKey, [], PERMISSION_CACHE_TTL);
+      if (!fresh) await cache.set(cacheKey, [], PERMISSION_CACHE_TTL);
       return [];
     }
     workspaceId = resource.workspaceId;
@@ -67,7 +69,7 @@ async function resolvePermissionsUncached(
         organizationId &&
         !(await isActiveOrganizationMember(ctx.principalId, organizationId))))
   ) {
-    await cache.set(cacheKey, [], PERMISSION_CACHE_TTL);
+    if (!fresh) await cache.set(cacheKey, [], PERMISSION_CACHE_TTL);
     return [];
   }
 
@@ -162,7 +164,16 @@ async function resolvePermissionsUncached(
   }
 
   const resolvedPermissions = uniquePermissions(permissions);
-  await cache.set(cacheKey, resolvedPermissions, PERMISSION_CACHE_TTL);
+  const nextExpiry = Math.min(
+    ...bindings.map(
+      ({ role_bindings: binding }) => binding?.expiresAt?.getTime() ?? Infinity,
+    ),
+  );
+  const ttl = Math.min(
+    PERMISSION_CACHE_TTL,
+    Math.floor((nextExpiry - Date.now()) / 1000),
+  );
+  if (!fresh && ttl > 0) await cache.set(cacheKey, resolvedPermissions, ttl);
   return resolvedPermissions;
 }
 
@@ -172,6 +183,14 @@ export async function resolvePermissions(
   resourceId: string,
 ): Promise<Permission[]> {
   const cacheKey = `perm:${ctx.principalType}:${ctx.principalId}:${resourceType}:${resourceId}`;
+  if (needsFreshAuthorization())
+    return resolvePermissionsUncached(
+      ctx,
+      resourceType,
+      resourceId,
+      cacheKey,
+      true,
+    );
   const cached = await cache.get<Permission[]>(cacheKey);
   if (cached) return cached;
 

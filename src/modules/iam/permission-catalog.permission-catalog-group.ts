@@ -16,6 +16,90 @@ export const PERMISSION_CATALOG = [
     description: "Structure, settings, projects, and access administration.",
     permissions: [
       {
+        id: "workspaces.curate",
+        label: "Manage shared project resources",
+        description:
+          "Curate shared assistants, knowledge and connections without administering access policies.",
+      },
+      {
+        id: "organization.delete",
+        label: "Delete organization",
+        description: "Delete the organization and all of its projects.",
+      },
+      {
+        id: "organization.transfer",
+        label: "Migrate organization",
+        description:
+          "Move or clone an organization into another authorized organization.",
+      },
+      {
+        id: "workspaces.delete",
+        label: "Delete projects",
+        description: "Delete a project and its resources.",
+      },
+      {
+        id: "workspaces.transfer",
+        label: "Transfer project resources",
+        description:
+          "Move or clone project resources and their access policies.",
+      },
+      {
+        id: "roles.get",
+        label: "View access policy",
+        description: "Read roles, assignments, members and teams.",
+      },
+      {
+        id: "roles.create",
+        label: "Create custom roles",
+        description: "Create a role limited to permissions you hold.",
+      },
+      {
+        id: "roles.update",
+        label: "Edit custom roles",
+        description: "Edit a subordinate role and its permissions.",
+      },
+      {
+        id: "roles.delete",
+        label: "Delete custom roles",
+        description: "Delete an unused subordinate custom role.",
+      },
+      {
+        id: "roles.assign",
+        label: "Assign roles",
+        description: "Grant subordinate access to members or teams.",
+      },
+      {
+        id: "roles.revoke",
+        label: "Revoke roles",
+        description: "Remove subordinate access assignments.",
+      },
+      {
+        id: "members.create",
+        label: "Add members",
+        description: "Add an account to the organization.",
+      },
+      {
+        id: "members.delete",
+        label: "Remove members",
+        description: "Remove a subordinate organization member.",
+      },
+      {
+        id: "teams.create",
+        label: "Create teams",
+        description: "Create an organization team.",
+      },
+      {
+        id: "teams.update",
+        label: "Edit team membership",
+        description:
+          "Add or remove subordinate members within delegable team access.",
+      },
+      {
+        id: "teams.delete",
+        label: "Delete teams",
+        description: "Delete a team whose access you can administer.",
+      },
+      {
         id: "organization.get",
         label: "View organization",
         description: "See organization settings and structure.",
@@ -62,6 +146,16 @@ export const PERMISSION_CATALOG = [
     label: "Assistants & conversations",
     description: "Build, run, and delegate AI assistants.",
     permissions: [
+      {
+        id: "agents.test",
+        label: "Test assistants",
+        description: "Run assistant tests.",
+      },
+      {
+        id: "agents.manage",
+        label: "Manage assistants",
+        description: "All currently catalogued assistant actions.",
+      },
       {
         id: "agents.list",
         label: "List assistants",
@@ -129,6 +223,51 @@ export const PERMISSION_CATALOG = [
     label: "Models, tools & knowledge",
     description: "AI providers, tools, integrations, and knowledge bases.",
     permissions: [
+      {
+        id: "providers.create",
+        label: "Create AI connections",
+        description: "Create a provider connection.",
+      },
+      {
+        id: "providers.update",
+        label: "Edit AI connections",
+        description: "Edit provider settings.",
+      },
+      {
+        id: "providers.delete",
+        label: "Delete AI connections",
+        description: "Remove a provider connection.",
+      },
+      {
+        id: "providers.test",
+        label: "Test AI connections",
+        description: "Test provider connectivity.",
+      },
+      {
+        id: "models.create",
+        label: "Create models",
+        description: "Add a model.",
+      },
+      {
+        id: "models.update",
+        label: "Edit models",
+        description: "Update model configuration.",
+      },
+      {
+        id: "models.delete",
+        label: "Delete models",
+        description: "Remove a model.",
+      },
+      {
+        id: "models.sync",
+        label: "Sync models",
+        description: "Discover models from a provider.",
+      },
+      {
+        id: "tools.manage",
+        label: "Manage tools",
+        description: "All currently catalogued tool actions.",
+      },
       {
         id: "providers.viewMetadata",
         label: "View AI connections",

@@ -1,3 +1,5 @@
+import { visibleScopedRoles } from "./standard-role";
+import { roleCapabilities, subordinateMemberIds } from "./access-capabilities";
 import { and, asc, eq, isNull, or } from "drizzle-orm";
 
 import { ACCESS_RESOURCE_DEFINITIONS } from "@/server/domain/entities/access-resource";
@@ -37,7 +39,7 @@ export async function getAccessConsoleSnapshot(input: {
   );
   const canView = await authorization.checkPermission(
     { principalType: "user", principalId: input.userId },
-    "workspaces.get",
+    "roles.get",
     "workspace",
     input.workspaceId,
   );
@@ -50,7 +52,7 @@ export async function getAccessConsoleSnapshot(input: {
     memberRows,
     teamRows,
     teamMemberRows,
-    roleRows,
+    allRoleRows,
     bindingRows,
     effectivePermissions,
     organizationPermissions,
@@ -143,6 +145,7 @@ export async function getAccessConsoleSnapshot(input: {
     ),
   ]);
 
+  const roleRows = visibleScopedRoles(allRoleRows);
   const memberNames = new Map(
     memberRows.map((member) => [
       member.userId,
@@ -161,22 +164,58 @@ export async function getAccessConsoleSnapshot(input: {
       matchesPermission(granted, permission),
     );
   const capabilities = {
-    canManageProjectAccess: hasWorkspacePermission("roles.manage"),
-    canManageOrganizationAccess: hasOrganizationPermission("roles.manage"),
+    canManageProjectAccess: hasWorkspacePermission("roles.assign"),
+    canManageOrganizationAccess: hasOrganizationPermission("roles.assign"),
     canCreateProjects: hasOrganizationPermission("workspaces.create"),
     canManageProjectLifecycle: hasWorkspacePermission("workspaces.update"),
     canManageOrganizationLifecycle: hasOrganizationPermission(
       "organization.update",
     ),
-    canManageMembers: hasOrganizationPermission("members.manage"),
-    canManageTeams: hasOrganizationPermission("teams.manage"),
+    canManageMembers: hasOrganizationPermission("members.create"),
+    canManageTeams: hasOrganizationPermission("teams.update"),
   };
-  if (!Object.values(capabilities).some(Boolean)) {
-    throw new IamOperationError(
-      "You do not have permission to view organization access",
-      403,
-    );
-  }
+  const actions = {
+    organization: Object.fromEntries(
+      [...KNOWN_PERMISSIONS].map((permission) => [
+        permission,
+        hasOrganizationPermission(permission),
+      ]),
+    ),
+    workspace: Object.fromEntries(
+      [...KNOWN_PERMISSIONS].map((permission) => [
+        permission,
+        hasWorkspacePermission(permission),
+      ]),
+    ),
+  };
+  const [editableRoles, organizationMemberIds, workspaceMemberIds] =
+    await Promise.all([
+      roleCapabilities(
+        input.userId,
+        roleRows,
+        organizationPermissions,
+        effectivePermissions,
+        organization.id,
+      ),
+      subordinateMemberIds(
+        input.userId,
+        memberRows,
+        "organization",
+        organization.id,
+        organizationPermissions,
+      ),
+      subordinateMemberIds(
+        input.userId,
+        memberRows,
+        "workspace",
+        input.workspaceId,
+        effectivePermissions,
+      ),
+    ]);
+  const subordinateIds = {
+    organization: organizationMemberIds,
+    workspace: workspaceMemberIds,
+  };
 
   const grantablePermissions = {
     organization: [...KNOWN_PERMISSIONS].filter(
@@ -219,9 +258,8 @@ export async function getAccessConsoleSnapshot(input: {
     })),
     roles: roleRows.map((role) => ({
       ...role,
-      permissions: expandPermissionGrants(
-        Array.isArray(role.permissionsJson) ? role.permissionsJson : [],
-      ),
+      ...editableRoles.get(role.id),
+      permissions: expandPermissionGrants(rolePermissions(role)),
     })),
     assignments: bindingRows.map(({ binding, role }) => {
       const memberPrincipal =
@@ -250,7 +288,10 @@ export async function getAccessConsoleSnapshot(input: {
     }),
     permissionCatalog: PERMISSION_CATALOG,
     resourceDefinitions: ACCESS_RESOURCE_DEFINITIONS,
-    effectivePermissions,
+    effectivePermissions: expandPermissionGrants(effectivePermissions),
+    organizationPermissions: expandPermissionGrants(organizationPermissions),
+    actions,
+    subordinateIds,
     grantablePermissions,
     assignableRoleIds,
     capabilities,

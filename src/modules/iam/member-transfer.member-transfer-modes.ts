@@ -1,3 +1,4 @@
+import { visibleScopedRoles } from "./standard-role";
 import { and, eq, isNull, or } from "drizzle-orm";
 
 import { authorization } from "@/server/domain/services/authorization";
@@ -79,20 +80,20 @@ export async function requireTransferPermissions(input: {
   const checks = await Promise.all([
     hasPermission(
       input.actorUserId,
-      "roles.manage",
+      input.mode === "move" ? "roles.revoke" : "roles.get",
       "workspace",
       input.sourceWorkspaceId,
     ),
     hasPermission(
       input.actorUserId,
-      "roles.manage",
+      "roles.assign",
       "workspace",
       input.targetWorkspaceId,
     ),
     crossOrganization
       ? hasPermission(
           input.actorUserId,
-          "members.manage",
+          "members.create",
           "organization",
           input.targetOrganizationId,
         )
@@ -100,7 +101,7 @@ export async function requireTransferPermissions(input: {
     crossOrganization && input.mode === "move"
       ? hasPermission(
           input.actorUserId,
-          "members.manage",
+          "members.delete",
           "organization",
           input.sourceOrganizationId,
         )
@@ -118,11 +119,12 @@ export async function listDestinationRoles(
   workspaceId: string,
   organizationId: string,
 ) {
-  return db
+  const rows = await db
     .select({
       id: roles.id,
       name: roles.name,
       displayName: roles.displayName,
+      isSystem: roles.isSystem,
     })
     .from(roles)
     .where(
@@ -143,4 +145,9 @@ export async function listDestinationRoles(
         ),
       ),
     );
+  return visibleScopedRoles(rows).map(({ id, name, displayName }) => ({
+    id,
+    name,
+    displayName,
+  }));
 }

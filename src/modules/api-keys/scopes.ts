@@ -9,6 +9,7 @@ export type ApiKeyScopeDefinition = {
 export const API_KEY_SCOPE_CATALOG = [
   { permission: "workspaces.get", group: "workspaces", risk: "read" },
   { permission: "workspaces.update", group: "workspaces", risk: "admin" },
+  { permission: "workspaces.curate", group: "workspaces", risk: "admin" },
   { permission: "roles.manage", group: "workspaces", risk: "admin" },
   { permission: "providers.viewMetadata", group: "providers", risk: "read" },
   { permission: "providers.create", group: "providers", risk: "write" },

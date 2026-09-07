@@ -106,7 +106,7 @@ describe("admin/auth – canManageTenantGlobals", () => {
     await testManage(session, "custom-ws");
     expect(authzMod.authorization.checkPermission).toHaveBeenCalledWith(
       { principalType: "user", principalId: "user-1" },
-      "roles.manage",
+      "workspaces.curate",
       "workspace",
       "custom-ws",
     );

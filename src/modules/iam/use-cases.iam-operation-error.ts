@@ -1,10 +1,11 @@
+import { resolveStandardRole } from "./standard-role";
+import { SYSTEM_ROLES } from "@/server/domain/entities/iam";
+import type { ResourceType } from "@/server/domain/services/authorization";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { createWorkspace } from "@/modules/workspace/use-cases";
-import {
-  authorization,
-  canDelegatePermissionSet,
-} from "@/server/domain/services/authorization";
+import { authorization } from "@/server/domain/services/authorization";
+import { canDelegatePermissionSet } from "./permission-matching";
 import { db } from "@/server/infrastructure/db";
 import {
   organizations,
@@ -41,7 +42,15 @@ export function customRoleName(displayName: string) {
   return `custom.${slug || crypto.randomUUID().slice(0, 8)}`;
 }
 
-export function rolePermissions(role: { permissionsJson: unknown }) {
+export function rolePermissions(role: {
+  permissionsJson: unknown;
+  name?: string;
+  isSystem?: boolean;
+}) {
+  if (role.isSystem) {
+    const definition = SYSTEM_ROLES.find((item) => item.name === role.name);
+    if (definition) return [...definition.permissions];
+  }
   return Array.isArray(role.permissionsJson)
     ? (role.permissionsJson as string[])
     : [];
@@ -49,7 +58,7 @@ export function rolePermissions(role: { permissionsJson: unknown }) {
 
 export async function requireDelegablePermissions(input: {
   actorUserId: string;
-  resourceType: ScopeType;
+  resourceType: ResourceType;
   resourceId: string;
   permissions: string[];
 }) {
@@ -81,7 +90,7 @@ export async function getWorkspaceScope(workspaceId: string) {
 export async function requirePermission(input: {
   userId: string;
   permission: string;
-  resourceType: ScopeType;
+  resourceType: ResourceType;
   resourceId: string;
   errorMessage: string;
 }) {
@@ -104,14 +113,20 @@ export async function invalidateUserOrganizationAccess(
   await authorization.invalidatePrincipalPermissionCache(userId);
 }
 
-export async function findSystemRole(name: string) {
+export async function findSystemRole(name: string, scopeId?: string) {
   const [role] = await db
     .select()
     .from(roles)
     .where(and(eq(roles.name, name), eq(roles.isSystem, true)))
     .limit(1);
   if (!role) throw new IamOperationError(`System role unavailable: ${name}`);
-  return role;
+  return scopeId
+    ? resolveStandardRole(
+        role,
+        role.scopeType === "organization" ? "organization" : "workspace",
+        scopeId,
+      )
+    : role;
 }
 
 export async function createOrganizationWithProject(input: {

@@ -46,6 +46,8 @@ type ScopeLifecycleDialogProps = {
   project: { name: string; slug: string };
   canManageProject: boolean;
   canManageOrganization: boolean;
+  canDeleteProject: boolean;
+  canDeleteOrganization: boolean;
   onRenamed: () => Promise<void>;
 };
 
@@ -54,6 +56,8 @@ export function ScopeLifecycleDialog({
   project,
   canManageProject,
   canManageOrganization,
+  canDeleteProject,
+  canDeleteOrganization,
   onRenamed,
 }: ScopeLifecycleDialogProps) {
   const t = useTranslations("access");
@@ -131,40 +135,48 @@ export function ScopeLifecycleDialog({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-64">
           <DropdownMenuLabel>{t("projectActions")}</DropdownMenuLabel>
-          {canManageProject ? (
+          {canManageProject || canDeleteProject ? (
             <>
-              <DropdownMenuItem onSelect={() => openAction("renameProject")}>
-                <PencilIcon aria-hidden="true" />
-                {t("renameProject")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => openAction("deleteProject")}
-              >
-                <Trash2Icon aria-hidden="true" />
-                {t("deleteProject")}
-              </DropdownMenuItem>
+              {canManageProject ? (
+                <DropdownMenuItem onSelect={() => openAction("renameProject")}>
+                  <PencilIcon aria-hidden="true" />
+                  {t("renameProject")}
+                </DropdownMenuItem>
+              ) : null}
+              {canDeleteProject ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => openAction("deleteProject")}
+                >
+                  <Trash2Icon aria-hidden="true" />
+                  {t("deleteProject")}
+                </DropdownMenuItem>
+              ) : null}
             </>
           ) : null}
           {canManageProject && canManageOrganization ? (
             <DropdownMenuSeparator />
           ) : null}
-          {canManageOrganization ? (
+          {canManageOrganization || canDeleteOrganization ? (
             <>
               <DropdownMenuLabel>{t("organizationActions")}</DropdownMenuLabel>
-              <DropdownMenuItem
-                onSelect={() => openAction("renameOrganization")}
-              >
-                <PencilIcon aria-hidden="true" />
-                {t("renameOrganization")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => openAction("deleteOrganization")}
-              >
-                <Trash2Icon aria-hidden="true" />
-                {t("deleteOrganization")}
-              </DropdownMenuItem>
+              {canManageOrganization ? (
+                <DropdownMenuItem
+                  onSelect={() => openAction("renameOrganization")}
+                >
+                  <PencilIcon aria-hidden="true" />
+                  {t("renameOrganization")}
+                </DropdownMenuItem>
+              ) : null}
+              {canDeleteOrganization ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => openAction("deleteOrganization")}
+                >
+                  <Trash2Icon aria-hidden="true" />
+                  {t("deleteOrganization")}
+                </DropdownMenuItem>
+              ) : null}
             </>
           ) : null}
         </DropdownMenuContent>

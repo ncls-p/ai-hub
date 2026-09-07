@@ -92,7 +92,7 @@ export async function canEditAgentForScope(
   if (agent.visibility === "workspace") {
     return authorization.hasPermission(
       { principalType: "user", principalId: userId },
-      "roles.manage",
+      "agents.manage",
       "workspace",
       agent.workspaceId,
     );
@@ -107,7 +107,7 @@ export async function canEditAgentForScope(
       workspace &&
       (await authorization.hasPermission(
         { principalType: "user", principalId: userId },
-        "roles.manage",
+        "agents.manage",
         "organization",
         workspace.organizationId,
       )),

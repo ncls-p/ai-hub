@@ -16,12 +16,18 @@ test.describe("retired custom tools builder", () => {
 });
 
 test.describe("scheduled tasks page", () => {
+  let workspaceId: string;
+
   test.beforeAll(async () => {
-    await ensureE2EAssistant();
+    ({ workspaceId } = await ensureE2EAssistant());
   });
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    const response = await page.request.patch("/api/workspaces", {
+      data: { workspaceId },
+    });
+    expect(response.ok()).toBe(true);
   });
 
   test("loads scheduled tasks page", async ({ page }) => {

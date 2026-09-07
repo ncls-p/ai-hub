@@ -26,7 +26,10 @@ const selectResults: unknown[][] = [];
 const insertedValues: unknown[] = [];
 
 vi.mock("@/server/infrastructure/db", () => ({
+  withPostgresAdvisoryLock: (_key: string, callback: () => Promise<unknown>) =>
+    callback(),
   db: {
+    transaction: vi.fn((callback) => callback(_dbModule.db)),
     select: vi.fn(),
     delete: vi.fn(),
     insert: vi.fn(),
@@ -34,6 +37,10 @@ vi.mock("@/server/infrastructure/db", () => ({
 }));
 vi.mock("@/server/domain/services/authorization", () => ({
   authorization: {
+    listPermissions: vi.fn(({ principalId }) =>
+      Promise.resolve(principalId === "owner-1" ? ["*"] : []),
+    ),
+    invalidatePrincipalPermissionCache: vi.fn(),
     hasPermission: vi.fn(),
     hasDirectPermission: vi.fn(),
     invalidatePermissionCache: vi.fn(),
@@ -73,6 +80,7 @@ const authorizationModule = _authorizationModule as unknown as {
     hasPermission: ReturnType<typeof vi.fn>;
     hasDirectPermission: ReturnType<typeof vi.fn>;
     invalidatePermissionCache: ReturnType<typeof vi.fn>;
+    invalidatePrincipalPermissionCache: ReturnType<typeof vi.fn>;
   };
 };
 const auditModule = _auditModule as unknown as {
@@ -328,8 +336,8 @@ describe("direct resource sharing", () => {
       ]),
     );
     expect(
-      authorizationModule.authorization.invalidatePermissionCache,
-    ).toHaveBeenCalledTimes(6);
+      authorizationModule.authorization.invalidatePrincipalPermissionCache,
+    ).toHaveBeenCalledTimes(3);
     expect(resourceSharing.listResourceShareTargets).toHaveBeenCalledWith({
       resourceType: "agent",
       resourceId: "agent-1",
@@ -447,14 +455,12 @@ describe("direct resource sharing", () => {
     expect(dbModule.db.delete).toHaveBeenCalledOnce();
     expect(dbModule.db.insert).not.toHaveBeenCalled();
     expect(
-      authorizationModule.authorization.invalidatePermissionCache,
-    ).toHaveBeenCalledWith("member-1", "knowledge_base", "kb-1");
+      authorizationModule.authorization.invalidatePrincipalPermissionCache,
+    ).toHaveBeenCalledWith("member-1");
   });
 
   it("lazily creates the knowledge editor role when it is missing", async () => {
-    dbModule.db.insert.mockImplementationOnce(() =>
-      chain([editorRoleRow]),
-    );
+    dbModule.db.insert.mockImplementationOnce(() => chain([editorRoleRow]));
     selectResults.push([viewerRoleRow], [{ userId: "member-1" }], []);
 
     await expect(

@@ -24,7 +24,7 @@ export async function listProjectAccessResources(input: {
 }) {
   const access = await authorization.checkPermission(
     { principalType: "user", principalId: input.userId },
-    "roles.manage",
+    "roles.get",
     "workspace",
     input.workspaceId,
   );

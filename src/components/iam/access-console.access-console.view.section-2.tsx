@@ -53,8 +53,8 @@ export function AccessConsoleSection2({
     workspaceId,
   } = model;
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-      <div className="w-full max-w-md">
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="min-w-0 flex-1 sm:max-w-md">
         <Field>
           <FieldLabel htmlFor="access-project">{t("activeProject")}</FieldLabel>
           <Select value={workspaceId ?? ""} onValueChange={setWorkspaceId}>
@@ -74,108 +74,42 @@ export function AccessConsoleSection2({
         </Field>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        {canManageProjectLifecycle || canManageOrganizationLifecycle ? (
-          <ScopeLifecycleDialog
-            organization={snapshot.organization}
-            project={snapshot.activeProject}
-            canManageProject={canManageProjectLifecycle}
-            canManageOrganization={canManageOrganizationLifecycle}
-            onRenamed={() => load({ preserveData: true })}
-          />
-        ) : null}
-        <Dialog open={organizationOpen} onOpenChange={setOrganizationOpen}>
-          <DialogTrigger asChild>
-            <Button type="button" variant="outline">
-              <Building2Icon data-icon="inline-start" aria-hidden="true" />
-              {t("newOrganization")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("createOrganizationTitle")}</DialogTitle>
-              <DialogDescription>
-                {t("createOrganizationDescription")}
-              </DialogDescription>
-            </DialogHeader>
-            <form
-              className="contents"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                const created = await mutate(
-                  "createOrganization",
-                  {
-                    action: "createOrganization",
-                    ...organizationForm,
-                  },
-                  t("organizationCreated"),
-                  { close: () => setOrganizationOpen(false) },
-                );
-                if (created) setOrganizationForm(INITIAL_ORGANIZATION_FORM);
-              }}
-            >
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="organization-name">
-                    {t("organizationName")}
-                  </FieldLabel>
-                  <Input
-                    id="organization-name"
-                    required
-                    minLength={2}
-                    value={organizationForm.organizationName}
-                    onChange={(event) =>
-                      setOrganizationForm((current) => ({
-                        ...current,
-                        organizationName: event.target.value,
-                      }))
-                    }
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="first-project-name">
-                    {t("firstProjectName")}
-                  </FieldLabel>
-                  <Input
-                    id="first-project-name"
-                    required
-                    minLength={2}
-                    value={organizationForm.projectName}
-                    onChange={(event) =>
-                      setOrganizationForm((current) => ({
-                        ...current,
-                        projectName: event.target.value,
-                      }))
-                    }
-                  />
-                </Field>
-              </FieldGroup>
-              <DialogFooter>
-                <MutatingButton
-                  pending={pendingAction === "createOrganization"}
-                >
-                  {t("createOrganization")}
-                </MutatingButton>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {canCreateProjects ? (
-          <Dialog open={projectOpen} onOpenChange={setProjectOpen}>
+      <details className="w-full sm:w-auto">
+        <summary className="cursor-pointer py-2 text-sm text-muted-foreground">
+          {t("simpleAccess.projectSettings")}
+        </summary>
+        <p className="max-w-md py-2 text-sm text-muted-foreground">
+          {snapshot.organization.name} · {t("inheritanceHint")}
+        </p>
+        <div className="flex flex-wrap gap-2 py-2">
+          {canManageProjectLifecycle ||
+          canManageOrganizationLifecycle ||
+          snapshot.actions.workspace["workspaces.delete"] ||
+          snapshot.actions.organization["organization.delete"] ? (
+            <ScopeLifecycleDialog
+              organization={snapshot.organization}
+              project={snapshot.activeProject}
+              canManageProject={canManageProjectLifecycle}
+              canManageOrganization={canManageOrganizationLifecycle}
+              canDeleteProject={snapshot.actions.workspace["workspaces.delete"]}
+              canDeleteOrganization={
+                snapshot.actions.organization["organization.delete"]
+              }
+              onRenamed={() => load({ preserveData: true })}
+            />
+          ) : null}
+          <Dialog open={organizationOpen} onOpenChange={setOrganizationOpen}>
             <DialogTrigger asChild>
-              <Button type="button">
-                <PlusIcon data-icon="inline-start" aria-hidden="true" />
-                {t("newProject")}
+              <Button type="button" variant="outline">
+                <Building2Icon data-icon="inline-start" aria-hidden="true" />
+                {t("newOrganization")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{t("createProjectTitle")}</DialogTitle>
+                <DialogTitle>{t("createOrganizationTitle")}</DialogTitle>
                 <DialogDescription>
-                  {t("createProjectDescription", {
-                    organization: snapshot.organization.name,
-                  })}
+                  {t("createOrganizationDescription")}
                 </DialogDescription>
               </DialogHeader>
               <form
@@ -183,42 +117,123 @@ export function AccessConsoleSection2({
                 onSubmit={async (event) => {
                   event.preventDefault();
                   const created = await mutate(
-                    "createProject",
+                    "createOrganization",
                     {
-                      action: "createProject",
-                      workspaceId,
-                      ...projectForm,
+                      action: "createOrganization",
+                      ...organizationForm,
                     },
-                    t("projectCreated"),
-                    { close: () => setProjectOpen(false) },
+                    t("organizationCreated"),
+                    { close: () => setOrganizationOpen(false) },
                   );
-                  if (created) setProjectForm(INITIAL_PROJECT_FORM);
+                  if (created) setOrganizationForm(INITIAL_ORGANIZATION_FORM);
                 }}
               >
-                <Field>
-                  <FieldLabel htmlFor="project-name">
-                    {t("projectName")}
-                  </FieldLabel>
-                  <Input
-                    id="project-name"
-                    required
-                    minLength={2}
-                    value={projectForm.name}
-                    onChange={(event) =>
-                      setProjectForm({ name: event.target.value })
-                    }
-                  />
-                </Field>
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="organization-name">
+                      {t("organizationName")}
+                    </FieldLabel>
+                    <Input
+                      id="organization-name"
+                      required
+                      minLength={2}
+                      value={organizationForm.organizationName}
+                      onChange={(event) =>
+                        setOrganizationForm((current) => ({
+                          ...current,
+                          organizationName: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="first-project-name">
+                      {t("firstProjectName")}
+                    </FieldLabel>
+                    <Input
+                      id="first-project-name"
+                      required
+                      minLength={2}
+                      value={organizationForm.projectName}
+                      onChange={(event) =>
+                        setOrganizationForm((current) => ({
+                          ...current,
+                          projectName: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                </FieldGroup>
                 <DialogFooter>
-                  <MutatingButton pending={pendingAction === "createProject"}>
-                    {t("createProject")}
+                  <MutatingButton
+                    pending={pendingAction === "createOrganization"}
+                  >
+                    {t("createOrganization")}
                   </MutatingButton>
                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
-        ) : null}
-      </div>
+
+          {canCreateProjects ? (
+            <Dialog open={projectOpen} onOpenChange={setProjectOpen}>
+              <DialogTrigger asChild>
+                <Button type="button">
+                  <PlusIcon data-icon="inline-start" aria-hidden="true" />
+                  {t("newProject")}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t("createProjectTitle")}</DialogTitle>
+                  <DialogDescription>
+                    {t("createProjectDescription", {
+                      organization: snapshot.organization.name,
+                    })}
+                  </DialogDescription>
+                </DialogHeader>
+                <form
+                  className="contents"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    const created = await mutate(
+                      "createProject",
+                      {
+                        action: "createProject",
+                        workspaceId,
+                        ...projectForm,
+                      },
+                      t("projectCreated"),
+                      { close: () => setProjectOpen(false) },
+                    );
+                    if (created) setProjectForm(INITIAL_PROJECT_FORM);
+                  }}
+                >
+                  <Field>
+                    <FieldLabel htmlFor="project-name">
+                      {t("projectName")}
+                    </FieldLabel>
+                    <Input
+                      id="project-name"
+                      required
+                      minLength={2}
+                      value={projectForm.name}
+                      onChange={(event) =>
+                        setProjectForm({ name: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <DialogFooter>
+                    <MutatingButton pending={pendingAction === "createProject"}>
+                      {t("createProject")}
+                    </MutatingButton>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          ) : null}
+        </div>
+      </details>
     </div>
   );
 }

@@ -1,5 +1,3 @@
-import { BoxesIcon, UsersIcon } from "lucide-react";
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AccessConsoleViewModel } from "./access-console.access-console.view";
 import { AccessMainSection1 } from "./access-console.access-console.view.section-1.section-1";
@@ -13,17 +11,24 @@ export function AccessConsoleSection1({
   model: AccessConsoleViewModel;
 }) {
   const { snapshot, t, workspaceId } = model;
+  const tabClassName =
+    "min-h-10 rounded-none data-[state=active]:text-foreground data-[state=active]:after:opacity-100 after:bottom-0";
   return (
     <Tabs defaultValue="access" className="min-w-0">
-      <TabsList className="w-full justify-start sm:w-fit">
-        <TabsTrigger value="access">
-          <UsersIcon data-icon="inline-start" aria-hidden="true" />
+      <TabsList
+        variant="line"
+        className="grid w-full grid-cols-2 justify-start border-b border-border sm:flex"
+      >
+        <TabsTrigger className={tabClassName} value="access">
           {t("tabs.people")}
         </TabsTrigger>
-        <TabsTrigger value="teams">{t("tabs.teams")}</TabsTrigger>
-        <TabsTrigger value="roles">{t("tabs.roles")}</TabsTrigger>
-        <TabsTrigger value="resources">
-          <BoxesIcon data-icon="inline-start" aria-hidden="true" />
+        <TabsTrigger className={tabClassName} value="teams">
+          {t("tabs.teams")}
+        </TabsTrigger>
+        <TabsTrigger className={tabClassName} value="roles">
+          {t("tabs.roles")}
+        </TabsTrigger>
+        <TabsTrigger className={tabClassName} value="resources">
           {t("tabs.resources")}
         </TabsTrigger>
       </TabsList>
@@ -32,6 +37,7 @@ export function AccessConsoleSection1({
 
       <TabsContent value="resources">
         <ResourceAccessPanel
+          key={workspaceId}
           workspaceId={workspaceId}
           organizationId={snapshot.organization.id}
           definitions={snapshot.resourceDefinitions}

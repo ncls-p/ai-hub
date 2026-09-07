@@ -33,45 +33,10 @@ const SYSTEM_ROLE_PERMISSIONS = new Map(
   SYSTEM_ROLES.map((role) => [role.name, role.permissions]),
 );
 
-const VIEW_ACTIONS = new Set([
-  "get",
-  "list",
-  "view",
-  "viewAllowed",
-  "viewLimited",
-  "viewMetadata",
-  "viewOwn",
-  "viewShared",
-]);
-
-function parsePermission(perm: string): { domain: string; action: string } {
-  const [domain, action = "*"] = perm.split(".");
-  return { domain, action };
-}
-
-export function matchesPermission(
-  grantedPermission: string,
-  requiredPermission: string,
-): boolean {
-  const { domain: grantedDomain, action: grantedAction } =
-    parsePermission(grantedPermission);
-  const { domain: requiredDomain, action: requiredAction } =
-    parsePermission(requiredPermission);
-
-  if (grantedDomain !== requiredDomain) return false;
-  if (grantedAction === "*" || grantedAction === "manage") return true;
-  if (grantedAction === "view" && VIEW_ACTIONS.has(requiredAction)) return true;
-  return grantedAction === requiredAction;
-}
-
-export function canDelegatePermissionSet(
-  actorPermissions: readonly Permission[],
-  delegatedPermissions: readonly Permission[],
-): boolean {
-  return delegatedPermissions.every((permission) =>
-    actorPermissions.some((granted) => matchesPermission(granted, permission)),
-  );
-}
+export {
+  matchesPermission,
+  canDelegatePermissionSet,
+} from "@/modules/iam/permission-matching";
 
 export async function isActiveWorkspaceMember(
   userId: string,
@@ -143,17 +108,16 @@ export async function isActiveOrganizationMember(
 
 export function addRolePermissions(
   permissions: Permission[],
-  role: { name: string; permissionsJson: unknown },
+  role: { name: string; permissionsJson: unknown; isSystem?: boolean },
 ) {
-  const dbPermissions = Array.isArray(role.permissionsJson)
-    ? (role.permissionsJson as Permission[])
-    : [];
-  permissions.push(...dbPermissions);
-
-  const currentSystemPermissions = SYSTEM_ROLE_PERMISSIONS.get(role.name);
-  if (currentSystemPermissions) {
-    permissions.push(...currentSystemPermissions);
-  }
+  const currentSystemPermissions =
+    role.isSystem === true ? SYSTEM_ROLE_PERMISSIONS.get(role.name) : undefined;
+  const grants =
+    currentSystemPermissions ??
+    (Array.isArray(role.permissionsJson) ? role.permissionsJson : []);
+  permissions.push(
+    ...grants.filter((grant): grant is string => typeof grant === "string"),
+  );
 }
 
 export function uniquePermissions(permissions: Permission[]) {

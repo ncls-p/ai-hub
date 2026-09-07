@@ -13,6 +13,7 @@ const createUserSchema = z.object({
   email: z.email(),
   password: z.string().min(8).max(128),
   role: z.enum(["user", "admin"]).default("user"),
+  provisionOnly: z.boolean().default(false),
 });
 
 export async function GET(req: NextRequest) {
@@ -46,11 +47,12 @@ export async function POST(req: NextRequest) {
         role: parsed.data.role,
         headers: req.headers,
       });
-      await ensurePrimaryWorkspaceForUser({
-        userId: user.id,
-        role: parsed.data.role,
-        invitedBy: auth.session.user.id,
-      });
+      if (!parsed.data.provisionOnly)
+        await ensurePrimaryWorkspaceForUser({
+          userId: user.id,
+          role: parsed.data.role,
+          invitedBy: auth.session.user.id,
+        });
       return NextResponse.json({ user }, { status: 201 });
     },
     {

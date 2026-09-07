@@ -1,8 +1,8 @@
+import { requireTransferPermission } from "./resource-transfer.transfer-access-policies";
 import { createHash } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
 
-import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
 import {
   agentSkills,
@@ -41,20 +41,7 @@ export type WorkspaceCloneCounts = {
   members: number;
 };
 
-async function requireClonePermission(userId: string, workspaceId: string) {
-  const result = await authorization.checkPermission(
-    { principalType: "user", principalId: userId },
-    "roles.manage",
-    "workspace",
-    workspaceId,
-  );
-  if (!result.granted) {
-    throw new IamOperationError(
-      "You need project access administration rights on both projects",
-      403,
-    );
-  }
-}
+const requireClonePermission = requireTransferPermission;
 
 async function workspaceScope(workspaceId: string) {
   const [scope] = await db

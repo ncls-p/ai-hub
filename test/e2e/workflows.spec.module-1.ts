@@ -17,8 +17,10 @@ test("builds, publishes, and executes a no-code workflow through the API", async
   expect(workspacesResponse.ok()).toBeTruthy();
   const workspaces = (await workspacesResponse.json()) as Array<{
     workspace: { id: string };
+    isActive: boolean;
   }>;
-  const workspaceId = workspaces[0]?.workspace.id;
+  const workspaceId = (workspaces.find((row) => row.isActive) ?? workspaces[0])
+    ?.workspace.id;
   expect(workspaceId).toBeTruthy();
 
   await page.goto("/en/workflows");

@@ -23,13 +23,20 @@ export function ResourceAccessPanelView({
 }) {
   const { canManageResources, t, workspaceId } = model;
   return (
-    <Card>
-      <CardHeader>
+    <Card className="rounded-none border-0 bg-transparent shadow-none">
+      <CardHeader className="grid-cols-1! px-0 sm:grid-cols-[1fr_auto]!">
         <CardTitle>{t("resourcesTitle")}</CardTitle>
         <CardDescription>{t("resourcesDescription")}</CardDescription>
         {canManageResources ? (
-          <CardAction>
-            <ScopeMigrationDialog workspaceId={workspaceId} />
+          <CardAction className="col-start-1 row-start-auto sm:col-start-2 sm:row-start-1">
+            <details>
+              <summary className="cursor-pointer py-2 text-sm text-muted-foreground">
+                {t("simpleAccess.advancedActions")}
+              </summary>
+              <div className="pt-2">
+                <ScopeMigrationDialog workspaceId={workspaceId} />
+              </div>
+            </details>
           </CardAction>
         ) : null}
       </CardHeader>

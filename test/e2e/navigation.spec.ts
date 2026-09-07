@@ -169,7 +169,7 @@ test.describe("workspace navigation", () => {
     await expect(page).toHaveURL(/\/en\/admin\/settings/);
 
     await expect(
-      page.getByRole("heading", { name: /Platform settings/i }).first(),
+      page.getByRole("heading", { name: /App settings/i }).first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 

@@ -31,7 +31,9 @@ test.describe("members page", () => {
 
   test("shows one unified access table", async ({ page }) => {
     await page.goto("/en/members");
-    await expect(page.getByText("Who has access")).toBeVisible({
+    await expect(
+      page.locator('[data-slot="card-title"]').filter({ hasText: /^People$/ }),
+    ).toBeVisible({
       timeout: 10_000,
     });
     await expect(
@@ -39,11 +41,14 @@ test.describe("members page", () => {
     ).toBeVisible();
   });
 
-  test("shows the organization to project inheritance path", async ({
+  test("explains organization inheritance in project settings", async ({
     page,
   }) => {
-    await page.goto("/en/members");
+    await page.goto("/en/admin/settings");
 
+    await page
+      .getByText("Project and organization settings", { exact: true })
+      .click();
     await expect(
       page.getByText(/Organization roles apply to every project/i),
     ).toBeVisible({ timeout: 10_000 });
@@ -59,7 +64,7 @@ test.describe("members page", () => {
   test("shows people, teams, and roles tabs", async ({ page }) => {
     await page.goto("/en/members");
     await expect(
-      page.getByRole("tab", { name: "People & access" }),
+      page.getByRole("tab", { name: "People", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("tab", { name: "Teams" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Roles" })).toBeVisible();
@@ -75,7 +80,7 @@ test.describe("members page", () => {
     await page.getByRole("button", { name: "Grant selected" }).click();
     const dialog = page.getByRole("dialog", { name: "Grant access" });
     await expect(
-      dialog.getByRole("combobox", { name: "Member or team" }),
+      dialog.getByRole("combobox", { name: "Person or team" }),
     ).toHaveCount(0);
     await dialog.getByRole("combobox", { name: "Role" }).click();
     await page
@@ -140,7 +145,7 @@ test.describe("members page", () => {
       0,
     );
 
-    await page.getByRole("tab", { name: "People & access" }).click();
+    await page.getByRole("tab", { name: "People", exact: true }).click();
     await page.getByRole("button", { name: "Grant access" }).click();
     const dialog = page.getByRole("dialog", { name: "Grant access" });
     await dialog.getByRole("combobox", { name: "Role" }).click();
@@ -165,6 +170,7 @@ test.describe("members page", () => {
 
     await page.getByRole("button", { name: "Grant access" }).click();
     const dialog = page.getByRole("dialog", { name: "Grant access" });
+    await dialog.getByText("Advanced: organization or team").click();
     await dialog.getByRole("combobox", { name: "Scope" }).click();
     await page
       .getByRole("option", { name: "Whole organization", exact: true })

@@ -40,14 +40,21 @@ test.describe("members page", () => {
     const roleRow = page.locator("tbody tr").filter({
       hasText: "Project Viewer",
     });
-    await roleRow.getByRole("button", { name: /permissions/i }).click();
+    await roleRow.getByRole("button", { name: "Edit", exact: true }).click();
     const roleDialog = page.getByRole("dialog", {
-      name: /Project Viewer permissions/,
+      name: /Edit Project Viewer/,
     });
-    await expect(roleDialog.getByLabel("Role name")).toBeDisabled();
-    await expect(roleDialog.getByRole("checkbox").first()).toBeDisabled();
+    await expect(roleDialog.getByLabel("Role name")).toBeEnabled();
+    await roleDialog
+      .getByRole("textbox", { name: "Search permissions" })
+      .fill("workspaces.get");
+    const permission = roleDialog.getByRole("checkbox", {
+      name: "View projects",
+    });
+    await expect(permission).toBeChecked();
+    await expect(permission).toBeEnabled();
     await expect(
-      roleDialog.getByRole("button", { name: "Duplicate and customize" }),
+      roleDialog.getByRole("button", { name: "Save role" }),
     ).toBeVisible();
   });
 
@@ -73,8 +80,9 @@ test.describe("members page", () => {
     });
     await expect(resourceRow).toBeVisible({ timeout: 10_000 });
     await resourceRow
-      .getByRole("button", { name: "Transfer", exact: true })
+      .getByRole("button", { name: "Actions for Transfer preview assistant" })
       .click();
+    await page.getByRole("menuitem", { name: "Transfer", exact: true }).click();
 
     const dialog = page.getByRole("dialog", {
       name: "Transfer Transfer preview assistant",
@@ -111,6 +119,7 @@ test.describe("members page", () => {
       await page.getByRole("option", { name: "Maiah", exact: true }).click();
     }
     await page.getByRole("tab", { name: "Resources" }).click();
+    await page.getByText("More actions", { exact: true }).click();
     await page
       .getByRole("button", { name: "Move or clone everything" })
       .click();
@@ -145,6 +154,7 @@ test.describe("members page", () => {
       await page.getByRole("option", { name: "Maiah", exact: true }).click();
     }
     await page.getByRole("tab", { name: "Resources" }).click();
+    await page.getByText("More actions", { exact: true }).click();
     await page
       .getByRole("button", { name: "Move or clone everything" })
       .click();

@@ -1,3 +1,5 @@
+import { createMemberAccount } from "@/modules/iam/use-cases.create-member-account";
+import { updateTeam } from "@/modules/iam/use-cases.update-team";
 import { NextRequest, NextResponse } from "next/server";
 
 import { handleRoute } from "@/lib/route-handler";
@@ -40,6 +42,19 @@ export async function POST(req: NextRequest) {
 
       const input = parsed.data;
       switch (input.action) {
+        case "createAccount":
+          return NextResponse.json(
+            {
+              user: await createMemberAccount({
+                ...input,
+                actorUserId: session.user.id,
+              }),
+            },
+            { status: 201 },
+          );
+        case "updateTeam":
+          await updateTeam({ ...input, actorUserId: session.user.id });
+          break;
         case "createOrganization": {
           const project = await createOrganizationWithProject({
             userId: session.user.id,
@@ -98,6 +113,7 @@ export async function POST(req: NextRequest) {
             actorUserId: session.user.id,
             workspaceId: input.workspaceId,
             email: input.email,
+            projectRoleId: input.projectRoleId,
           });
           break;
         case "removeMember":
@@ -150,6 +166,7 @@ export async function POST(req: NextRequest) {
           break;
         case "assignRole":
           await assignRole({
+            replaceExisting: input.replaceExisting,
             actorUserId: session.user.id,
             workspaceId: input.workspaceId,
             principalType: input.principalType,
@@ -213,6 +230,7 @@ export async function POST(req: NextRequest) {
             actorUserId: session.user.id,
             workspaceId: input.workspaceId,
             roleId: input.roleId,
+            expectedUpdatedAt: input.expectedUpdatedAt,
             displayName: input.displayName,
             description: input.description,
             permissions: input.permissions,

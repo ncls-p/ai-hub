@@ -65,20 +65,20 @@ export async function runIamDatabaseScenario8(
     }),
   ).rejects.toMatchObject({ status: 400 });
 
-  const immutableSystemRole = await db
+  const standardSystemRole = await db
     .select({ id: roles.id })
     .from(roles)
     .where(and(eq(roles.name, "workspace.viewer"), eq(roles.isSystem, true)))
     .limit(1);
   await expect(
     updateCustomRole({
-      actorUserId: ownerId,
+      actorUserId: memberId,
       workspaceId: firstProjectId,
-      roleId: immutableSystemRole[0].id,
+      roleId: standardSystemRole[0].id,
       displayName: "Unsafe override",
       permissions: ["workspaces.get"],
     }),
-  ).rejects.toMatchObject({ status: 404 });
+  ).rejects.toMatchObject({ status: 403 });
 
   await expect(
     addOrganizationMember({

@@ -407,6 +407,13 @@
       "when": 1786949000313,
       "tag": "0057_chat_stream_leases",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1788595200000,
+      "tag": "0058_permission_delegation",
+      "breakpoints": true
     }
   ]
 }

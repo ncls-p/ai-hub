@@ -38,7 +38,11 @@ export async function scopeForWorkspace(workspaceId: string) {
 
 export async function requirePermission(input: {
   actorUserId: string;
-  permission: "organization.update" | "workspaces.update";
+  permission:
+    | "organization.update"
+    | "workspaces.update"
+    | "organization.delete"
+    | "workspaces.delete";
   resourceType: "organization" | "workspace";
   resourceId: string;
 }) {

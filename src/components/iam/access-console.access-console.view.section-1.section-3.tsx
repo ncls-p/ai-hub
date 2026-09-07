@@ -35,8 +35,8 @@ export function AccessMainSection3({
   } = model;
   return (
     <TabsContent value="access" className="flex flex-col gap-4">
-      <Card>
-        <CardHeader className="grid-cols-1! lg:grid-cols-[1fr_auto]!">
+      <Card className="rounded-none border-0 bg-transparent shadow-none">
+        <CardHeader className="grid-cols-1! px-0 lg:grid-cols-[1fr_auto]!">
           <CardTitle>{t("assignmentsTitle")}</CardTitle>
           <CardDescription>{t("assignmentsDescription")}</CardDescription>
           {canManageMembers ||
@@ -46,7 +46,7 @@ export function AccessMainSection3({
           ) : null}
         </CardHeader>
         <CardContent className="flex flex-col gap-4 px-0">
-          <div className="flex flex-col gap-3 px-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-md">
               <SearchIcon
                 className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"

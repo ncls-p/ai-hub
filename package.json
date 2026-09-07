@@ -38,7 +38,9 @@
     "quality:dead-code": "knip --include files,dependencies,devDependencies,unlisted,unresolved",
     "quality:duplicates": "jscpd src --min-lines 20 --min-tokens 100 --threshold 0.45 --ignore '**/generated-route-manifest.ts,**/migrations/**'",
     "quality:file-length": "node scripts/check-file-length.mjs",
-    "quality": "npm run quality:file-length && npm run quality:dead-code && npm run quality:duplicates"
+    "quality": "npm run quality:file-length && npm run quality:dead-code && npm run quality:duplicates",
+    "permissions:generate": "tsx scripts/generate-permission-matrix.ts",
+    "permissions:check": "tsx scripts/generate-permission-matrix.ts --check"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.38",

@@ -1,4 +1,6 @@
-import { CopyIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { RolePermissionPicker } from "./role-permission-picker";
+import { expandPermissionGrants } from "@/modules/iam/permission-matching";
+import { CopyIcon, PlusIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -7,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -17,13 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -46,8 +41,6 @@ export function AccessRolesSection2({
   const {
     canCustomizeViewedRole,
     canDelegateViewedRole,
-    canManageOrganizationAccess,
-    canManageProjectAccess,
     editingRoleId,
     grantablePermissionSet,
     mutate,
@@ -65,17 +58,20 @@ export function AccessRolesSection2({
     t,
     workspaceId,
   } = model;
+  const canCreateOrganizationRole =
+    snapshot.actions.organization["roles.create"];
+  const canCreateProjectRole = snapshot.actions.workspace["roles.create"];
   return (
-    <CardHeader>
+    <CardHeader className="grid-cols-1! px-0 sm:grid-cols-[1fr_auto]!">
       <CardTitle>{t("rolesTitle")}</CardTitle>
       <CardDescription>{t("rolesDescription")}</CardDescription>
-      {canManageProjectAccess || canManageOrganizationAccess ? (
-        <CardAction>
+      <>
+        <CardAction className="col-start-1 row-start-auto justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end">
           <Dialog
             open={roleOpen}
             onOpenChange={(open) => {
               setRoleOpen(open);
-              if (open && !canManageOrganizationAccess) {
+              if (open && !editingRoleId && !canCreateOrganizationRole) {
                 setRoleForm((current) => ({
                   ...current,
                   scopeType: "workspace",
@@ -86,21 +82,28 @@ export function AccessRolesSection2({
               }
             }}
           >
-            <DialogTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  setEditingRoleId(null);
-                  setRoleEditorReadOnly(false);
-                  setRoleForm(INITIAL_ROLE_FORM);
-                  setPermissionQuery("");
-                }}
-              >
-                <PlusIcon data-icon="inline-start" aria-hidden="true" />
-                {t("createRole")}
-              </Button>
-            </DialogTrigger>
+            {canCreateProjectRole || canCreateOrganizationRole ? (
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    setEditingRoleId(null);
+                    setRoleEditorReadOnly(false);
+                    setRoleForm({
+                      ...INITIAL_ROLE_FORM,
+                      scopeType: canCreateProjectRole
+                        ? "workspace"
+                        : "organization",
+                    });
+                    setPermissionQuery("");
+                  }}
+                >
+                  <PlusIcon data-icon="inline-start" aria-hidden="true" />
+                  {t("createRole")}
+                </Button>
+              </DialogTrigger>
+            ) : null}
             <DialogContent className="max-h-[min(46rem,calc(100vh-2rem))] overflow-y-auto sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>
@@ -116,7 +119,12 @@ export function AccessRolesSection2({
                 </DialogTitle>
                 <DialogDescription>
                   {roleEditorReadOnly
-                    ? t("builtInRoleDescription")
+                    ? t(
+                        snapshot.roles.find((role) => role.id === editingRoleId)
+                          ?.name === "organization.owner"
+                          ? "simpleAccess.ownerProtected"
+                          : "simpleAccess.roleReadOnly",
+                      )
                     : editingRoleId
                       ? t("editRoleDescription")
                       : t("createRoleDescription")}
@@ -133,9 +141,14 @@ export function AccessRolesSection2({
                           action: "updateRole",
                           workspaceId,
                           roleId: editingRoleId,
+                          expectedUpdatedAt: snapshot.roles.find(
+                            (role) => role.id === editingRoleId,
+                          )?.updatedAt,
                           displayName: roleForm.displayName,
                           description: roleForm.description,
-                          permissions: roleForm.permissions,
+                          permissions: expandPermissionGrants(
+                            roleForm.permissions,
+                          ),
                         }
                       : {
                           action: "createRole",
@@ -189,7 +202,7 @@ export function AccessRolesSection2({
                       {t("roleScope")}
                     </FieldLabel>
                     <Select
-                      disabled={Boolean(editingRoleId)}
+                      disabled={Boolean(editingRoleId) || roleEditorReadOnly}
                       value={roleForm.scopeType}
                       onValueChange={(value) =>
                         setRoleForm({
@@ -216,7 +229,7 @@ export function AccessRolesSection2({
                           <SelectItem value="workspace">
                             {t("projectRole")}
                           </SelectItem>
-                          {canManageOrganizationAccess ? (
+                          {canCreateOrganizationRole ? (
                             <SelectItem value="organization">
                               {t("organizationRole")}
                             </SelectItem>
@@ -225,165 +238,20 @@ export function AccessRolesSection2({
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field>
-                    <FieldLabel htmlFor="permission-search">
-                      {t("searchPermissions")}
-                    </FieldLabel>
-                    <div className="relative">
-                      <SearchIcon
-                        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      <Input
-                        id="permission-search"
-                        className="pl-9"
-                        value={permissionQuery}
-                        placeholder={t("searchPlaceholder")}
-                        onChange={(event) =>
-                          setPermissionQuery(event.target.value)
-                        }
-                      />
-                    </div>
-                  </Field>
-                  <div className="flex flex-col gap-4">
-                    {snapshot.permissionCatalog.map((group) => {
-                      const visiblePermissions = group.permissions.filter(
-                        (permission) =>
-                          [
-                            t(
-                              `permissions.${permission.id.replaceAll(".", "_")}.label`,
-                            ),
-                            t(
-                              `permissions.${permission.id.replaceAll(".", "_")}.description`,
-                            ),
-                            permission.id,
-                          ].some((value) =>
-                            value
-                              .toLocaleLowerCase()
-                              .includes(
-                                permissionQuery.trim().toLocaleLowerCase(),
-                              ),
-                          ),
-                      );
-                      if (visiblePermissions.length === 0) return null;
-                      const compatiblePermissions = visiblePermissions.filter(
-                        (permission) =>
-                          isPermissionCompatibleWithScope(
-                            permission.id,
-                            roleForm.scopeType,
-                          ) && grantablePermissionSet.has(permission.id),
-                      );
-                      const allSelected =
-                        compatiblePermissions.length > 0 &&
-                        compatiblePermissions.every((permission) =>
-                          roleForm.permissions.includes(permission.id),
-                        );
-                      return (
-                        <fieldset
-                          key={group.id}
-                          className="flex flex-col gap-3 rounded-2xl border border-border/70 p-4"
-                        >
-                          <legend className="flex w-full items-center justify-between gap-3 px-1 font-semibold">
-                            <span>
-                              {t(`permissionGroups.${group.id}.label`)}
-                            </span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={roleEditorReadOnly}
-                              onClick={() =>
-                                setRoleForm((current) => ({
-                                  ...current,
-                                  permissions: allSelected
-                                    ? current.permissions.filter(
-                                        (permission) =>
-                                          !compatiblePermissions.some(
-                                            (item) => item.id === permission,
-                                          ),
-                                      )
-                                    : [
-                                        ...new Set([
-                                          ...current.permissions,
-                                          ...compatiblePermissions.map(
-                                            (permission) => permission.id,
-                                          ),
-                                        ]),
-                                      ],
-                                }))
-                              }
-                            >
-                              {allSelected ? t("clearGroup") : t("selectGroup")}
-                            </Button>
-                          </legend>
-                          <p className="text-sm text-muted-foreground">
-                            {t(`permissionGroups.${group.id}.description`)}
-                          </p>
-                          <FieldGroup data-slot="checkbox-group">
-                            {visiblePermissions.map((permission) => {
-                              const checked = roleForm.permissions.includes(
-                                permission.id,
-                              );
-                              const compatible =
-                                isPermissionCompatibleWithScope(
-                                  permission.id,
-                                  roleForm.scopeType,
-                                );
-                              const grantable = grantablePermissionSet.has(
-                                permission.id,
-                              );
-                              return (
-                                <Field
-                                  key={permission.id}
-                                  orientation="horizontal"
-                                  data-disabled={!compatible}
-                                >
-                                  <Checkbox
-                                    id={`permission-${permission.id}`}
-                                    checked={checked}
-                                    disabled={
-                                      roleEditorReadOnly ||
-                                      !compatible ||
-                                      (!checked && !grantable)
-                                    }
-                                    onCheckedChange={(nextChecked) =>
-                                      setRoleForm((current) => ({
-                                        ...current,
-                                        permissions: nextChecked
-                                          ? [
-                                              ...current.permissions,
-                                              permission.id,
-                                            ]
-                                          : current.permissions.filter(
-                                              (item) => item !== permission.id,
-                                            ),
-                                      }))
-                                    }
-                                  />
-                                  <FieldContent>
-                                    <FieldLabel
-                                      htmlFor={`permission-${permission.id}`}
-                                    >
-                                      {t(
-                                        `permissions.${permission.id.replaceAll(".", "_")}.label`,
-                                      )}
-                                    </FieldLabel>
-                                    <FieldDescription>
-                                      {t(
-                                        `permissions.${permission.id.replaceAll(".", "_")}.description`,
-                                      )}
-                                    </FieldDescription>
-                                  </FieldContent>
-                                </Field>
-                              );
-                            })}
-                          </FieldGroup>
-                        </fieldset>
-                      );
-                    })}
-                  </div>
+                  <RolePermissionPicker
+                    catalog={snapshot.permissionCatalog}
+                    selected={roleForm.permissions}
+                    grantable={grantablePermissionSet}
+                    scope={roleForm.scopeType}
+                    readOnly={roleEditorReadOnly}
+                    query={permissionQuery}
+                    onQuery={setPermissionQuery}
+                    onChange={(permissions) =>
+                      setRoleForm((current) => ({ ...current, permissions }))
+                    }
+                  />
                 </FieldGroup>
-                <DialogFooter className="sticky bottom-0">
+                <DialogFooter className="sticky bottom-0 bg-background pt-3">
                   {roleEditorReadOnly &&
                   canCustomizeViewedRole &&
                   canDelegateViewedRole ? (
@@ -405,6 +273,11 @@ export function AccessRolesSection2({
                     </Button>
                   ) : roleEditorReadOnly ? null : (
                     <MutatingButton
+                      disabled={
+                        Boolean(pendingAction) ||
+                        Boolean(model.refreshError) ||
+                        roleForm.permissions.length === 0
+                      }
                       pending={
                         pendingAction ===
                         (editingRoleId ? "updateRole" : "createRole")
@@ -418,7 +291,7 @@ export function AccessRolesSection2({
             </DialogContent>
           </Dialog>
         </CardAction>
-      ) : null}
+      </>
     </CardHeader>
   );
 }

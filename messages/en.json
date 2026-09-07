@@ -105,8 +105,8 @@
     "access": "Access",
     "usage": "Consumption",
     "activityLog": "Activity log",
-    "settings": "Settings",
-    "adminSettings": "Platform settings",
+    "settings": "My account",
+    "adminSettings": "App settings",
     "setup": "Setup",
     "assistantConfig": "Assistant settings",
     "workspace": "App",
@@ -1215,7 +1215,6 @@
       "setOrganizationDefault": "Set as organization default",
       "organizationDefaultCurrent": "Current organization default",
       "setup": "Set up",
-
       "view": "View",
       "viewDetails": "View details",
       "customize": "Customize",
@@ -1487,7 +1486,6 @@
       "toastModelRegistered": "Model added",
       "toastModelsRegistered": "{count, plural, one {# model added} other {# models added}}",
       "toastDiscoveredModels": "{count, plural, one {# model discovered} other {# models discovered}}",
-      "discoverModels": "Discover models",
       "toastLogoAssigned": "Logo added",
       "toastLogoRemoved": "Logo removed",
       "toastModelUpdated": "Model configuration saved",
@@ -2321,8 +2319,8 @@
     }
   },
   "settings": {
-    "title": "Settings",
-    "description": "Personal preferences for your account.",
+    "title": "Personal settings",
+    "description": "Manage your account and password.",
     "languageTitle": "Language",
     "languageDescription": "Choose the interface language for your account.",
     "adminLinkTitle": "Platform administration",
@@ -2387,12 +2385,15 @@
       "saving": "Saving…",
       "saved": "Organization branding updated",
       "loadFailed": "Unable to load organization branding",
-      "saveFailed": "Unable to save organization branding"
-    }
+      "saveFailed": "Unable to save organization branding",
+      "retry": "Retry",
+      "noOrganization": "No active organization. Choose a project from your account menu."
+    },
+    "accountTitle": "My account"
   },
   "admin": {
-    "platformSettingsTitle": "Platform settings",
-    "platformSettingsDescription": "Registration, automation, integrations, and system health.",
+    "platformSettingsTitle": "App settings",
+    "platformSettingsDescription": "Organization and platform settings.",
     "settingsPage": {
       "loadFailed": "Unable to load settings",
       "loadErrorDescription": "This section could not be loaded. No settings were changed.",
@@ -2863,7 +2864,7 @@
   },
   "access": {
     "title": "Access",
-    "description": "Manage organizations, projects, teams, roles, and inherited permissions from one place.",
+    "description": "Manage people, teams and their access.",
     "searchPlaceholder": "Type to search…",
     "searchProjects": "Search projects",
     "organizationAccess": "Organization access",
@@ -2893,14 +2894,14 @@
     "readOnlyDescription": "You can inspect effective access, but only an access administrator can change it.",
     "tabs": {
       "access": "Assignments",
-      "people": "People & access",
+      "people": "People",
       "resources": "Resources",
       "members": "Members",
       "teams": "Teams",
       "roles": "Roles"
     },
-    "assignmentsTitle": "Who has access",
-    "assignmentsDescription": "One row per person, with app, organization, project, and team access together.",
+    "assignmentsTitle": "People",
+    "assignmentsDescription": "Add people and choose their role in this project.",
     "searchPeople": "Search people, email, role, or team…",
     "searchPrincipal": "Search members or teams",
     "selectedCount": "{count, plural, one {# person selected} other {# people selected}}",
@@ -2915,7 +2916,7 @@
     "noMemberTransferDestination": "No other manageable project",
     "noMemberTransferDestinationDescription": "You need access administration rights on another project before you can add or move people there.",
     "destinationProject": "Destination project",
-    "chooseDestination": "Choose an organization and project",
+    "chooseDestination": "Choose a project…",
     "transferMode": "Action",
     "addToDestination": "Add",
     "addToDestinationDescription": "Keep current access and add the new access.",
@@ -2979,14 +2980,14 @@
     "accountAndMemberCreated": "Account created and added to the organization",
     "assignRole": "Grant access",
     "assignRoleTitle": "Grant access",
-    "assignRoleDescription": "Choose who receives which role and where it applies.",
+    "assignRoleDescription": "Choose a person and a role that matches their needs.",
     "scope": "Scope",
     "projectOnly": "This project only",
     "wholeOrganization": "Whole organization",
     "principalType": "Grant to",
     "member": "Member",
     "team": "Team",
-    "principal": "Member or team",
+    "principal": "Person or team",
     "choose": "Choose…",
     "role": "Role",
     "saveAssignment": "Grant access",
@@ -3017,7 +3018,7 @@
     "cancel": "Keep access",
     "confirmRemove": "Remove access",
     "teamsTitle": "Teams",
-    "teamsDescription": "Group members once, then assign roles to the team across projects.",
+    "teamsDescription": "Group people together to give them the same access.",
     "searchTeams": "Search teams or members…",
     "createTeam": "Create team",
     "createTeamTitle": "Create a team",
@@ -3043,7 +3044,7 @@
     "deleteTeamDescription": "The team and all of its access assignments will be removed. Its members remain in the organization.",
     "teamDeleted": "Team deleted",
     "rolesTitle": "Roles",
-    "rolesDescription": "Built-in roles cover common cases. Create a custom role only when a smaller permission set is needed.",
+    "rolesDescription": "A role defines what someone can do. Use an existing role or create your own.",
     "createRole": "Create custom role",
     "createRoleTitle": "Create a custom role",
     "createRoleDescription": "Give the role a clear outcome-based name, choose its scope, then select only the permissions it needs.",
@@ -3054,7 +3055,7 @@
     "roleCreated": "Role created",
     "roleUpdated": "Role updated",
     "editRoleTitle": "Edit {name}",
-    "editRoleDescription": "Change the role details and check or uncheck its permissions. Existing assignments update immediately.",
+    "editRoleDescription": "Changes apply to everyone using this role in this scope.",
     "viewRoleTitle": "{name} permissions",
     "builtInRoleDescription": "Built-in roles are protected. Review every permission here or duplicate the role to customize it safely.",
     "saveRole": "Save role",
@@ -3067,7 +3068,7 @@
     "roleColumn": "Role",
     "permissionsColumn": "Permissions",
     "assignmentsColumn": "Assigned",
-    "builtIn": "Built-in",
+    "builtIn": "Standard",
     "custom": "Custom",
     "assignmentCount": "{count, plural, =0 {Not assigned} one {# assignment} other {# assignments}}",
     "edit": "Edit",
@@ -3077,7 +3078,7 @@
     "deleteRoleDescription": "Only roles with no active assignments can be deleted.",
     "roleDeleted": "Role deleted",
     "resourcesTitle": "Resource access",
-    "resourcesDescription": "Search any project resource and manage its direct and inherited access in one place.",
+    "resourcesDescription": "Choose a resource to see who has access and change its sharing.",
     "manageScope": "Manage",
     "projectActions": "Active project",
     "organizationActions": "Organization",
@@ -3183,9 +3184,7 @@
     "loadingDestinations": "Loading destination projects",
     "noTransferDestination": "No destination project",
     "noTransferDestinationDescription": "You need access administration rights on another project before you can transfer a resource to it.",
-    "destinationProject": "Destination project",
     "searchDestination": "Search an organization or project…",
-    "chooseDestination": "Choose a project…",
     "includeDependencies": "Automatically include linked items",
     "includeDependenciesDescription": "Moves the models, connections, tools, dependent assistants, and history required to keep everything working.",
     "advancedTransferOptions": "Advanced options",
@@ -3221,11 +3220,11 @@
     "resourceAccess": "Resource access",
     "resourceAccessTitle": "Access to {name}",
     "resourceAccessDescription": "Select one or more members or teams. Private resources are visible only to their owner and recipients with direct access.",
-    "shareAgentDependencies": "Also share assistant dependencies",
-    "shareAgentDependenciesDescription": "Also grants read access to its active data sources, MCP servers, skills, custom tools, delegated assistants, provider, and model. Each recipient keeps separate connector credentials.",
-    "searchResourceAccess": "Search effective access…",
+    "shareAgentDependencies": "Include the assistant’s documents and tools",
+    "shareAgentDependenciesDescription": "Also allows viewing the documents, tools and settings this assistant needs. Connection credentials remain personal.",
+    "searchResourceAccess": "Search people, teams or roles…",
     "noResourceAccessResults": "No matching member, team, role, or scope.",
-    "grantResourceAccess": "Grant direct access",
+    "grantResourceAccess": "Share",
     "resourceAccessGranted": "Resource access granted",
     "removeResourceRole": "Remove {role} from {name}",
     "resourceScope": "This resource",
@@ -3252,7 +3251,9 @@
       "organizationMember": "Organization Member",
       "projectAdmin": "Project Administrator",
       "projectEditor": "Project Editor",
-      "projectViewer": "Project Viewer"
+      "projectViewer": "Project Viewer",
+      "knowledgeEditor": "Knowledge Editor",
+      "assistantUser": "Assistant User"
     },
     "permissionGroups": {
       "organization": {
@@ -3456,7 +3457,179 @@
       "apiKeys_manage": {
         "label": "Manage all API keys",
         "description": "Administer credentials for the project."
+      },
+      "roles_get": {
+        "label": "View access policy",
+        "description": "Read roles, assignments, members and teams."
+      },
+      "roles_create": {
+        "label": "Create custom roles",
+        "description": "Create a role limited to permissions you hold."
+      },
+      "roles_update": {
+        "label": "Edit custom roles",
+        "description": "Edit a subordinate role and its permissions."
+      },
+      "roles_delete": {
+        "label": "Delete custom roles",
+        "description": "Delete an unused subordinate custom role."
+      },
+      "roles_assign": {
+        "label": "Assign roles",
+        "description": "Grant subordinate access to members or teams."
+      },
+      "roles_revoke": {
+        "label": "Revoke roles",
+        "description": "Remove subordinate access assignments."
+      },
+      "members_create": {
+        "label": "Add members",
+        "description": "Add an account to the organization."
+      },
+      "members_delete": {
+        "label": "Remove members",
+        "description": "Remove a subordinate organization member."
+      },
+      "teams_create": {
+        "label": "Create teams",
+        "description": "Create an organization team."
+      },
+      "teams_update": {
+        "label": "Edit team membership",
+        "description": "Add or remove subordinate members within delegable team access."
+      },
+      "teams_delete": {
+        "label": "Delete teams",
+        "description": "Delete a team whose access you can administer."
+      },
+      "agents_test": {
+        "label": "Test assistants",
+        "description": "Run assistant tests."
+      },
+      "agents_manage": {
+        "label": "Manage assistants",
+        "description": "All currently catalogued assistant actions."
+      },
+      "providers_create": {
+        "label": "Create AI connections",
+        "description": "Create a provider connection."
+      },
+      "providers_update": {
+        "label": "Edit AI connections",
+        "description": "Edit provider settings."
+      },
+      "providers_delete": {
+        "label": "Delete AI connections",
+        "description": "Remove a provider connection."
+      },
+      "providers_test": {
+        "label": "Test AI connections",
+        "description": "Test provider connectivity."
+      },
+      "models_create": {
+        "label": "Create models",
+        "description": "Add a model."
+      },
+      "models_update": {
+        "label": "Edit models",
+        "description": "Update model configuration."
+      },
+      "models_delete": {
+        "label": "Delete models",
+        "description": "Remove a model."
+      },
+      "models_sync": {
+        "label": "Sync models",
+        "description": "Discover models from a provider."
+      },
+      "tools_manage": {
+        "label": "Manage tools",
+        "description": "All currently catalogued tool actions."
+      },
+      "organization_delete": {
+        "label": "Delete organization",
+        "description": "Delete the organization and all of its projects."
+      },
+      "organization_transfer": {
+        "label": "Migrate organization",
+        "description": "Move or clone an organization into another authorized organization."
+      },
+      "workspaces_delete": {
+        "label": "Delete projects",
+        "description": "Delete a project and its resources."
+      },
+      "workspaces_transfer": {
+        "label": "Transfer project resources",
+        "description": "Move or clone project resources and their access policies."
+      },
+      "workspaces_curate": {
+        "label": "Manage shared project resources",
+        "description": "Curate shared assistants, knowledge and connections without administering access policies."
       }
+    },
+    "matrix": {
+      "title": "Permissions",
+      "description": "Permissions inherit from the organization to its projects and resources. Delegate only permissions you hold to less privileged members. Manage actions include the registered actions in the same domain.",
+      "caption": "{count} permissions at this scope. Direct resource assignments can add resource-specific access.",
+      "effective": "My effective access",
+      "delegable": "Delegable",
+      "allowed": "Yes",
+      "denied": "—"
+    },
+    "simpleAccess": {
+      "addDescription": "Choose the account and its role in “{project}”.",
+      "accountCreatedRetry": "The account has been created. Correct the access and retry; the same account will be used.",
+      "standardAccount": "Standard account. Its access is determined by the role selected below.",
+      "projectRole": "Role in this project",
+      "noProjectAccess": "No project access",
+      "noProjectAccessDescription": "The person will join the organization. A project role can be assigned later.",
+      "viewMatrix": "Advanced: full permission matrix",
+      "advancedScope": "Advanced: organization or team",
+      "cancel": "Cancel",
+      "ownerProtected": "Owners always retain full control. You can appoint another owner to hand over management.",
+      "roleReadOnly": "You can view this role. Editing it requires additional management rights.",
+      "editTeam": "Edit team",
+      "editTeamDescription": "Update its name and description. Members and their access are kept.",
+      "save": "Save",
+      "teamUpdated": "Team updated",
+      "roleBasics": "Access by category",
+      "roleBasicsDescription": "Choose what this role can do. Open a category to adjust the details.",
+      "noAccess": "None",
+      "readAccess": "View",
+      "fullAccess": "Manage",
+      "customAccess": "Custom",
+      "passwordHelp": "At least 8 characters. Give this password to the person for their first sign-in.",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "replaceProjectRole": "This replaces roles assigned directly in this project. Organization and team access still applies.",
+      "changeRole": "Change role",
+      "projectSettings": "Project and organization settings",
+      "roleNames": {
+        "projectAdmin": "Administrator",
+        "projectEditor": "Editor",
+        "projectViewer": "Viewer"
+      },
+      "multipleRoles": "Multiple roles",
+      "noDirectRole": "No direct role",
+      "changePersonRole": "Role for {name}: {role}",
+      "accessDetails": "Access details",
+      "additionalAccess": "Other access: see details",
+      "customRoleHelp": "Permissions defined by this custom role.",
+      "teamCount": "{count, plural, =0 {No teams} one {# team} other {# teams}}",
+      "teamMembers": "View members",
+      "resourceActions": "Actions for {name}",
+      "advancedActions": "More actions",
+      "ownerAccess": "Organization owner · full control"
+    },
+    "builtInRoleDescriptions": {
+      "owner": "Full organization administration, including deletion and migration.",
+      "organizationAdmin": "Manage members, teams, projects and their resources.",
+      "organizationMember": "Organization membership; project access is granted separately.",
+      "projectAdmin": "Manage all resources and access in this project.",
+      "projectEditor": "Create and use resources without managing project access.",
+      "projectViewer": "View project resources and activity.",
+      "knowledgeEditor": "View and edit a shared knowledge collection.",
+      "assistantUser": "Use an assistant shared with you."
     }
   },
   "shell": {
@@ -3481,7 +3654,9 @@
     "accessCheckFailedTitle": "Unable to verify your access",
     "accessCheckFailedDescription": "Sensitive actions remain unavailable until this check succeeds.",
     "retryAccess": "Try again",
-    "backToChat": "Back to chat"
+    "backToChat": "Back to chat",
+    "myAccount": "My account",
+    "appSettings": "App settings"
   },
   "auth": {
     "eyebrow": "Enterprise AI Workspace",
@@ -3762,10 +3937,18 @@
       "skipped": "Skipped"
     },
     "nodes": {
-      "trigger": { "manual": "API trigger" },
-      "agent": { "run": "Run an assistant" },
-      "http": { "request": "HTTP request" },
-      "code": { "execute": "Custom code" },
+      "trigger": {
+        "manual": "API trigger"
+      },
+      "agent": {
+        "run": "Run an assistant"
+      },
+      "http": {
+        "request": "HTTP request"
+      },
+      "code": {
+        "execute": "Custom code"
+      },
       "data": {
         "set": "Set data",
         "pick": "Keep fields",
@@ -3775,8 +3958,12 @@
         "parseJson": "Parse JSON",
         "stringifyJson": "Convert to JSON"
       },
-      "text": { "transform": "Transform text" },
-      "number": { "calculate": "Calculate" },
+      "text": {
+        "transform": "Transform text"
+      },
+      "number": {
+        "calculate": "Calculate"
+      },
       "list": {
         "filter": "Filter a list",
         "sort": "Sort a list",
@@ -3787,14 +3974,26 @@
         "delay": "Wait",
         "stop": "End workflow"
       },
-      "debug": { "snapshot": "Inspect data" },
-      "date": { "now": "Current date" }
+      "debug": {
+        "snapshot": "Inspect data"
+      },
+      "date": {
+        "now": "Current date"
+      }
     },
     "nodeDescriptions": {
-      "trigger": { "manual": "Receives the JSON sent when the run starts." },
-      "agent": { "run": "Delegates this step to a Maiah assistant." },
-      "http": { "request": "Calls an external HTTPS API." },
-      "code": { "execute": "Runs isolated JavaScript or Python." },
+      "trigger": {
+        "manual": "Receives the JSON sent when the run starts."
+      },
+      "agent": {
+        "run": "Delegates this step to a Maiah assistant."
+      },
+      "http": {
+        "request": "Calls an external HTTPS API."
+      },
+      "code": {
+        "execute": "Runs isolated JavaScript or Python."
+      },
       "data": {
         "set": "Adds or replaces fields.",
         "pick": "Keeps only the selected fields.",
@@ -3804,8 +4003,12 @@
         "parseJson": "Converts JSON text into structured data.",
         "stringifyJson": "Converts structured data into JSON text."
       },
-      "text": { "transform": "Trims, changes case, or replaces text." },
-      "number": { "calculate": "Performs a simple numeric calculation." },
+      "text": {
+        "transform": "Trims, changes case, or replaces text."
+      },
+      "number": {
+        "calculate": "Performs a simple numeric calculation."
+      },
       "list": {
         "filter": "Keeps items that match a rule.",
         "sort": "Sorts a list by field and direction.",
@@ -3819,7 +4022,9 @@
       "debug": {
         "snapshot": "Captures the data here without changing it."
       },
-      "date": { "now": "Adds the current date or timestamp." }
+      "date": {
+        "now": "Adds the current date or timestamp."
+      }
     }
   },
   "scheduledTasks": {

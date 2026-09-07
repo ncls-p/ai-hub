@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { toast } from "sonner";
@@ -36,6 +37,10 @@ export function useResourceAccessPanelController({
   const [resourceType, setResourceType] = useState(
     definitions[0]?.type ?? "agent",
   );
+  const resourceRequest = useRef(0);
+  const detailRequest = useRef(0);
+  const [resourcesError, setResourcesError] = useState<string | null>(null);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [resources, setResources] = useState<AccessResource[]>([]);
   const [loadingResources, setLoadingResources] = useState(true);
@@ -59,6 +64,8 @@ export function useResourceAccessPanelController({
 
   const loadResources = useCallback(
     async (offset = 0) => {
+      const request = ++resourceRequest.current;
+      setResourcesError(null);
       if (offset === 0) {
         setLoadingResources(true);
       } else {
@@ -76,17 +83,21 @@ export function useResourceAccessPanelController({
           resources: AccessResource[];
           nextOffset: number | null;
         }>(`/api/workspace/iam/resources?${params}`);
+        if (request !== resourceRequest.current) return;
         setResources((current) =>
           offset === 0 ? result.resources : [...current, ...result.resources],
         );
         setNextResourceOffset(result.nextOffset);
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : t("resourcesLoadFailed"),
-        );
+        if (request === resourceRequest.current)
+          setResourcesError(
+            error instanceof Error ? error.message : t("resourcesLoadFailed"),
+          );
       } finally {
-        setLoadingResources(false);
-        setLoadingMoreResources(false);
+        if (request === resourceRequest.current) {
+          setLoadingResources(false);
+          setLoadingMoreResources(false);
+        }
       }
     },
     [query, resourceType, t, workspaceId],
@@ -94,6 +105,8 @@ export function useResourceAccessPanelController({
 
   const loadDetails = useCallback(
     async (resource: AccessResource) => {
+      const request = ++detailRequest.current;
+      setDetailsError(null);
       setDetailsLoading(true);
       try {
         const params = new URLSearchParams({
@@ -101,17 +114,17 @@ export function useResourceAccessPanelController({
           resourceType: resource.type,
           resourceId: resource.id,
         });
-        setDetails(
-          await fetchJson<ResourceAccessSnapshot>(
-            `/api/workspace/iam/resources?${params}`,
-          ),
+        const result = await fetchJson<ResourceAccessSnapshot>(
+          `/api/workspace/iam/resources?${params}`,
         );
+        if (request === detailRequest.current) setDetails(result);
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : t("resourcesLoadFailed"),
-        );
+        if (request === detailRequest.current)
+          setDetailsError(
+            error instanceof Error ? error.message : t("resourcesLoadFailed"),
+          );
       } finally {
-        setDetailsLoading(false);
+        if (request === detailRequest.current) setDetailsLoading(false);
       }
     },
     [t, workspaceId],
@@ -119,7 +132,10 @@ export function useResourceAccessPanelController({
 
   useEffect(() => {
     const timeout = window.setTimeout(() => void loadResources(), 250);
-    return () => window.clearTimeout(timeout);
+    return () => {
+      window.clearTimeout(timeout);
+      resourceRequest.current += 1;
+    };
   }, [loadResources]);
 
   const principals =
@@ -211,7 +227,15 @@ export function useResourceAccessPanelController({
 
   async function assignResourceRole(event: FormEvent) {
     event.preventDefault();
-    if (!selected || principalIds.length === 0 || !roleId) return;
+    if (
+      !selected ||
+      principalIds.length === 0 ||
+      !roleId ||
+      pending ||
+      detailsLoading ||
+      detailsError
+    )
+      return;
     setPending("assign");
     try {
       await fetchJson("/api/workspace/iam", {
@@ -240,7 +264,7 @@ export function useResourceAccessPanelController({
   }
 
   async function removeResourceAssignment(bindingId: string) {
-    if (!selected) return;
+    if (!selected || pending || detailsLoading || detailsError) return;
     setPending(bindingId);
     try {
       await fetchJson("/api/workspace/iam", {
@@ -312,6 +336,8 @@ export function useResourceAccessPanelController({
     destinationQuery,
     details,
     detailsLoading,
+    detailsError,
+    resourcesError,
     executeTransfer,
     filteredDestinations,
     filteredGroupedAssignments,

@@ -95,15 +95,17 @@ export async function runIamDatabaseScenario7(
       createdById: ownerId,
     })
     .returning();
-  await assignResourceRole({
-    actorUserId: ownerId,
-    workspaceId: removableProject.id,
-    principalType: "user",
-    principalId: ownerId,
-    roleId: removableRole.id,
-    resourceType: "agent",
-    resourceId: removableAgent.id,
-  });
+  await expect(
+    assignResourceRole({
+      actorUserId: ownerId,
+      workspaceId: removableProject.id,
+      principalType: "user",
+      principalId: ownerId,
+      roleId: removableRole.id,
+      resourceType: "agent",
+      resourceId: removableAgent.id,
+    }),
+  ).resolves.toBeDefined();
   await expect(
     deleteProject({
       actorUserId: ownerId,
@@ -148,14 +150,16 @@ export async function runIamDatabaseScenario7(
     scopeType: "organization",
     permissions: ["organization.get"],
   });
-  await assignRole({
-    actorUserId: ownerId,
-    workspaceId: lifecycleProject.id,
-    principalType: "user",
-    principalId: ownerId,
-    roleId: organizationRole.id,
-    scopeType: "organization",
-  });
+  await expect(
+    assignRole({
+      actorUserId: ownerId,
+      workspaceId: lifecycleProject.id,
+      principalType: "user",
+      principalId: ownerId,
+      roleId: organizationRole.id,
+      scopeType: "organization",
+    }),
+  ).resolves.toBeUndefined();
 
   const organizationDeletion = await deleteOrganization({
     actorUserId: ownerId,

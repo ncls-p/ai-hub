@@ -4,8 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { useAccessConsoleController } from "./access-console.access-console";
 import { AccessConsoleSection1 } from "./access-console.access-console.view.section-1";
-import { AccessConsoleSection2 } from "./access-console.access-console.view.section-2";
-import { ScopePath } from "./access-console.scope-path";
+import { AccessProjectSelector } from "./access-project-selector";
 
 export type AccessConsoleViewModel = Extract<
   ReturnType<typeof useAccessConsoleController>,
@@ -16,7 +15,7 @@ export function AccessConsoleView({
 }: {
   model: AccessConsoleViewModel;
 }) {
-  const { canManageAnything, load, refreshError, snapshot, t } = model;
+  const { canManageAnything, load, refreshError, t } = model;
   return (
     <div className="flex flex-col gap-5">
       {refreshError ? (
@@ -38,9 +37,7 @@ export function AccessConsoleView({
         </Alert>
       ) : null}
 
-      <ScopePath snapshot={snapshot} />
-
-      <AccessConsoleSection2 model={model} />
+      <AccessProjectSelector />
 
       {!canManageAnything ? (
         <Alert>

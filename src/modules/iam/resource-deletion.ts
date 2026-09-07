@@ -33,7 +33,7 @@ async function requireResourceDeletionPermission(
 ) {
   const permission = await authorization.checkPermission(
     { principalType: "user", principalId: userId },
-    "roles.manage",
+    "workspaces.delete",
     "workspace",
     workspaceId,
   );

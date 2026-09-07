@@ -1,3 +1,12 @@
+import { resolveStandardRole } from "./standard-role";
+import { resourceDefinition } from "@/server/domain/entities/access-resource";
+import { expandPermissionGrants } from "./permission-matching";
+import { requireSubordinatePrincipal } from "./delegation";
+import {
+  requireDelegablePermissions,
+  rolePermissions,
+} from "./use-cases.iam-operation-error";
+import { policyMutation } from "./policy-mutation";
 import { audit } from "@/server/domain/services/audit";
 import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
@@ -34,22 +43,30 @@ export interface DirectShare {
 
 const KNOWLEDGE_EDITOR_ROLE_NAME = "workspace.knowledge_editor";
 
-async function sharingContext(input: {
-  actorUserId: string;
-  workspaceId: string;
-  resourceType: DirectlyShareableResourceType;
-  resourceId: string;
-}) {
+async function sharingContext(
+  input: {
+    actorUserId: string;
+    workspaceId: string;
+    resourceType: DirectlyShareableResourceType;
+    resourceId: string;
+  },
+  write = false,
+) {
   const [{ organization }, resource, canManageProject, canManageResource] =
     await Promise.all([
       getWorkspaceScope(input.workspaceId),
       findAccessResource(input.resourceType, input.resourceId),
-      authorization.hasPermission(
-        { principalType: "user", principalId: input.actorUserId },
-        "roles.manage",
-        "workspace",
-        input.workspaceId,
-      ),
+      Promise.all(
+        (write ? ["roles.assign", "roles.revoke"] : ["roles.get"]).map(
+          (permission) =>
+            authorization.hasPermission(
+              { principalType: "user", principalId: input.actorUserId },
+              permission,
+              "workspace",
+              input.workspaceId,
+            ),
+        ),
+      ).then((grants) => grants.every(Boolean)),
       authorization.hasDirectPermission(
         { principalType: "user", principalId: input.actorUserId },
         SHARE_PERMISSIONS[input.resourceType],
@@ -118,6 +135,7 @@ async function ensureKnowledgeEditorRole(actorUserId: string) {
 async function sharingRoles(
   resourceType: DirectlyShareableResourceType,
   actorUserId: string,
+  workspaceId: string,
 ) {
   const roleRows = await db
     .select()
@@ -149,7 +167,13 @@ async function sharingRoles(
       ? (roleRows.find(({ name }) => name === KNOWLEDGE_EDITOR_ROLE_NAME) ??
         (await ensureKnowledgeEditorRole(actorUserId)))
       : undefined;
-  return { rootRole, viewerRole, editorRole };
+  return {
+    rootRole: await resolveStandardRole(rootRole, "workspace", workspaceId),
+    viewerRole: await resolveStandardRole(viewerRole, "workspace", workspaceId),
+    editorRole: editorRole
+      ? await resolveStandardRole(editorRole, "workspace", workspaceId)
+      : undefined,
+  };
 }
 
 function directShareRoleIds(
@@ -175,10 +199,12 @@ export async function getDirectResourceSharing(input: {
   resourceType: DirectlyShareableResourceType;
   resourceId: string;
 }) {
-  const [{ organization }, sharing] = await Promise.all([
-    sharingContext(input),
-    sharingRoles(input.resourceType, input.actorUserId),
-  ]);
+  const { organization } = await sharingContext(input);
+  const sharing = await sharingRoles(
+    input.resourceType,
+    input.actorUserId,
+    input.workspaceId,
+  );
   const [members, bindings] = await Promise.all([
     db
       .select({ id: users.id, name: users.name, email: users.email })
@@ -241,185 +267,228 @@ export async function getDirectResourceSharing(input: {
   };
 }
 
-export async function replaceDirectResourceSharing(input: {
-  actorUserId: string;
-  workspaceId: string;
-  resourceType: DirectlyShareableResourceType;
-  resourceId: string;
-  userIds?: string[];
-  shares?: DirectShare[];
-  includeDependencies?: boolean;
-}) {
-  const requestedShares: DirectShare[] =
-    input.shares ??
-    (input.userIds ?? []).map((userId) => ({ userId, access: "view" }));
-  const sharesByUserId = new Map<string, DirectShareAccess>();
-  for (const { userId, access } of requestedShares) {
-    if (userId === input.actorUserId) continue;
-    // "edit" only applies to knowledge bases; other resources keep view-only shares.
-    const effectiveAccess =
-      input.resourceType === "knowledge_base" ? access : "view";
-    if (effectiveAccess === "edit" || !sharesByUserId.has(userId)) {
-      sharesByUserId.set(userId, effectiveAccess);
+export const replaceDirectResourceSharing = policyMutation(
+  async function replaceDirectResourceSharing(input: {
+    actorUserId: string;
+    workspaceId: string;
+    resourceType: DirectlyShareableResourceType;
+    resourceId: string;
+    userIds?: string[];
+    shares?: DirectShare[];
+    includeDependencies?: boolean;
+  }) {
+    const requestedShares: DirectShare[] =
+      input.shares ??
+      (input.userIds ?? []).map((userId) => ({ userId, access: "view" }));
+    const sharesByUserId = new Map<string, DirectShareAccess>();
+    for (const { userId, access } of requestedShares) {
+      if (userId === input.actorUserId) continue;
+      // "edit" only applies to knowledge bases; other resources keep view-only shares.
+      const effectiveAccess =
+        input.resourceType === "knowledge_base" ? access : "view";
+      if (effectiveAccess === "edit" || !sharesByUserId.has(userId)) {
+        sharesByUserId.set(userId, effectiveAccess);
+      }
     }
-  }
-  const shares = [...sharesByUserId.entries()].map(([userId, access]) => ({
-    userId,
-    access,
-  }));
-  const userIds = shares.map(({ userId }) => userId);
-  const [{ organization }, sharing] = await Promise.all([
-    sharingContext(input),
-    sharingRoles(input.resourceType, input.actorUserId),
-  ]);
-  const { rootRole, viewerRole, editorRole } = sharing;
-  if (userIds.length > 0) {
-    const validMembers = await db
-      .select({ userId: organizationMembers.userId })
-      .from(organizationMembers)
+    const shares = [...sharesByUserId.entries()].map(([userId, access]) => ({
+      userId,
+      access,
+    }));
+    const userIds = shares.map(({ userId }) => userId);
+    const { organization } = await sharingContext(input, true);
+    const sharing = await sharingRoles(
+      input.resourceType,
+      input.actorUserId,
+      input.workspaceId,
+    );
+    const { rootRole, viewerRole, editorRole } = sharing;
+    if (userIds.length > 0) {
+      const validMembers = await db
+        .select({ userId: organizationMembers.userId })
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.organizationId, organization.id),
+            eq(organizationMembers.status, "active"),
+            inArray(organizationMembers.userId, userIds),
+          ),
+        );
+      if (validMembers.length !== userIds.length) {
+        throw new IamOperationError(
+          "A selected member is outside this organization",
+          400,
+        );
+      }
+      const projectAccess = await Promise.all(
+        userIds.map((userId) =>
+          authorization.hasPermission(
+            { principalType: "user", principalId: userId },
+            "workspaces.get",
+            "workspace",
+            input.workspaceId,
+          ),
+        ),
+      );
+      if (projectAccess.some((granted) => !granted)) {
+        throw new IamOperationError(
+          "A selected member does not have access to this project",
+          400,
+        );
+      }
+    }
+
+    const previousBindings = await db
+      .select({ userId: roleBindings.principalId, roleId: roleBindings.roleId })
+      .from(roleBindings)
       .where(
         and(
-          eq(organizationMembers.organizationId, organization.id),
-          eq(organizationMembers.status, "active"),
-          inArray(organizationMembers.userId, userIds),
-        ),
-      );
-    if (validMembers.length !== userIds.length) {
-      throw new IamOperationError(
-        "A selected member is outside this organization",
-        400,
-      );
-    }
-    const projectAccess = await Promise.all(
-      userIds.map((userId) =>
-        authorization.hasPermission(
-          { principalType: "user", principalId: userId },
-          "workspaces.get",
-          "workspace",
-          input.workspaceId,
-        ),
-      ),
-    );
-    if (projectAccess.some((granted) => !granted)) {
-      throw new IamOperationError(
-        "A selected member does not have access to this project",
-        400,
-      );
-    }
-  }
-
-  const previousBindings = await db
-    .select({ userId: roleBindings.principalId })
-    .from(roleBindings)
-    .where(
-      and(
-        eq(roleBindings.resourceType, input.resourceType),
-        eq(roleBindings.resourceId, input.resourceId),
-        eq(roleBindings.principalType, "user"),
-        inArray(
-          roleBindings.roleId,
-          directShareRoleIds(input.resourceType, sharing),
-        ),
-      ),
-    );
-  await db
-    .delete(roleBindings)
-    .where(
-      and(
-        eq(roleBindings.principalType, "user"),
-        or(
-          and(
-            eq(roleBindings.resourceType, input.resourceType),
-            eq(roleBindings.resourceId, input.resourceId),
-            inArray(
-              roleBindings.roleId,
-              directShareRoleIds(input.resourceType, sharing),
-            ),
+          eq(roleBindings.resourceType, input.resourceType),
+          eq(roleBindings.resourceId, input.resourceId),
+          eq(roleBindings.principalType, "user"),
+          inArray(
+            roleBindings.roleId,
+            directShareRoleIds(input.resourceType, sharing),
           ),
-          input.resourceType === "agent"
-            ? and(
-                sql`${roleBindings.conditionJson}->>'source' = 'agent_direct_share'`,
-                sql`${roleBindings.conditionJson}->>'rootAgentId' = ${input.resourceId}`,
-              )
-            : undefined,
         ),
-      ),
-    );
-
-  const targets = await listResourceShareTargets({
-    resourceType: input.resourceType,
-    resourceId: input.resourceId,
-    includeDependencies:
-      input.resourceType === "agent" && input.includeDependencies !== false,
-  });
-  if (shares.length > 0) {
-    await db
-      .insert(roleBindings)
-      .values(
-        shares.flatMap(({ userId, access }) =>
-          targets.map((target) => ({
-            principalType: "user" as const,
-            principalId: userId,
-            roleId:
-              target.type === input.resourceType &&
-              target.id === input.resourceId
-                ? access === "edit" && editorRole
-                  ? editorRole.id
-                  : rootRole.id
-                : viewerRole.id,
-            resourceType: target.type,
-            resourceId: target.id,
-            conditionJson:
-              input.resourceType === "agent"
-                ? {
-                    source: "agent_direct_share",
-                    rootAgentId: input.resourceId,
-                  }
-                : undefined,
-            createdById: input.actorUserId,
-          })),
-        ),
-      )
-      .onConflictDoNothing();
-  }
-
-  const affectedUserIds = [
-    ...new Set([...previousBindings.map(({ userId }) => userId), ...userIds]),
-  ];
-  await Promise.all(
-    affectedUserIds.flatMap((userId) =>
-      targets.map((target) =>
-        authorization.invalidatePermissionCache(userId, target.type, target.id),
-      ),
-    ),
-  );
-  await audit.emit({
-    organizationId: organization.id,
-    workspaceId: input.workspaceId,
-    actorPrincipalType: "user",
-    actorPrincipalId: input.actorUserId,
-    action: "iam.resource_direct_sharing.replaced",
-    resourceType: input.resourceType,
-    resourceId: input.resourceId,
-    outcome: "success",
-    metadata: {
-      userIds,
-      ...(input.resourceType === "knowledge_base"
-        ? {
-            access: {
-              view: shares
-                .filter(({ access }) => access === "view")
-                .map(({ userId }) => userId),
-              edit: shares
-                .filter(({ access }) => access === "edit")
-                .map(({ userId }) => userId),
-            },
-          }
-        : {}),
+      );
+    const targets = await listResourceShareTargets({
+      resourceType: input.resourceType,
+      resourceId: input.resourceId,
       includeDependencies:
         input.resourceType === "agent" && input.includeDependencies !== false,
-      sharedResourceCount: targets.length,
-    },
-  });
-  return { userIds, resourceCount: targets.length };
-}
+    });
+    const affectedUserIds = [
+      ...new Set([...previousBindings.map(({ userId }) => userId), ...userIds]),
+    ];
+    for (const target of targets) {
+      const resource = await findAccessResource(target.type, target.id);
+      if (!resource || resource.workspaceId !== input.workspaceId)
+        throw new IamOperationError(
+          "A dependency is outside this project",
+          409,
+        );
+      const domains = resourceDefinition(target.type)?.permissionDomains ?? [];
+      const candidateRoles =
+        target.type === input.resourceType && target.id === input.resourceId
+          ? [
+              rootRole,
+              ...(editorRole &&
+              (shares.some(({ access }) => access === "edit") ||
+                previousBindings.some(({ roleId }) => roleId === editorRole.id))
+                ? [editorRole]
+                : []),
+            ]
+          : [viewerRole];
+      for (const role of candidateRoles) {
+        await requireDelegablePermissions({
+          actorUserId: input.actorUserId,
+          resourceType: target.type,
+          resourceId: target.id,
+          permissions: expandPermissionGrants(rolePermissions(role)).filter(
+            (permission) => domains.includes(permission.split(".")[0]),
+          ),
+        });
+      }
+      for (const userId of affectedUserIds) {
+        await requireSubordinatePrincipal({
+          actorUserId: input.actorUserId,
+          principalType: "user",
+          principalId: userId,
+          resourceType: target.type,
+          resourceId: target.id,
+        });
+      }
+    }
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(roleBindings)
+        .where(
+          and(
+            eq(roleBindings.principalType, "user"),
+            or(
+              and(
+                eq(roleBindings.resourceType, input.resourceType),
+                eq(roleBindings.resourceId, input.resourceId),
+                inArray(
+                  roleBindings.roleId,
+                  directShareRoleIds(input.resourceType, sharing),
+                ),
+              ),
+              input.resourceType === "agent"
+                ? and(
+                    sql`${roleBindings.conditionJson}->>'source' = 'agent_direct_share'`,
+                    sql`${roleBindings.conditionJson}->>'rootAgentId' = ${input.resourceId}`,
+                  )
+                : undefined,
+            ),
+          ),
+        );
+
+      if (shares.length > 0) {
+        await tx
+          .insert(roleBindings)
+          .values(
+            shares.flatMap(({ userId, access }) =>
+              targets.map((target) => ({
+                principalType: "user" as const,
+                principalId: userId,
+                roleId:
+                  target.type === input.resourceType &&
+                  target.id === input.resourceId
+                    ? access === "edit" && editorRole
+                      ? editorRole.id
+                      : rootRole.id
+                    : viewerRole.id,
+                resourceType: target.type,
+                resourceId: target.id,
+                conditionJson:
+                  input.resourceType === "agent"
+                    ? {
+                        source: "agent_direct_share",
+                        rootAgentId: input.resourceId,
+                      }
+                    : undefined,
+                createdById: input.actorUserId,
+              })),
+            ),
+          )
+          .onConflictDoNothing();
+      }
+    });
+
+    await Promise.all(
+      affectedUserIds.map((userId) =>
+        authorization.invalidatePrincipalPermissionCache(userId),
+      ),
+    );
+    await audit.emit({
+      organizationId: organization.id,
+      workspaceId: input.workspaceId,
+      actorPrincipalType: "user",
+      actorPrincipalId: input.actorUserId,
+      action: "iam.resource_direct_sharing.replaced",
+      resourceType: input.resourceType,
+      resourceId: input.resourceId,
+      outcome: "success",
+      metadata: {
+        userIds,
+        ...(input.resourceType === "knowledge_base"
+          ? {
+              access: {
+                view: shares
+                  .filter(({ access }) => access === "view")
+                  .map(({ userId }) => userId),
+                edit: shares
+                  .filter(({ access }) => access === "edit")
+                  .map(({ userId }) => userId),
+              },
+            }
+          : {}),
+        includeDependencies:
+          input.resourceType === "agent" && input.includeDependencies !== false,
+        sharedResourceCount: targets.length,
+      },
+    });
+    return { userIds, resourceCount: targets.length };
+  },
+);

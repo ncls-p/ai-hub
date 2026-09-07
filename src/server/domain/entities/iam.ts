@@ -50,6 +50,9 @@ const TENANT_USER_PERMISSIONS: Permission[] = [
 ];
 
 const TENANT_ADMIN_PERMISSIONS: Permission[] = [
+  "workspaces.curate",
+  "workspaces.delete",
+  "workspaces.transfer",
   "workspaces.get",
   "workspaces.update",
   "roles.manage",
@@ -113,6 +116,8 @@ export const SYSTEM_ROLES: Omit<Role, "createdAt" | "updatedAt">[] = [
     description:
       "Full control over the organization and every project it contains.",
     permissions: [
+      "organization.delete",
+      "organization.transfer",
       ...new Set([
         "organization.get",
         "organization.update",
@@ -134,6 +139,7 @@ export const SYSTEM_ROLES: Omit<Role, "createdAt" | "updatedAt">[] = [
     displayName: "Organization Admin",
     description: "Can administer organization-level settings.",
     permissions: [
+      ...TENANT_ADMIN_PERMISSIONS,
       "organization.get",
       "organization.update",
       "workspaces.get",

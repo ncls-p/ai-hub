@@ -1,11 +1,20 @@
 import {
   ArrowRightLeftIcon,
   BoxesIcon,
+  EllipsisIcon,
   SearchIcon,
   ShieldCheckIcon,
   Trash2Icon,
 } from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import {
@@ -44,6 +53,7 @@ export function ResourceAccessPanelSection4({
     query,
     resourceType,
     resources,
+    resourcesError,
     setAssignmentQuery,
     setDeletingResource,
     setDetails,
@@ -57,8 +67,8 @@ export function ResourceAccessPanelSection4({
     t,
   } = model;
   return (
-    <CardContent className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-[15rem_minmax(16rem,1fr)]">
+    <CardContent className="flex flex-col gap-4 px-0">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
         <Field>
           <FieldLabel htmlFor="resource-type">{t("resourceType")}</FieldLabel>
           <Select
@@ -103,7 +113,22 @@ export function ResourceAccessPanelSection4({
         </Field>
       </div>
 
-      {loadingResources ? (
+      {resourcesError ? (
+        <Alert variant="destructive">
+          <AlertTitle>{t("resourcesLoadFailed")}</AlertTitle>
+          <AlertDescription>
+            {resourcesError}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loadingResources || loadingMoreResources}
+              onClick={() => void loadResources()}
+            >
+              {t("retry")}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : loadingResources ? (
         <div className="flex min-h-40 items-center justify-center">
           <Spinner />
           <span className="sr-only">{t("loadingResources")}</span>
@@ -119,38 +144,29 @@ export function ResourceAccessPanelSection4({
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="overflow-hidden rounded-xl border">
-          <table className="w-full text-left">
-            <thead className="bg-muted/45 text-xs text-muted-foreground">
+        <div className="@container min-w-0 border-y">
+          <table className="w-full table-fixed text-left @max-xl:block">
+            <thead className="text-xs text-muted-foreground @max-xl:sr-only">
               <tr>
                 <th className="px-4 py-3 font-medium">{t("resource")}</th>
-                <th className="px-4 py-3 text-right font-medium">
+                <th className="w-64 px-4 py-3 text-right font-medium">
                   {t("actions")}
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y @max-xl:block">
               {resources.map((resource) => (
-                <tr key={resource.id} className="hover:bg-muted/25">
-                  <td className="px-4 py-3">
-                    <span className="font-medium">{resource.name}</span>
+                <tr
+                  key={resource.id}
+                  className="hover:bg-muted/25 @max-xl:block"
+                >
+                  <td className="px-4 py-3 @max-xl:block">
+                    <span className="break-words [overflow-wrap:anywhere] font-medium">
+                      {resource.name}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right @max-xl:block">
                     <div className="flex justify-end gap-2">
-                      {canManageResources ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void openTransfer(resource)}
-                        >
-                          <ArrowRightLeftIcon
-                            data-icon="inline-start"
-                            aria-hidden="true"
-                          />
-                          {t("transfer")}
-                        </Button>
-                      ) : null}
                       <Button
                         type="button"
                         size="sm"
@@ -171,18 +187,37 @@ export function ResourceAccessPanelSection4({
                         {t("manageResourceAccess")}
                       </Button>
                       {canManageResources ? (
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          aria-label={t("deleteResource", {
-                            name: resource.name,
-                          })}
-                          onClick={() => setDeletingResource(resource)}
-                        >
-                          <Trash2Icon aria-hidden="true" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label={t("simpleAccess.resourceActions", {
+                                name: resource.name,
+                              })}
+                            >
+                              <EllipsisIcon aria-hidden="true" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuGroup>
+                              <DropdownMenuItem
+                                onSelect={() => void openTransfer(resource)}
+                              >
+                                <ArrowRightLeftIcon aria-hidden="true" />
+                                {t("transfer")}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={() => setDeletingResource(resource)}
+                              >
+                                <Trash2Icon aria-hidden="true" />
+                                {t("deleteResource", { name: resource.name })}
+                              </DropdownMenuItem>
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       ) : null}
                     </div>
                   </td>

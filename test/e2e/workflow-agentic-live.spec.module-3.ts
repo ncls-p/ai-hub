@@ -10,8 +10,9 @@ test("builds, saves, and runs a workflow through the real agentic provider strea
 }) => {
   const workspaces = (await (
     await page.request.get("/api/workspaces")
-  ).json()) as Array<{ workspace: { id: string } }>;
-  const workspaceId = workspaces[0]!.workspace.id;
+  ).json()) as Array<{ workspace: { id: string }; isActive: boolean }>;
+  const workspaceId = (workspaces.find((row) => row.isActive) ?? workspaces[0])!
+    .workspace.id;
   const previousBuilderState = (await (
     await page.request.get(
       `/api/admin/workflow-builder?workspaceId=${workspaceId}`,

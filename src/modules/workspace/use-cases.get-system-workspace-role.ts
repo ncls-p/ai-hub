@@ -1,3 +1,4 @@
+import { resolveStandardRole } from "@/modules/iam/standard-role";
 import { logger } from "@/lib/logger";
 import { audit } from "@/server/domain/services/audit";
 import { authorization } from "@/server/domain/services/authorization";
@@ -12,7 +13,10 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 import { WORKSPACE_SCOPE } from "./use-cases.workspace-scope";
 
-export async function getSystemWorkspaceRole(roleName: string) {
+export async function getSystemWorkspaceRole(
+  roleName: string,
+  workspaceId?: string,
+) {
   const [role] = await db
     .select()
     .from(roles)
@@ -25,7 +29,9 @@ export async function getSystemWorkspaceRole(roleName: string) {
     )
     .limit(1);
 
-  return role ?? null;
+  return role && workspaceId
+    ? resolveStandardRole(role, "workspace", workspaceId)
+    : (role ?? null);
 }
 
 export async function addWorkspaceMember(input: {
@@ -74,7 +80,7 @@ export async function addWorkspaceMember(input: {
       )
       .limit(1);
 
-    const role = await getSystemWorkspaceRole(roleName);
+    const role = await getSystemWorkspaceRole(roleName, workspaceId);
     if (!role) {
       throw new Error(`Role not found: ${roleName}`);
     }

@@ -6,6 +6,7 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 
+import { PersonProjectRole } from "./person-project-role";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,8 +30,6 @@ export function AccessPeopleBranch2({
     allVisiblePeopleSelected,
     busyPlatformUserId,
     canManageMembers,
-    canManageOrganizationAccess,
-    canManageProjectAccess,
     currentUserId,
     mutate,
     pendingAction,
@@ -48,11 +47,11 @@ export function AccessPeopleBranch2({
     workspaceId,
   } = model;
   return (
-    <div className="border-y border-border/60">
-      <table className="w-full text-left max-md:block">
-        <thead className="bg-muted/35 text-xs font-medium text-muted-foreground max-md:sr-only">
+    <div className="@container min-w-0 border-y border-border/60">
+      <table className="w-full table-fixed text-left @max-3xl:block">
+        <thead className="text-xs font-medium text-muted-foreground @max-3xl:sr-only">
           <tr>
-            <th className="w-12 px-6 py-3">
+            <th className="w-14 px-3 py-3">
               <Checkbox
                 id="select-visible-people"
                 aria-label={t("selectVisiblePeople")}
@@ -69,30 +68,33 @@ export function AccessPeopleBranch2({
                 }
               />
             </th>
-            <th className="px-3 py-3">{t("personColumn")}</th>
-            <th className="px-3 py-3">{t("accessColumn")}</th>
-            <th className="px-3 py-3">{t("teamsColumn")}</th>
-            <th className="w-14 px-6 py-3 text-right">
+            <th className="w-1/4 px-3 py-3">{t("personColumn")}</th>
+            <th className="px-3 py-3">{t("simpleAccess.projectRole")}</th>
+            <th className="w-1/6 px-3 py-3">{t("teamsColumn")}</th>
+            <th className="w-16 px-3 py-3 text-right">
               <span className="sr-only">{t("actions")}</span>
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border/60 max-md:grid max-md:gap-3 max-md:divide-y-0 max-md:bg-muted/15 max-md:p-3">
+        <tbody className="divide-y divide-border/60 @max-3xl:grid @max-3xl:gap-3 @max-3xl:divide-y-0 @max-3xl:bg-muted/15 @max-3xl:p-3">
           {visiblePeople.map((person) => {
             const isMember = person.memberStatus === "active";
+            const canGrant =
+              model.snapshot.subordinateIds.workspace.includes(person.userId) &&
+              model.snapshot.actions.workspace["roles.assign"];
             const isCurrentUser = person.userId === currentUserId;
             return (
               <tr
                 key={person.userId}
-                className="align-top transition-colors hover:bg-muted/20 max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)_auto] max-md:overflow-hidden max-md:rounded-2xl max-md:border max-md:border-border/70 max-md:bg-background max-md:shadow-sm"
+                className="align-top transition-colors hover:bg-muted/20 @max-3xl:grid @max-3xl:grid-cols-[auto_minmax(0,1fr)_auto] @max-3xl:overflow-hidden @max-3xl:rounded-lg @max-3xl:border @max-3xl:border-border/70 @max-3xl:bg-background"
               >
-                <td className="px-6 py-4 max-md:px-3">
+                <td className="px-6 py-4 @max-3xl:px-3">
                   <Checkbox
                     id={`select-person-${person.userId}`}
                     aria-label={t("selectPerson", {
                       name: person.name,
                     })}
-                    disabled={!isMember}
+                    disabled={!isMember || !canGrant}
                     checked={selectedPeople.includes(person.userId)}
                     onCheckedChange={(checked) =>
                       setSelectedPeople((current) =>
@@ -103,8 +105,8 @@ export function AccessPeopleBranch2({
                     }
                   />
                 </td>
-                <td className="px-3 py-4 max-md:px-0">
-                  <div className="flex min-w-52 items-start gap-3">
+                <td className="px-3 py-4 @max-3xl:px-0">
+                  <div className="flex min-w-0 items-start gap-3">
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                       {person.name
                         .split(/\s+/)
@@ -115,7 +117,9 @@ export function AccessPeopleBranch2({
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-medium">{person.name}</span>
+                        <span className="break-words [overflow-wrap:anywhere] font-medium">
+                          {person.name}
+                        </span>
                         {isCurrentUser ? (
                           <Badge variant="outline">{t("you")}</Badge>
                         ) : null}
@@ -125,104 +129,126 @@ export function AccessPeopleBranch2({
                           <Badge variant="secondary">{t("accountOnly")}</Badge>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 break-all text-xs text-muted-foreground">
                         {person.email}
                       </p>
                     </div>
                   </div>
                 </td>
-                <td className="px-3 py-4 max-md:col-span-3 max-md:border-t max-md:border-border/60 max-md:px-4 max-md:py-3">
-                  <span className="mb-2 hidden text-xs font-medium text-muted-foreground max-md:block">
+                <td className="px-3 py-4 @max-3xl:col-span-3 @max-3xl:border-t @max-3xl:border-border/60 @max-3xl:px-4 @max-3xl:py-3">
+                  <span className="mb-2 hidden text-xs font-medium text-muted-foreground @max-3xl:block">
                     {t("accessColumn")}
                   </span>
-                  <div className="flex max-w-xl flex-wrap gap-1.5">
-                    {person.platformRole === "admin" ? (
-                      <Badge>
-                        <LockKeyholeIcon aria-hidden="true" />
-                        {t("appAdministrator")}
-                      </Badge>
-                    ) : null}
-                    {person.assignments.map((item) => (
-                      <span key={item.id} className="inline-flex items-center">
-                        <Badge
-                          variant={item.inherited ? "secondary" : "outline"}
-                          className="rounded-r-none border-r-0"
-                        >
-                          {roleLabel(item.roleKey, item.roleName)}
-                          <span className="text-[10px] opacity-70">
-                            ·{" "}
-                            {item.scope === "organization"
-                              ? t("organizationShort")
-                              : t("projectShort")}
-                          </span>
+                  <PersonProjectRole model={model} person={person} />
+                  <details className="mt-2">
+                    <summary className="cursor-pointer py-1 text-xs text-muted-foreground">
+                      {t("simpleAccess.accessDetails")}
+                    </summary>
+                    <div className="mt-2 flex max-w-xl flex-wrap gap-1.5">
+                      {person.platformRole === "admin" ? (
+                        <Badge className="max-w-full whitespace-normal break-words">
+                          <LockKeyholeIcon aria-hidden="true" />
+                          {t("appAdministrator")}
                         </Badge>
-                        {(
-                          item.scope === "organization"
-                            ? canManageOrganizationAccess
-                            : canManageProjectAccess
-                        ) ? (
-                          <ConfirmRemovalButton
-                            pending={pendingAction === item.id}
-                            label={t("removeAssignment", {
-                              name: item.principalName,
-                            })}
-                            title={t("removeAssignmentTitle", {
-                              name: item.principalName,
-                            })}
-                            description={t("removeAssignmentDescription", {
-                              role: roleLabel(item.roleKey, item.roleName),
-                              scope:
-                                item.scope === "organization"
-                                  ? t("organizationScope")
-                                  : t("projectScope"),
-                            })}
-                            onConfirm={() =>
-                              void mutate(
-                                item.id,
-                                {
-                                  action: "removeAssignment",
-                                  workspaceId,
-                                  bindingId: item.id,
-                                },
-                                t("assignmentRemoved"),
-                              )
-                            }
-                          />
-                        ) : null}
-                      </span>
-                    ))}
-                    {person.assignments.length === 0 &&
-                    person.platformRole !== "admin" ? (
-                      <span className="text-xs text-muted-foreground">
-                        {isMember
-                          ? t("noExplicitAccess")
-                          : t("notInOrganization")}
-                      </span>
-                    ) : null}
-                  </div>
+                      ) : null}
+                      {person.assignments.map((item) => (
+                        <span
+                          key={item.id}
+                          className="inline-flex min-w-0 max-w-full items-center"
+                        >
+                          <Badge
+                            variant={item.inherited ? "secondary" : "outline"}
+                            className="min-w-0 max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
+                          >
+                            {roleLabel(item.roleKey, item.roleName)}
+                            {item.roleKey.startsWith("custom.") ? (
+                              <span className="text-[10px] opacity-70">
+                                ·{" "}
+                                {item.scope === "organization"
+                                  ? t("organizationShort")
+                                  : t("projectShort")}
+                              </span>
+                            ) : null}
+                          </Badge>
+                          {model.snapshot.actions[
+                            item.scope === "organization"
+                              ? "organization"
+                              : "workspace"
+                          ]["roles.revoke"] &&
+                          model.snapshot.subordinateIds[
+                            item.scope === "organization"
+                              ? "organization"
+                              : "workspace"
+                          ].includes(person.userId) ? (
+                            <ConfirmRemovalButton
+                              pending={pendingAction === item.id}
+                              label={t("removeAssignment", {
+                                name: item.principalName,
+                              })}
+                              title={t("removeAssignmentTitle", {
+                                name: item.principalName,
+                              })}
+                              description={t("removeAssignmentDescription", {
+                                role: roleLabel(item.roleKey, item.roleName),
+                                scope:
+                                  item.scope === "organization"
+                                    ? t("organizationScope")
+                                    : t("projectScope"),
+                              })}
+                              onConfirm={() =>
+                                void mutate(
+                                  item.id,
+                                  {
+                                    action: "removeAssignment",
+                                    workspaceId,
+                                    bindingId: item.id,
+                                  },
+                                  t("assignmentRemoved"),
+                                )
+                              }
+                            />
+                          ) : null}
+                        </span>
+                      ))}
+                      {person.assignments.length === 0 &&
+                      person.platformRole !== "admin" ? (
+                        <span className="text-xs text-muted-foreground">
+                          {isMember
+                            ? t("noExplicitAccess")
+                            : t("notInOrganization")}
+                        </span>
+                      ) : null}
+                    </div>
+                  </details>
                 </td>
-                <td className="px-3 py-4 max-md:col-span-3 max-md:border-t max-md:border-border/60 max-md:px-4 max-md:py-3">
-                  <span className="mb-2 hidden text-xs font-medium text-muted-foreground max-md:block">
+                <td className="px-3 py-4 @max-3xl:col-span-3 @max-3xl:border-t @max-3xl:border-border/60 @max-3xl:px-4 @max-3xl:py-3">
+                  <span className="mb-2 hidden text-xs font-medium text-muted-foreground @max-3xl:block">
                     {t("teamsColumn")}
                   </span>
-                  <div className="flex max-w-xs flex-wrap gap-1">
-                    {person.teams.length === 0 ? (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ) : (
-                      person.teams.slice(0, 3).map((team) => (
-                        <Badge key={team.id} variant="outline">
-                          {team.name}
-                        </Badge>
-                      ))
-                    )}
-                    {person.teams.length > 3 ? (
-                      <Badge variant="secondary">
-                        +{person.teams.length - 3}
-                      </Badge>
-                    ) : null}
-                  </div>
+                  <details className="max-w-full">
+                    <summary className="cursor-pointer py-2 text-sm text-muted-foreground">
+                      {t("simpleAccess.teamCount", {
+                        count: person.teams.length,
+                      })}
+                    </summary>
+                    <div className="flex max-w-xs flex-wrap gap-1">
+                      {person.teams.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        person.teams.map((team) => (
+                          <Badge
+                            key={team.id}
+                            variant="outline"
+                            className="max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
+                          >
+                            {team.name}
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </details>
                 </td>
-                <td className="px-6 py-4 text-right max-md:col-start-3 max-md:row-start-1 max-md:px-3">
+                <td className="px-6 py-4 text-right @max-3xl:col-start-3 @max-3xl:row-start-1 @max-3xl:px-3">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -243,23 +269,30 @@ export function AccessPeopleBranch2({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-64">
                       <DropdownMenuLabel>{person.name}</DropdownMenuLabel>
-                      {isMember &&
-                      (canManageProjectAccess ||
-                        canManageOrganizationAccess) ? (
+                      {isMember && canGrant ? (
                         <DropdownMenuItem
                           onSelect={() => {
                             setBulkAssignmentIds([]);
                             setAssignment({
                               principalType: "user",
                               principalId: person.userId,
-                              roleId: "",
+                              roleId:
+                                person.assignments.find(
+                                  (item) => item.scope === "project",
+                                )?.roleId ?? "",
                               scopeType: "workspace",
                             });
                             setAssignmentOpen(true);
                           }}
                         >
                           <ShieldCheckIcon aria-hidden="true" />
-                          {t("grantAccess")}
+                          {t(
+                            person.assignments.some(
+                              (item) => item.scope === "project",
+                            )
+                              ? "simpleAccess.changeRole"
+                              : "grantAccess",
+                          )}
                         </DropdownMenuItem>
                       ) : null}
                       {!isMember && canManageMembers ? (
@@ -314,7 +347,11 @@ export function AccessPeopleBranch2({
                           </DropdownMenuItem>
                         </>
                       ) : null}
-                      {isMember && canManageMembers ? (
+                      {isMember &&
+                      model.snapshot.actions.organization["members.delete"] &&
+                      model.snapshot.subordinateIds.organization.includes(
+                        person.userId,
+                      ) ? (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem

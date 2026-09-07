@@ -52,6 +52,7 @@ describe("ensurePrimaryWorkspaceForUser", () => {
       .mockResolvedValueOnce([{ workspace: primaryWorkspace }]) // getPrimaryWorkspace
       .mockResolvedValueOnce([]) // getActiveWorkspaceMember
       .mockResolvedValueOnce([]) // getActiveOrganizationMember
+      .mockResolvedValueOnce([]) // no managed membership in any organization
       .mockResolvedValueOnce([primaryWorkspace]) // addWorkspaceMember workspace lookup
       .mockResolvedValueOnce([]) // existing member lookup
       .mockResolvedValueOnce([]) // existing organization member
@@ -82,6 +83,7 @@ describe("ensurePrimaryWorkspaceForUser", () => {
       .mockResolvedValueOnce([{ roleName: "workspace.admin" }]) // getWorkspaceRoleName
       .mockResolvedValueOnce([primaryWorkspace]) // updateWorkspaceMemberRole workspace lookup
       .mockResolvedValueOnce([memberRole]) // getSystemWorkspaceRole
+      .mockResolvedValueOnce([]) // no scoped customization
       .mockResolvedValueOnce([fakeMember]); // member lookup
 
     await ensurePrimaryWorkspaceForUser({

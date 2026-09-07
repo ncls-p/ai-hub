@@ -1,3 +1,6 @@
+import { resolveStandardRole } from "./standard-role";
+import { policyMutation } from "./policy-mutation";
+import { requireSubordinatePrincipal } from "./delegation";
 import { and, eq } from "drizzle-orm";
 
 import { audit } from "@/server/domain/services/audit";
@@ -53,20 +56,27 @@ export async function validateAssignmentPrincipal(input: {
   return Boolean(team);
 }
 
-export async function assignRole(input: {
+export const assignRole = policyMutation(async function assignRole(input: {
   actorUserId: string;
   workspaceId: string;
   principalType: AssignmentPrincipalType;
   principalId: string;
   roleId: string;
   scopeType: ScopeType;
+  replaceExisting?: boolean;
 }) {
   const { organization } = await getWorkspaceScope(input.workspaceId);
-  const [role] = await db
+  let [role] = await db
     .select()
     .from(roles)
     .where(eq(roles.id, input.roleId))
     .limit(1);
+  if (role)
+    role = await resolveStandardRole(
+      role,
+      input.scopeType,
+      input.scopeType === "organization" ? organization.id : input.workspaceId,
+    );
   if (
     !role ||
     role.scopeType !== input.scopeType ||
@@ -84,7 +94,7 @@ export async function assignRole(input: {
   }
   await requirePermission({
     userId: input.actorUserId,
-    permission: "roles.manage",
+    permission: "roles.assign",
     resourceType: input.scopeType,
     resourceId:
       input.scopeType === "organization" ? organization.id : input.workspaceId,
@@ -119,17 +129,59 @@ export async function assignRole(input: {
 
   const resourceId =
     input.scopeType === "organization" ? organization.id : input.workspaceId;
-  await db
-    .insert(roleBindings)
-    .values({
-      principalType: input.principalType,
-      principalId: input.principalId,
-      roleId: role.id,
-      resourceType: input.scopeType,
+  await requireSubordinatePrincipal({
+    ...input,
+    resourceType: input.scopeType,
+    resourceId,
+  });
+  const previous =
+    input.replaceExisting &&
+    input.scopeType === "workspace" &&
+    input.principalType === "user"
+      ? await db
+          .select({ binding: roleBindings, role: roles })
+          .from(roleBindings)
+          .innerJoin(roles, eq(roles.id, roleBindings.roleId))
+          .where(
+            and(
+              eq(roleBindings.principalType, "user"),
+              eq(roleBindings.principalId, input.principalId),
+              eq(roleBindings.resourceType, "workspace"),
+              eq(roleBindings.resourceId, resourceId),
+            ),
+          )
+      : [];
+  if (previous.length) {
+    await requirePermission({
+      userId: input.actorUserId,
+      permission: "roles.revoke",
+      resourceType: "workspace",
       resourceId,
-      createdById: input.actorUserId,
-    })
-    .onConflictDoNothing();
+      errorMessage: "You cannot replace existing access",
+    });
+    for (const row of previous)
+      await requireDelegablePermissions({
+        ...input,
+        resourceType: "workspace",
+        resourceId,
+        permissions: rolePermissions(row.role),
+      });
+  }
+  await db.transaction(async (tx) => {
+    for (const row of previous)
+      await tx.delete(roleBindings).where(eq(roleBindings.id, row.binding.id));
+    await tx
+      .insert(roleBindings)
+      .values({
+        principalType: input.principalType,
+        principalId: input.principalId,
+        roleId: role.id,
+        resourceType: input.scopeType,
+        resourceId,
+        createdById: input.actorUserId,
+      })
+      .onConflictDoNothing();
+  });
 
   const affectedUserIds =
     input.principalType === "user"
@@ -160,4 +212,4 @@ export async function assignRole(input: {
       principalId: input.principalId,
     },
   });
-}
+});

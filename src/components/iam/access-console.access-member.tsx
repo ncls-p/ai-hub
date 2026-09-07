@@ -20,6 +20,7 @@ export type PlatformAccessUser = {
 
 export type AccessTeam = {
   id: string;
+  updatedAt?: string;
   name: string;
   description: string | null;
   members: Array<{
@@ -37,6 +38,9 @@ type AccessRole = {
   description: string | null;
   scopeType: "system" | "organization" | "workspace";
   isSystem: boolean;
+  updatedAt: string;
+  canUpdate: boolean;
+  canDelete: boolean;
   permissions: string[];
 };
 
@@ -75,6 +79,12 @@ export type AccessSnapshot = {
   permissionCatalog: PermissionGroup[];
   resourceDefinitions: AccessResourceDefinition[];
   effectivePermissions: string[];
+  organizationPermissions: string[];
+  actions: {
+    organization: Record<string, boolean>;
+    workspace: Record<string, boolean>;
+  };
+  subordinateIds: { organization: string[]; workspace: string[] };
   grantablePermissions: {
     organization: string[];
     workspace: string[];

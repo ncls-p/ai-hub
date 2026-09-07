@@ -21,7 +21,7 @@ test.describe("members page", () => {
     page,
   }) => {
     await ensureE2ELifecycleProject();
-    await page.goto("/en/members");
+    await page.goto("/en/admin/settings");
     const activeProject = page.getByRole("combobox", {
       name: "Active project",
     });
@@ -30,6 +30,14 @@ test.describe("members page", () => {
       .getByRole("option", { name: "Lifecycle browser project", exact: true })
       .click();
 
+    if (
+      !(await page
+        .getByRole("button", { name: "Manage", exact: true })
+        .isVisible())
+    )
+      await page
+        .getByText("Project and organization settings", { exact: true })
+        .click();
     await page.getByRole("button", { name: "Manage", exact: true }).click();
     await page.getByRole("menuitem", { name: "Rename project" }).click();
     const renameDialog = page.getByRole("dialog", { name: "Rename project" });
@@ -43,6 +51,14 @@ test.describe("members page", () => {
       "Lifecycle browser project renamed",
     );
 
+    if (
+      !(await page
+        .getByRole("button", { name: "Manage", exact: true })
+        .isVisible())
+    )
+      await page
+        .getByText("Project and organization settings", { exact: true })
+        .click();
     await page.getByRole("button", { name: "Manage", exact: true }).click();
     await page.getByRole("menuitem", { name: "Delete project" }).click();
     const deleteDialog = page.getByRole("dialog", {
@@ -79,7 +95,10 @@ test.describe("members page", () => {
     });
     await expect(resourceRow).toBeVisible({ timeout: 10_000 });
     await resourceRow
-      .getByRole("button", { name: "Delete Removable assistant" })
+      .getByRole("button", { name: "Actions for Removable assistant" })
+      .click();
+    await page
+      .getByRole("menuitem", { name: "Delete Removable assistant" })
       .click();
     const deleteDialog = page.getByRole("alertdialog");
     await expect(
@@ -99,9 +118,7 @@ test.describe("members page", () => {
     await page.getByRole("button", { name: "Add person" }).click();
     const personDialog = page.getByRole("dialog", { name: "Add a person" });
     await personDialog.getByLabel("Email").fill(e2eMember.email);
-    await personDialog
-      .getByRole("button", { name: "Add to organization" })
-      .click();
+    await personDialog.getByRole("button", { name: "Add person" }).click();
     await expect(personDialog).not.toBeVisible();
 
     await page.getByRole("tab", { name: "Teams" }).click();
@@ -115,6 +132,7 @@ test.describe("members page", () => {
     const teamCard = page
       .locator('[data-slot="card"]')
       .filter({ hasText: teamName });
+    await teamCard.getByText("View members", { exact: true }).click();
     await teamCard.getByRole("combobox").click();
     await page.getByRole("option", { name: e2eMember.name }).click();
     await teamCard.getByRole("button", { name: "Add", exact: true }).click();
@@ -124,15 +142,19 @@ test.describe("members page", () => {
         .filter({ hasText: e2eMember.name }),
     ).toBeVisible();
 
-    await page.getByRole("tab", { name: "People & access" }).click();
+    await page.getByRole("tab", { name: "People", exact: true }).click();
     await page.getByRole("button", { name: "Grant access" }).click();
     const accessDialog = page.getByRole("dialog", { name: "Grant access" });
-    const accessSelects = accessDialog.getByRole("combobox");
-    await accessSelects.nth(1).click();
+    await accessDialog.getByText("Advanced: organization or team").click();
+    await accessDialog.getByRole("combobox", { name: "Grant to" }).click();
     await page.getByRole("option", { name: "Team", exact: true }).click();
-    await accessSelects.nth(2).click();
+    await accessDialog
+      .getByRole("combobox", { name: "Person or team" })
+      .click();
     await page.getByRole("option", { name: teamName, exact: true }).click();
-    await accessSelects.nth(3).click();
+    await accessDialog
+      .getByRole("combobox", { name: "Role", exact: true })
+      .click();
     await page.getByRole("option", { name: "Project Viewer" }).click();
     await accessDialog.getByRole("button", { name: "Grant access" }).click();
     await expect(accessDialog).not.toBeVisible();

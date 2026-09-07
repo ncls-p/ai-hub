@@ -30,7 +30,7 @@ export async function canManageTenantGlobals(
   return hasWorkspacePermissionForRequest(
     session.user.id,
     workspaceId,
-    "roles.manage",
+    "workspaces.curate",
   );
 }
 

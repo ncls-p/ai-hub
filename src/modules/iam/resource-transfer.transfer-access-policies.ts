@@ -1,3 +1,5 @@
+import { SYSTEM_ROLES } from "@/server/domain/entities/iam";
+import { requireDelegablePermissions } from "./use-cases.iam-operation-error";
 import { getWorkspacesByUserId } from "@/modules/workspace/use-cases";
 import {
   ACCESS_RESOURCE_TYPES,
@@ -113,7 +115,7 @@ export async function requireTransferPermission(
 ) {
   const result = await authorization.checkPermission(
     { principalType: "user", principalId: userId },
-    "roles.manage",
+    "workspaces.transfer",
     "workspace",
     workspaceId,
   );
@@ -123,6 +125,13 @@ export async function requireTransferPermission(
       403,
     );
   }
+  await requireDelegablePermissions({
+    actorUserId: userId,
+    resourceType: "workspace",
+    resourceId: workspaceId,
+    permissions: SYSTEM_ROLES.find((role) => role.name === "workspace.admin")!
+      .permissions,
+  });
 }
 
 export async function listResourceTransferDestinations(input: {
@@ -140,7 +149,7 @@ export async function listResourceTransferDestinations(input: {
         (
           await authorization.checkPermission(
             { principalType: "user", principalId: input.userId },
-            "roles.manage",
+            "workspaces.transfer",
             "workspace",
             workspace.id,
           )

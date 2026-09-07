@@ -95,7 +95,15 @@ export function useAccessConsoleController({
         const data = await fetchJson<AccessSnapshot>(
           `/api/workspace/iam?workspaceId=${workspaceId}`,
         );
-        setSnapshot(data);
+        setSnapshot({
+          ...data,
+          roles: data.roles.map((role) => {
+            const key = role.isSystem ? builtInRoleKey(role.name) : undefined;
+            return key
+              ? { ...role, description: t(`builtInRoleDescriptions.${key}`) }
+              : role;
+          }),
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : t("loadError");
         setRefreshError(message);
@@ -117,6 +125,7 @@ export function useAccessConsoleController({
     successMessage: string,
     options?: { close?: () => void; nextWorkspaceId?: string },
   ) {
+    if (pendingAction || refreshError) return false;
     setPendingAction(key);
     try {
       const result = await fetchJson<{ project?: { id: string } }>(
@@ -182,14 +191,26 @@ export function useAccessConsoleController({
       snapshot?.roles.filter(
         (role) =>
           role.scopeType === assignment.scopeType &&
+          (assignment.scopeType !== "workspace" ||
+            role.permissions.includes("workspaces.get")) &&
           snapshot.assignableRoleIds.includes(role.id),
       ) ?? [],
     [assignment.scopeType, snapshot],
   );
   const principalOptions =
     assignment.principalType === "user"
-      ? activeMembers
-      : (snapshot?.teams ?? []);
+      ? activeMembers.filter((member) =>
+          snapshot?.subordinateIds[assignment.scopeType].includes(
+            member.userId,
+          ),
+        )
+      : (snapshot?.teams ?? []).filter((team) =>
+          team.members.every((member) =>
+            snapshot?.subordinateIds[assignment.scopeType].includes(
+              member.userId,
+            ),
+          ),
+        );
   const selectedAssignmentRole = snapshot?.roles.find(
     (role) => role.id === assignment.roleId,
   );
@@ -245,6 +266,8 @@ export function useAccessConsoleController({
     canManageTeams,
   } = snapshot.capabilities;
   const canManageAnything =
+    snapshot.actions.workspace["roles.create"] ||
+    snapshot.actions.organization["roles.create"] ||
     snapshot.canManageAccess ||
     canCreateProjects ||
     canManageProjectLifecycle ||
@@ -252,9 +275,7 @@ export function useAccessConsoleController({
     canManageMembers ||
     canManageTeams;
   const canCustomizeViewedRole =
-    roleForm.scopeType === "organization"
-      ? canManageOrganizationAccess
-      : canManageProjectAccess;
+    snapshot.actions[roleForm.scopeType]["roles.create"];
   const canDelegateViewedRole =
     !editingRoleId || snapshot.assignableRoleIds.includes(editingRoleId);
   const grantablePermissionSet = new Set(
@@ -286,7 +307,10 @@ export function useAccessConsoleController({
   });
   const visiblePeople = people.slice(0, visiblePeopleCount);
   const selectedVisiblePeople = visiblePeople.filter(
-    (person) => person.memberStatus === "active",
+    (person) =>
+      person.memberStatus === "active" &&
+      snapshot.subordinateIds.workspace.includes(person.userId) &&
+      snapshot.actions.workspace["roles.assign"],
   );
   const allVisiblePeopleSelected =
     selectedVisiblePeople.length > 0 &&

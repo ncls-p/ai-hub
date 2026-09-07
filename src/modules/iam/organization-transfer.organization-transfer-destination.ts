@@ -1,3 +1,5 @@
+import { SYSTEM_ROLES } from "@/server/domain/entities/iam";
+import { requireDelegablePermissions } from "./use-cases.iam-operation-error";
 import { createHash } from "node:crypto";
 
 import { and, eq, isNull } from "drizzle-orm";
@@ -83,25 +85,25 @@ export async function requireOrganizationTransferPermissions(input: {
   const checks = await Promise.all([
     hasPermission(
       input.actorUserId,
-      "roles.manage",
+      "workspaces.transfer",
       "workspace",
       input.sourceWorkspaceId,
     ),
     hasPermission(
       input.actorUserId,
-      "members.manage",
+      "organization.transfer",
       "organization",
       input.sourceOrganizationId,
     ),
     hasPermission(
       input.actorUserId,
-      "roles.manage",
+      "workspaces.transfer",
       "workspace",
       input.targetWorkspaceId,
     ),
     hasPermission(
       input.actorUserId,
-      "members.manage",
+      "organization.transfer",
       "organization",
       input.targetOrganizationId,
     ),
@@ -111,6 +113,19 @@ export async function requireOrganizationTransferPermissions(input: {
       "You need organization and project access administration rights on both sides",
       403,
     );
+  }
+  for (const resourceId of [
+    input.sourceOrganizationId,
+    input.targetOrganizationId,
+  ]) {
+    await requireDelegablePermissions({
+      actorUserId: input.actorUserId,
+      resourceType: "organization",
+      resourceId,
+      permissions: SYSTEM_ROLES.find(
+        (role) => role.name === "organization.owner",
+      )!.permissions,
+    });
   }
 }
 
@@ -131,13 +146,13 @@ export async function listOrganizationTransferDestinations(input: {
     const allowed = await Promise.all([
       hasPermission(
         input.actorUserId,
-        "roles.manage",
+        "workspaces.transfer",
         "workspace",
         workspace.id,
       ),
       hasPermission(
         input.actorUserId,
-        "members.manage",
+        "organization.transfer",
         "organization",
         organization.id,
       ),

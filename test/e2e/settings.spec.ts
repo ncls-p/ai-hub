@@ -13,8 +13,10 @@ test.describe("settings page", () => {
   test("loads settings page", async ({ page }) => {
     const workspaces = (await (
       await page.request.get("/api/workspaces")
-    ).json()) as Array<{ workspace: { name: string } }>;
-    const projectName = workspaces[0]?.workspace.name;
+    ).json()) as Array<{ workspace: { name: string }; isActive: boolean }>;
+    const projectName = (
+      workspaces.find((row) => row.isActive) ?? workspaces[0]
+    )?.workspace.name;
     await page.goto("/en/settings");
     await expect(page).toHaveURL(/\/en\/settings/);
 
@@ -40,23 +42,19 @@ test.describe("settings page", () => {
 
   test("admin settings link exists for admins", async ({ page }) => {
     await page.goto("/en/settings");
-    await page.waitForTimeout(2000);
-
-    // Admin link should be visible for admin users
-    const adminLink = page
-      .getByRole("link", { name: /platform settings|admin/i })
-      .first();
-
-    if (await adminLink.isVisible()) {
-      await expect(adminLink).toBeVisible();
-    }
+    await page.getByRole("button", { name: e2eUser.name, exact: true }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "App settings", exact: true }),
+    ).toBeVisible();
   });
 
   test("persists organization logo and preset theme", async ({ page }) => {
     const workspaces = (await (
       await page.request.get("/api/workspaces")
-    ).json()) as Array<{ workspace: { id: string } }>;
-    const workspaceId = workspaces[0]?.workspace.id;
+    ).json()) as Array<{ workspace: { id: string }; isActive: boolean }>;
+    const workspaceId = (
+      workspaces.find((row) => row.isActive) ?? workspaces[0]
+    )?.workspace.id;
     if (!workspaceId) throw new Error("E2E workspace is missing");
 
     const resetBranding = () =>
@@ -70,7 +68,7 @@ test.describe("settings page", () => {
       });
     await resetBranding();
     try {
-      await page.goto("/en/settings");
+      await page.goto("/en/admin/settings");
       const branding = page.locator("section").filter({
         has: page.getByRole("heading", { name: "Organization branding" }),
       });
@@ -122,12 +120,14 @@ test.describe("settings page", () => {
     test.setTimeout(120_000);
     const workspaces = (await (
       await page.request.get("/api/workspaces")
-    ).json()) as Array<{ workspace: { id: string } }>;
-    const workspaceId = workspaces[0]?.workspace.id;
+    ).json()) as Array<{ workspace: { id: string }; isActive: boolean }>;
+    const workspaceId = (
+      workspaces.find((row) => row.isActive) ?? workspaces[0]
+    )?.workspace.id;
     if (!workspaceId) throw new Error("E2E workspace is missing");
 
     try {
-      await page.goto("/en/settings");
+      await page.goto("/en/admin/settings");
       const branding = page.locator("section").filter({
         has: page.getByRole("heading", { name: "Organization branding" }),
       });

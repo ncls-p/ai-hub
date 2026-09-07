@@ -1,3 +1,4 @@
+import { policyMutation } from "./policy-mutation";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 
 import { audit } from "@/server/domain/services/audit";
@@ -69,80 +70,85 @@ export async function renameOrganization(input: {
   return updated;
 }
 
-export async function deleteProject(input: {
-  actorUserId: string;
-  workspaceId: string;
-  confirmationName: string;
-}) {
-  const { workspace, organization } = await scopeForWorkspace(
-    input.workspaceId,
-  );
-  await requirePermission({
-    actorUserId: input.actorUserId,
-    permission: "workspaces.update",
-    resourceType: "workspace",
-    resourceId: workspace.id,
-  });
-  if (input.confirmationName.trim() !== workspace.name) {
-    throw new IamOperationError("Type the exact project name to confirm", 400);
-  }
-  const activeProjects = await db
-    .select({ id: workspaces.id })
-    .from(workspaces)
-    .where(
-      and(
-        eq(workspaces.organizationId, organization.id),
-        isNull(workspaces.archivedAt),
-      ),
+export const deleteProject = policyMutation(
+  async function deleteProject(input: {
+    actorUserId: string;
+    workspaceId: string;
+    confirmationName: string;
+  }) {
+    const { workspace, organization } = await scopeForWorkspace(
+      input.workspaceId,
     );
-  if (activeProjects.length === 1) {
-    throw new IamOperationError(
-      "This is the organization’s last project. Delete the organization instead.",
-      409,
-    );
-  }
-  const [resourceIds, customRoles] = await Promise.all([
-    listAllResourceIds([workspace.id]),
-    db
-      .select({ id: roles.id })
-      .from(roles)
+    await requirePermission({
+      actorUserId: input.actorUserId,
+      permission: "workspaces.delete",
+      resourceType: "workspace",
+      resourceId: workspace.id,
+    });
+    if (input.confirmationName.trim() !== workspace.name) {
+      throw new IamOperationError(
+        "Type the exact project name to confirm",
+        400,
+      );
+    }
+    const activeProjects = await db
+      .select({ id: workspaces.id })
+      .from(workspaces)
       .where(
         and(
-          eq(roles.isSystem, false),
-          eq(roles.ownerResourceType, "workspace"),
-          eq(roles.ownerResourceId, workspace.id),
+          eq(workspaces.organizationId, organization.id),
+          isNull(workspaces.archivedAt),
         ),
-      ),
-  ]);
-  const customRoleIds = customRoles.map(({ id }) => id);
-  await db.transaction(async (tx) => {
-    if (customRoleIds.length > 0) {
-      await tx
-        .delete(roleBindings)
-        .where(inArray(roleBindings.roleId, customRoleIds));
-      await tx.delete(roles).where(inArray(roles.id, customRoleIds));
+      );
+    if (activeProjects.length === 1) {
+      throw new IamOperationError(
+        "This is the organization’s last project. Delete the organization instead.",
+        409,
+      );
     }
-    const boundResourceIds = [workspace.id, ...resourceIds];
-    if (boundResourceIds.length > 0) {
-      await tx
-        .delete(roleBindings)
-        .where(inArray(roleBindings.resourceId, boundResourceIds));
-    }
-    await tx.delete(workspaces).where(eq(workspaces.id, workspace.id));
-  });
-  await invalidateOrganizationMembers(organization.id);
-  await audit.emit({
-    organizationId: organization.id,
-    actorPrincipalType: "user",
-    actorPrincipalId: input.actorUserId,
-    action: "workspace.deleted",
-    resourceType: "workspace",
-    resourceId: workspace.id,
-    outcome: "success",
-    metadata: { name: workspace.name, slug: workspace.slug },
-  });
-  return {
-    nextWorkspaceId:
-      activeProjects.find(({ id }) => id !== workspace.id)?.id ?? null,
-  };
-}
+    const [resourceIds, customRoles] = await Promise.all([
+      listAllResourceIds([workspace.id]),
+      db
+        .select({ id: roles.id })
+        .from(roles)
+        .where(
+          and(
+            eq(roles.isSystem, false),
+            eq(roles.ownerResourceType, "workspace"),
+            eq(roles.ownerResourceId, workspace.id),
+          ),
+        ),
+    ]);
+    const customRoleIds = customRoles.map(({ id }) => id);
+    await db.transaction(async (tx) => {
+      if (customRoleIds.length > 0) {
+        await tx
+          .delete(roleBindings)
+          .where(inArray(roleBindings.roleId, customRoleIds));
+        await tx.delete(roles).where(inArray(roles.id, customRoleIds));
+      }
+      const boundResourceIds = [workspace.id, ...resourceIds];
+      if (boundResourceIds.length > 0) {
+        await tx
+          .delete(roleBindings)
+          .where(inArray(roleBindings.resourceId, boundResourceIds));
+      }
+      await tx.delete(workspaces).where(eq(workspaces.id, workspace.id));
+    });
+    await invalidateOrganizationMembers(organization.id);
+    await audit.emit({
+      organizationId: organization.id,
+      actorPrincipalType: "user",
+      actorPrincipalId: input.actorUserId,
+      action: "workspace.deleted",
+      resourceType: "workspace",
+      resourceId: workspace.id,
+      outcome: "success",
+      metadata: { name: workspace.name, slug: workspace.slug },
+    });
+    return {
+      nextWorkspaceId:
+        activeProjects.find(({ id }) => id !== workspace.id)?.id ?? null,
+    };
+  },
+);

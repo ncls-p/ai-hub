@@ -192,6 +192,12 @@ export async function ensurePrimaryWorkspaceForUser(input: {
       input.userId,
     );
     if (organizationMember) return workspace;
+    const [managedMembership] = await db
+      .select({ id: organizationMembers.id })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.userId, input.userId))
+      .limit(1);
+    if (managedMembership) return workspace;
 
     await addWorkspaceMember({
       workspaceId: workspace.id,
