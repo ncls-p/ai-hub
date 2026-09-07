@@ -140,7 +140,9 @@ test.describe("access page", () => {
     page,
   }) => {
     await page.goto("/en/members");
-    await expect(page.getByText("Who has access")).toBeVisible();
+    for (const name of ["People", "Teams", "Roles", "Resources"]) {
+      await expect(page.getByRole("tab", { name, exact: true })).toBeVisible();
+    }
     await expect(
       page.getByRole("tab", { name: "Platform accounts" }),
     ).toHaveCount(0);
