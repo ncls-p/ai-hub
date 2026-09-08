@@ -627,6 +627,8 @@ export const OPENAPI_ROUTE_MANIFEST = [
       "agents.create",
       "agents.list",
       "agents.update",
+      "marketplaceItems.install",
+      "marketplaceItems.publish",
       "models.manage",
       "providers.update",
       "roles.manage",

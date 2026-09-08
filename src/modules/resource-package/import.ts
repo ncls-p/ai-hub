@@ -6,7 +6,8 @@ import {
   installCustomTool,
   installMcpPreset,
 } from "@/modules/marketplace/install-helpers";
-import { sanitizeMarketplaceManifest } from "@/modules/marketplace/manifest-sanitizer";
+import { sanitizeResourcePackageManifest } from "./sanitize";
+import { installWorkflowManifest } from "./workflow";
 import { requirePackageInstallPermissions } from "./permissions";
 import { parseResourcePackage } from "./schema";
 import { describeResourcePackage } from "./summary";
@@ -18,7 +19,7 @@ export async function importResourcePackage(input: {
   preview?: boolean;
 }) {
   const resourcePackage = parseResourcePackage(input.package);
-  resourcePackage.manifest = sanitizeMarketplaceManifest(
+  resourcePackage.manifest = sanitizeResourcePackageManifest(
     resourcePackage.manifest,
   );
   const preview = describeResourcePackage(resourcePackage);
@@ -32,6 +33,8 @@ export async function importResourcePackage(input: {
   const pending = [manifest];
   while (pending.length) {
     const current = pending.pop()!;
+    if (current.type === "workflow")
+      pending.push(...current.agentBindings.map(({ manifest }) => manifest));
     if (current.type === "agent")
       pending.push(
         ...(current.specialists ?? []).map((item) => item.manifest),
@@ -47,6 +50,8 @@ export async function importResourcePackage(input: {
   const resource = await db.transaction(async (tx) => {
     const context = { workspaceId: input.workspaceId, userId: input.userId };
     switch (manifest.type) {
+      case "workflow":
+        return installWorkflowManifest(tx, { ...context, manifest });
       case "agent":
         return installAgentManifest(tx, {
           ...context,

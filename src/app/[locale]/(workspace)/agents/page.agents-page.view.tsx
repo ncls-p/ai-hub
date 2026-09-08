@@ -1,6 +1,7 @@
 import { PlusIcon } from "lucide-react";
 
 import { ResourceAccessDialog } from "@/components/resource-access-dialog";
+import { ResourcePackageImport } from "@/components/marketplace/resource-package-import";
 import { Button } from "@/components/ui/button";
 import { WorkspacePage } from "@/components/workspace-page";
 import type { useAgentsPageController } from "./page.agents-page";
@@ -18,6 +19,7 @@ export function AgentsPageView({ model }: { model: AgentsPageViewModel }) {
     accessOptions,
     agents,
     canCreateAgent,
+    canImportResources,
     loading,
     refreshAgents,
     saveAgentAccess,
@@ -34,12 +36,20 @@ export function AgentsPageView({ model }: { model: AgentsPageViewModel }) {
       description={t("orbitDescription")}
       width="default"
       actions={
-        canCreateAgent && !loading && agents.length > 0 ? (
-          <Button size="sm" onClick={() => setShowCreateDialog(true)}>
-            <PlusIcon className={ICON_SIZE_CLASS} aria-hidden="true" />
-            {t("create")}
-          </Button>
-        ) : null
+        <>
+          {canCreateAgent && canImportResources && !loading && (
+            <ResourcePackageImport
+              key={workspaceId}
+              workspaceId={workspaceId}
+            />
+          )}
+          {canCreateAgent && !loading && agents.length > 0 ? (
+            <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+              <PlusIcon className={ICON_SIZE_CLASS} aria-hidden="true" />
+              {t("create")}
+            </Button>
+          ) : null}
+        </>
       }
     >
       <AgentsPageSection2 model={model} />

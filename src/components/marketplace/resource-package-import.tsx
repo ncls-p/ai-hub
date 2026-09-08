@@ -74,6 +74,7 @@ export function ResourcePackageImport({
           skill: "/tools?tab=skills",
           mcp_preset: "/tools?tab=mcp",
           custom_tool: "/custom-tools",
+          workflow: `/workflows/${data.resource.id}`,
         };
         router.push(paths[data.resource.type] ?? "/marketplace");
       }
@@ -127,7 +128,12 @@ export function ResourcePackageImport({
               <ul className="max-h-48 overflow-y-auto text-sm">
                 {preview.resources.map((resource, index) => (
                   <li key={index} className="break-words">
-                    {t(`types.${resource.type}`)} — {resource.name}
+                    {t(
+                      resource.agentKind === "orchestrator"
+                        ? "types.orchestrator"
+                        : `types.${resource.type}`,
+                    )}{" "}
+                    — {resource.name}
                   </li>
                 ))}
               </ul>

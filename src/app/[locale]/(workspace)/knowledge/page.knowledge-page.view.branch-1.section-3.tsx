@@ -77,6 +77,9 @@ export function KnowledgeMainSection3({
             />
           ) : previewDocument ? (
             <article className="mx-auto max-w-2xl space-y-2">
+              <p className="mb-4 rounded-xl border border-border/65 bg-background p-4 text-sm text-muted-foreground">
+                {t("originalUnavailable")}
+              </p>
               {previewDocument.chunks.map((chunk) => (
                 <section
                   key={chunk.chunkId}

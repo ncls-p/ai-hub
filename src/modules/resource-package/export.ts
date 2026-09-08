@@ -7,10 +7,6 @@ import {
   buildSkillManifest,
 } from "@/modules/marketplace/manifest-builders";
 import { sanitizeMarketplaceManifest } from "@/modules/marketplace/manifest-sanitizer";
-import type {
-  MarketplaceManifest,
-  SourceResourceType,
-} from "@/modules/marketplace/manifest-types";
 import {
   canUserInstallMarketplaceItem,
   getMarketplaceItem,
@@ -27,11 +23,14 @@ import { audit } from "@/server/domain/services/audit";
 import { requirePackageResourceAccess } from "./permissions";
 import { parseResourcePackage, ResourcePackageError } from "./schema";
 import { describeResourcePackage } from "./summary";
+import type { ResourcePackageManifest, ResourcePackageSource } from "./types";
+import { exportWorkflowManifest } from "./workflow";
+import { sanitizeResourcePackageManifest } from "./sanitize";
 
 export async function exportResourcePackage(input: {
   workspaceId: string;
   userId: string;
-  resourceType: SourceResourceType | "marketplace_item";
+  resourceType: ResourcePackageSource;
   resourceId: string;
 }) {
   if (
@@ -45,8 +44,10 @@ export async function exportResourcePackage(input: {
       "You cannot export resources from this project",
       403,
     );
-  let manifest: MarketplaceManifest;
-  if (input.resourceType === "marketplace_item") {
+  let manifest: ResourcePackageManifest;
+  if (input.resourceType === "workflow") {
+    manifest = await exportWorkflowManifest(input);
+  } else if (input.resourceType === "marketplace_item") {
     const item = await getMarketplaceItem(input.resourceId);
     if (!item || !(await canUserInstallMarketplaceItem(item, input.userId)))
       throw new ResourcePackageError("Marketplace item not found", 404);
@@ -135,10 +136,12 @@ export async function exportResourcePackage(input: {
       tool ? "tool" : "server",
     );
   }
-  manifest = sanitizeMarketplaceManifest(manifest);
+  manifest = sanitizeResourcePackageManifest(manifest);
   const pending = [manifest];
   while (pending.length) {
     const current = pending.pop()!;
+    if (current.type === "workflow")
+      pending.push(...current.agentBindings.map(({ manifest }) => manifest));
     if (current.type === "agent") {
       delete current.agent.providerId;
       delete current.agent.modelId;

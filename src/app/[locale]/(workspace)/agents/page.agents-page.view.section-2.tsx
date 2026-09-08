@@ -1,16 +1,10 @@
 import {
   ArrowRightIcon,
   BotIcon,
-  EyeIcon,
-  EyeOffIcon,
   Grid2X2Icon,
   ListIcon,
-  MoreHorizontal,
-  PencilIcon,
   PlusIcon,
   SearchIcon,
-  Share2,
-  StarIcon,
   XIcon,
 } from "lucide-react";
 
@@ -20,12 +14,7 @@ import { ModelLogo } from "@/components/providers/model-logo";
 import { ResourceProvenanceBadge } from "@/components/resource-provenance-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { AgentCardActions } from "./page.agent-card-actions";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AgentsPageViewModel } from "./page.agents-page.view";
@@ -39,21 +28,17 @@ export function AgentsPageSection2({ model }: { model: AgentsPageViewModel }) {
     filteredAgents,
     loadError,
     loading,
-    openAgentAccess,
     organizationDefaultAgentId,
     refreshAgents,
     router,
     searchQuery,
-    setAgentHiddenInChat,
     setAgentKindFilter,
-    setDefaultAgent,
     setDisplayMode,
     setSearchQuery,
     setShowCreateDialog,
     t,
     tCommon,
     tList,
-    updatingDefaultAgentId,
     userDefaultAgentId,
   } = model;
   return (
@@ -252,99 +237,12 @@ export function AgentsPageSection2({ model }: { model: AgentsPageViewModel }) {
                           : tList("scopePersonal")}
                       </p>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-10 shrink-0 rounded-full text-muted-foreground transition-[background-color,color,scale] hover:text-foreground active:scale-[0.96]"
-                          aria-label={tList("agentActionsNamed", {
-                            name: agent.name,
-                          })}
-                        >
-                          <MoreHorizontal
-                            className={ICON_SIZE_CLASS}
-                            aria-hidden="true"
-                          />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        {isReady ? (
-                          <DropdownMenuItem
-                            className="min-h-10"
-                            onClick={() => router.push(`/agents/${agent.id}`)}
-                          >
-                            <PencilIcon
-                              className={ICON_SIZE_CLASS}
-                              aria-hidden="true"
-                            />
-                            {agent.canEdit
-                              ? tList("customize")
-                              : tList("viewDetails")}
-                          </DropdownMenuItem>
-                        ) : null}
-                        <DropdownMenuItem
-                          className="min-h-10"
-                          disabled={updatingDefaultAgentId !== null}
-                          onClick={() =>
-                            void setDefaultAgent(
-                              "user",
-                              isUserDefault ? null : agent.id,
-                              agent.id,
-                            )
-                          }
-                        >
-                          <StarIcon
-                            className={cn(
-                              ICON_SIZE_CLASS,
-                              isUserDefault && "fill-current text-primary",
-                            )}
-                            aria-hidden="true"
-                          />
-                          {isUserDefault
-                            ? tList("clearMyDefault")
-                            : tList("setMyDefault")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="min-h-10"
-                          onClick={() =>
-                            void setAgentHiddenInChat(
-                              agent.id,
-                              !agent.hiddenInChat,
-                            )
-                          }
-                        >
-                          {agent.hiddenInChat ? (
-                            <EyeIcon
-                              className={ICON_SIZE_CLASS}
-                              aria-hidden="true"
-                            />
-                          ) : (
-                            <EyeOffIcon
-                              className={ICON_SIZE_CLASS}
-                              aria-hidden="true"
-                            />
-                          )}
-                          {agent.hiddenInChat
-                            ? tList("showInChatSelector")
-                            : agent.canEdit
-                              ? tList("hideFromChatSelector")
-                              : tList("removeSharedAssistant")}
-                        </DropdownMenuItem>
-                        {agent.canEdit && agent.kind !== "orchestrator" ? (
-                          <DropdownMenuItem
-                            className="min-h-10"
-                            onClick={() => void openAgentAccess(agent)}
-                          >
-                            <Share2
-                              className={ICON_SIZE_CLASS}
-                              aria-hidden="true"
-                            />
-                            {tList("manageAccess")}
-                          </DropdownMenuItem>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <AgentCardActions
+                      agent={agent}
+                      model={model}
+                      isReady={isReady}
+                      isUserDefault={isUserDefault}
+                    />
                   </div>
 
                   <p className="mt-4 min-h-10 line-clamp-2 text-xs leading-5 text-muted-foreground">

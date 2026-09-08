@@ -28,6 +28,8 @@ export function useAgentsPageController() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [canAdminCurate, setCanAdminCurate] = useState(false);
   const [canCreateAgent, setCanCreateAgent] = useState(false);
+  const [canExportResources, setCanExportResources] = useState(false);
+  const [canImportResources, setCanImportResources] = useState(false);
   const [accessOptions, setAccessOptions] = useState<AgentAccessOptions>({
     scopes: ["private"],
     teams: [],
@@ -90,6 +92,8 @@ export function useAgentsPageController() {
       setAgents(nextAgents);
       setCanAdminCurate(Boolean(data.canAdminCurate));
       setCanCreateAgent(Boolean(data.canCreateAgent));
+      setCanExportResources(Boolean(data.canExportResources));
+      setCanImportResources(Boolean(data.canImportResources));
       if (data.accessOptions) setAccessOptions(data.accessOptions);
       setOrganizationDefaultAgentId(data.organizationDefaultAgentId ?? null);
       setUserDefaultAgentId(data.userDefaultAgentId ?? null);
@@ -349,6 +353,8 @@ export function useAgentsPageController() {
     applyTemplate,
     canAdminCurate,
     canCreateAgent,
+    canExportResources,
+    canImportResources,
     creating,
     displayMode,
     filteredAgents,

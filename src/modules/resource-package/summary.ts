@@ -1,5 +1,6 @@
 import { BUILTIN_TOOL_SUMMARIES } from "@/modules/tool/builtin-tools-catalog";
-import type { MarketplaceManifest } from "@/modules/marketplace/manifest-types";
+import type { ResourcePackageManifest } from "./types";
+import { hasCycle } from "@/modules/workflows/runtime.workflow-node-registry";
 import {
   MAX_PACKAGE_RESOURCES,
   ResourcePackageError,
@@ -14,20 +15,47 @@ function unique(values: string[]) {
 }
 
 export function describeResourcePackage(resourcePackage: ResourcePackage) {
-  const resources: Array<{ type: MarketplaceManifest["type"]; name: string }> =
-    [];
+  const resources: Array<{
+    type: ResourcePackageManifest["type"];
+    name: string;
+    agentKind?: "assistant" | "orchestrator";
+  }> = [];
   const knowledge = new Set<string>();
   const models = new Set<string>();
   let requiresCredentials = false;
   const pending = [resourcePackage.manifest];
   while (pending.length) {
     const manifest = pending.pop()!;
-    resources.push({ type: manifest.type, name: manifest.name });
+    resources.push({
+      type: manifest.type,
+      name: manifest.name,
+      ...(manifest.type === "agent"
+        ? { agentKind: manifest.kind ?? "assistant" }
+        : {}),
+    });
     if (resources.length > MAX_PACKAGE_RESOURCES)
       throw new ResourcePackageError(
         "A package can contain at most 256 resources",
       );
-    if (manifest.type === "agent") {
+    if (manifest.type === "workflow") {
+      unique(manifest.agentBindings.map(({ ref }) => ref));
+      const usedRefs = new Set(
+        manifest.definition.nodes
+          .filter((node) => node.type === "agent.run")
+          .map((node) => node.parameters.agentId),
+      );
+      if (
+        usedRefs.size !== manifest.agentBindings.length ||
+        manifest.agentBindings.some(({ ref }) => !usedRefs.has(ref))
+      )
+        throw new ResourcePackageError(
+          "Workflow assistant dependencies must exactly match its nodes",
+        );
+      if (hasCycle(manifest.definition))
+        throw new ResourcePackageError("Workflow cannot contain cycles");
+      requiresCredentials ||= manifest.requiresCredentials;
+      pending.push(...manifest.agentBindings.map(({ manifest }) => manifest));
+    } else if (manifest.type === "agent") {
       const bundled = manifest.bundledResources;
       const skills = bundled?.skills ?? [];
       const mcp = bundled?.mcpPresets ?? [];

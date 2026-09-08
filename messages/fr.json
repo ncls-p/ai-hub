@@ -1712,7 +1712,8 @@
     "renameAria": "Renommer {name}",
     "renameDocument": "Renommer le document",
     "renameDescription": "Modifiez le nom du fichier sans changer son contenu ni son indexation.",
-    "renameFailed": "Le document n’a pas pu être renommé."
+    "renameFailed": "Le document n’a pas pu être renommé.",
+    "originalUnavailable": "Le fichier original n’a pas été conservé pour ce document. Cette vue contient uniquement le texte extrait. Réimportez le fichier original pour pouvoir le prévisualiser et le télécharger."
   },
   "tools": {
     "title": "Outils & intégrations",
@@ -4163,7 +4164,9 @@
       "agent": "Assistant",
       "skill": "Skill",
       "mcp_preset": "Serveur MCP",
-      "custom_tool": "Outil personnalisé"
+      "custom_tool": "Outil personnalisé",
+      "workflow": "Workflow",
+      "orchestrator": "Orchestrateur"
     },
     "recipientEmail": "Adresse e-mail du destinataire"
   }
