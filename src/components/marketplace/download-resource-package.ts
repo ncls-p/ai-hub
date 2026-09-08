@@ -1,7 +1,13 @@
-import type { ShareableResource } from "./resource-share-dialog.share-step";
+import type { ResourcePackageSource } from "@/modules/resource-package/types";
+
+export type ResourcePackageExportTarget = {
+  kind: ResourcePackageSource;
+  id: string;
+  name: string;
+};
 
 export async function downloadResourcePackage(
-  resource: ShareableResource,
+  resource: ResourcePackageExportTarget,
   workspaceId: string,
   failureMessage: string,
 ) {

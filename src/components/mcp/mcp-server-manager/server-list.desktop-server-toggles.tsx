@@ -22,6 +22,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ServerListProps } from "./server-list.server-list-props";
 import type { McpServer } from "./types";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { ResourcePackageExport } from "@/components/marketplace/resource-package-export";
 
 export function DesktopServerToggles({
   server,
@@ -136,6 +138,7 @@ export function ServerActions({
   | "onShareServerAction"
 > & { server: McpServer }) {
   const tShare = useTranslations("marketplace.share");
+  const { workspaceId } = useWorkspace();
   const t = useTranslations("mcp.serverManager");
 
   return (
@@ -152,6 +155,11 @@ export function ServerActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <ResourcePackageExport
+          presentation="menu-item"
+          workspaceId={workspaceId}
+          resource={{ kind: "mcp_server", id: server.id, name: server.name }}
+        />
         {server.healthStatus === "unhealthy" ? (
           <DropdownMenuItem
             disabled={!server.canEdit}

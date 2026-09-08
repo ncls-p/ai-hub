@@ -148,7 +148,10 @@ test.describe("agents list page", () => {
         name: /(?:Hide from|Show in) chat selector/i,
       }),
     ).toBeVisible();
-    expect(await menu.getByRole("menuitem").count()).toBeLessThanOrEqual(4);
+    await expect(
+      menu.getByRole("menuitem", { name: "Export JSON", exact: true }),
+    ).toBeVisible();
+    expect(await menu.getByRole("menuitem").count()).toBeLessThanOrEqual(5);
     await expect(
       menu.getByRole("menuitem", { name: /Duplicate|Delete|Publish/i }),
     ).toHaveCount(0);

@@ -13,7 +13,7 @@ import {
   hasWorkspacePermissionForRequest,
 } from "@/modules/auth/workspace-access";
 import type { AccessResourceType } from "@/server/domain/entities/access-resource";
-import type { MarketplaceManifest } from "@/modules/marketplace/manifest-types";
+import type { ResourcePackageManifest } from "./types";
 import { ResourcePackageError } from "./schema";
 
 const readPermissions: Partial<Record<AccessResourceType, string>> = {
@@ -24,6 +24,7 @@ const readPermissions: Partial<Record<AccessResourceType, string>> = {
   knowledge_base: "knowledgeBases.viewAllowed",
   provider: "providers.viewMetadata",
   model: "models.view",
+  workflow: "workflows.view",
 };
 
 export async function requirePackageResourceAccess(input: {
@@ -88,7 +89,7 @@ export async function requirePackageResourceAccess(input: {
 }
 
 export async function requirePackageInstallPermissions(
-  manifest: MarketplaceManifest,
+  manifest: ResourcePackageManifest,
   workspaceId: string,
   userId: string,
 ) {
@@ -96,7 +97,10 @@ export async function requirePackageInstallPermissions(
   const pending = [manifest];
   while (pending.length) {
     const current = pending.pop()!;
-    if (current.type === "agent") {
+    if (current.type === "workflow") {
+      permissions.add("workflows.create");
+      pending.push(...current.agentBindings.map((binding) => binding.manifest));
+    } else if (current.type === "agent") {
       permissions.add("agents.create");
       if (current.skillBindings?.some((binding) => binding.bundled))
         permissions.add("tools.configure");

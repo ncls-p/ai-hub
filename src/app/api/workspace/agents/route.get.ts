@@ -54,6 +54,8 @@ export async function GET(req: NextRequest) {
         canUpdateAgents,
         canManageProviderSettings,
         canManageModels,
+        canExportResources,
+        canImportResources,
         accessOptions,
       ] = await Promise.all([
         hasWorkspacePermissionForRequest(
@@ -75,6 +77,16 @@ export async function GET(req: NextRequest) {
           session.user.id,
           workspaceId,
           "models.manage",
+        ),
+        hasWorkspacePermissionForRequest(
+          session.user.id,
+          workspaceId,
+          "marketplaceItems.publish",
+        ),
+        hasWorkspacePermissionForRequest(
+          session.user.id,
+          workspaceId,
+          "marketplaceItems.install",
         ),
         getAgentAccessOptions(session.user.id, workspaceId),
       ]);
@@ -158,6 +170,8 @@ export async function GET(req: NextRequest) {
         canAdminCurate,
         canCreateAgent,
         canManageProviders,
+        canExportResources,
+        canImportResources,
         accessOptions,
         ...defaultPreferences,
       });

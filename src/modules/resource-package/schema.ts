@@ -1,8 +1,7 @@
 import { z } from "zod";
-import type {
-  AgentMarketplaceManifest,
-  MarketplaceManifest,
-} from "@/modules/marketplace/manifest-types";
+import type { AgentMarketplaceManifest } from "@/modules/marketplace/manifest-types";
+import { workflowDefinitionSchema } from "@/modules/workflows/contracts";
+import type { ResourcePackageManifest } from "./types";
 
 export const MAX_PACKAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_PACKAGE_RESOURCES = 256;
@@ -176,12 +175,27 @@ const agent: z.ZodType<AgentMarketplaceManifest> = z.lazy(() =>
 export const resourcePackageSchema = z.strictObject({
   format: z.literal("maiah.resource"),
   schemaVersion: z.literal(1),
-  manifest: z.union([agent, skill, customTool, mcp]),
+  manifest: z.union([
+    agent,
+    skill,
+    customTool,
+    mcp,
+    z.strictObject({
+      type: z.literal("workflow"),
+      name,
+      description,
+      definition: workflowDefinitionSchema,
+      agentBindings: z
+        .array(z.strictObject({ ref: z.uuid(), manifest: agent }))
+        .max(100),
+      requiresCredentials: z.boolean().default(false),
+    }),
+  ]),
 });
 export type ResourcePackage = {
   format: "maiah.resource";
   schemaVersion: 1;
-  manifest: MarketplaceManifest;
+  manifest: ResourcePackageManifest;
 };
 
 export class ResourcePackageError extends Error {

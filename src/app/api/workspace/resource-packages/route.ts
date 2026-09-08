@@ -18,6 +18,7 @@ const exportSchema = z.object({
     "mcp_server",
     "mcp_tool",
     "marketplace_item",
+    "workflow",
   ]),
 });
 const importSchema = z.object({

@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { PageEmptyState } from "@/components/page-empty-state";
+import { ResourcePackageImport } from "@/components/marketplace/resource-package-import";
+import { ResourcePackageExport } from "@/components/marketplace/resource-package-export";
 import { PageLoading } from "@/components/page-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,14 +84,17 @@ export default function WorkflowsPage() {
       description={t("description")}
       width="wide"
       actions={
-        <Button
-          type="button"
-          onClick={() => void createWorkflow()}
-          disabled={creating}
-        >
-          <PlusIcon data-icon="inline-start" aria-hidden="true" />
-          {creating ? t("creating") : t("create")}
-        </Button>
+        <>
+          <ResourcePackageImport key={workspaceId} workspaceId={workspaceId} />
+          <Button
+            type="button"
+            onClick={() => void createWorkflow()}
+            disabled={creating}
+          >
+            <PlusIcon data-icon="inline-start" aria-hidden="true" />
+            {creating ? t("creating") : t("create")}
+          </Button>
+        </>
       }
     >
       {isLoading ? (
@@ -142,6 +147,14 @@ export default function WorkflowsPage() {
                 ) : null}
               </CardContent>
               <CardFooter className="justify-end">
+                <ResourcePackageExport
+                  workspaceId={workspaceId}
+                  resource={{
+                    kind: "workflow",
+                    id: workflow.id,
+                    name: workflow.name,
+                  }}
+                />
                 <Button
                   type="button"
                   variant="ghost"

@@ -133,8 +133,8 @@ describe("package dependency preview", () => {
       name: "Coordinator",
       requiresCredentials: false,
       resources: [
-        { type: "agent", name: "Coordinator" },
-        { type: "agent", name: "Reviewer" },
+        { type: "agent", name: "Coordinator", agentKind: "orchestrator" },
+        { type: "agent", name: "Reviewer", agentKind: "assistant" },
         { type: "skill", name: "Review" },
       ],
       knowledge: ["Handbook"],

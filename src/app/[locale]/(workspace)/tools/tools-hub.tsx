@@ -11,6 +11,7 @@ import { PageLoading } from "@/components/page-loading";
 import { SkillManager } from "@/components/skills/skill-manager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkspacePage } from "@/components/workspace-page";
+import { ResourcePackageImport } from "@/components/marketplace/resource-package-import";
 import { useWorkspace } from "@/hooks/use-workspace";
 import type { WorkspacePermissions } from "@/lib/workspace-nav";
 
@@ -141,6 +142,11 @@ export function ToolsHub() {
       eyebrow={t("orbitEyebrow")}
       description={t("orbitDescription")}
       width="wide"
+      actions={
+        permissions.canConfigureTools || permissions.canManageMcpServers ? (
+          <ResourcePackageImport key={workspaceId} workspaceId={workspaceId} />
+        ) : undefined
+      }
     >
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="justify-start">

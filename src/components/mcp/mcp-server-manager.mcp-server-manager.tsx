@@ -80,6 +80,7 @@ export function useMcpServerManagerController() {
       const serversPendingInitialDiscovery = data.filter(
         (server) =>
           server.canEdit &&
+          server.enabled &&
           server.transport !== "stdio" &&
           (!server.healthStatus || server.healthStatus === "unknown"),
       );

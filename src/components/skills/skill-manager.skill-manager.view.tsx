@@ -1,5 +1,6 @@
 import { DestructiveConfirmationDialog } from "@/components/destructive-confirmation-dialog";
 import { ResourceShareDialog } from "@/components/marketplace/resource-share-dialog";
+import { ResourcePackageExport } from "@/components/marketplace/resource-package-export";
 import { ResourceProvenanceBadge } from "@/components/resource-provenance-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -164,6 +165,15 @@ export function SkillManagerView({ model }: { model: SkillManagerViewModel }) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <ResourcePackageExport
+                          presentation="menu-item"
+                          workspaceId={workspaceId}
+                          resource={{
+                            kind: "skill",
+                            id: skill.id,
+                            name: skill.name,
+                          }}
+                        />
                         <DropdownMenuItem
                           onSelect={() =>
                             window.requestAnimationFrame(() =>

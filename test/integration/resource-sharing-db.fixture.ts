@@ -8,6 +8,7 @@ import {
 import { db } from "@/server/infrastructure/db";
 import {
   agents,
+  agentDelegationBindings,
   agentVersions,
   auditEvents,
   marketplaceItems,
@@ -24,16 +25,14 @@ export async function createSharingFixture() {
   const owner = randomUUID(),
     member = randomUUID(),
     outsider = randomUUID();
-  await db
-    .insert(users)
-    .values(
-      [owner, member, outsider].map((id) => ({
-        id,
-        name: id,
-        email: `${id}@example.test`,
-        emailVerified: true,
-      })),
-    );
+  await db.insert(users).values(
+    [owner, member, outsider].map((id) => ({
+      id,
+      name: id,
+      email: `${id}@example.test`,
+      emailVerified: true,
+    })),
+  );
   const project = await createOrganizationWithProject({
     userId: owner,
     organizationName: `Sharing ${suffix}`,
@@ -124,6 +123,17 @@ export async function createSharingFixture() {
         .delete(conversations)
         .where(
           inArray(conversations.workspaceId, [project.id, destination.id]),
+        );
+      const versions = await db
+        .select({ id: agentVersions.id })
+        .from(agentVersions)
+        .where(inArray(agentVersions.createdById, ids));
+      if (versions.length)
+        await db.delete(agentDelegationBindings).where(
+          inArray(
+            agentDelegationBindings.agentVersionId,
+            versions.map(({ id }) => id),
+          ),
         );
       await db
         .delete(agentVersions)
