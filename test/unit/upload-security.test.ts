@@ -5,6 +5,12 @@ import { textPdfBytes } from "../fixtures/pdf";
 
 const objectStore = new Map<string, Uint8Array>();
 
+// These storage fixtures have no shared conversations. Real sharing grants and
+// revocation are covered against PostgreSQL in resource-access-db.test.ts.
+vi.mock("@/modules/chat/conversation-asset-access", () => ({
+  canReadSharedConversationAsset: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock("@/server/infrastructure/storage", () => ({
   storage: {
     upload: vi.fn(async (key: string, body: Buffer | Uint8Array | string) => {
@@ -96,7 +102,7 @@ describe("upload security", () => {
     ).resolves.toMatchObject({ content: "console.log('hello');" });
   });
 
-  it("scopes code workspace file access to the creating user", async () => {
+  it("restricts unshared code workspace files to the creating user", async () => {
     const { createCodeWorkspaceFromZip, readCodeWorkspaceFile } =
       await import("@/modules/code-workspace/storage");
 
