@@ -5,6 +5,7 @@ import {
   publicChatAttachment,
   type ChatAttachment,
 } from "@/modules/chat/attachments";
+import { canReadConversationAsset } from "@/modules/chat/conversation-asset-access";
 import { db } from "@/server/infrastructure/db";
 import { messageParts, messages } from "@/server/infrastructure/db/schema";
 import { and, desc, eq } from "drizzle-orm";
@@ -53,7 +54,11 @@ export async function loadAuthorizedConversationAttachments(input: {
         const metadata = await getChatAttachment(attachmentId);
         if (
           metadata.workspaceId !== input.workspaceId ||
-          metadata.createdByUserId !== input.userId
+          !(await canReadConversationAsset(
+            metadata,
+            input.userId,
+            "attachment",
+          ))
         )
           return null;
         return publicChatAttachment(metadata);

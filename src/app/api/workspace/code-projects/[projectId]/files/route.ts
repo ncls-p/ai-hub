@@ -13,6 +13,8 @@ import {
   writeCodeWorkspaceFile,
 } from "@/modules/code-workspace/storage";
 
+import { canReadConversationAsset } from "@/modules/chat/conversation-asset-access";
+
 const paramsSchema = z.object({ projectId: z.uuid() });
 const writeFileSchema = z.object({
   path: z.string().trim().min(1).max(260),
@@ -22,8 +24,19 @@ const deleteFileSchema = z.object({
   path: z.string().trim().min(1).max(260),
 });
 
-async function authorizeProject(projectId: string, userId: string) {
+async function authorizeProject(
+  projectId: string,
+  userId: string,
+  readOnly = false,
+) {
   const metadata = await getCodeWorkspace(projectId);
+  if (readOnly) {
+    return (await canReadConversationAsset(metadata, userId, "code_workspace"))
+      ? { metadata }
+      : {
+          response: NextResponse.json({ error: "Not found" }, { status: 404 }),
+        };
+  }
   if (metadata.createdByUserId !== userId) {
     return {
       response: NextResponse.json({ error: "Not found" }, { status: 404 }),
@@ -56,6 +69,7 @@ export async function GET(
       const auth = await authorizeProject(
         parsed.data.projectId,
         session.user.id,
+        true,
       );
       if (auth.response) return auth.response;
       const metadata = auth.metadata;
@@ -66,20 +80,28 @@ export async function GET(
       const filePath = searchParams.get("path");
       if (!filePath) {
         return NextResponse.json(
-          await listCodeWorkspaceFiles({
-            projectId: metadata.id,
-            workspaceId: metadata.workspaceId,
-            userId: metadata.createdByUserId,
-          }),
+          {
+            ...(await listCodeWorkspaceFiles({
+              projectId: metadata.id,
+              workspaceId: metadata.workspaceId,
+              userId: metadata.createdByUserId,
+            })),
+            canEdit: metadata.createdByUserId === session.user.id,
+          },
+          { headers: { "Cache-Control": "no-store" } },
         );
       }
       return NextResponse.json(
-        await readCodeWorkspaceFile({
-          projectId: metadata.id,
-          workspaceId: metadata.workspaceId,
-          userId: metadata.createdByUserId,
-          filePath,
-        }),
+        {
+          ...(await readCodeWorkspaceFile({
+            projectId: metadata.id,
+            workspaceId: metadata.workspaceId,
+            userId: metadata.createdByUserId,
+            filePath,
+          })),
+          canEdit: metadata.createdByUserId === session.user.id,
+        },
+        { headers: { "Cache-Control": "no-store" } },
       );
     },
     {
@@ -87,7 +109,10 @@ export async function GET(
       expectedError: (error) => {
         const message = error instanceof Error ? error.message : String(error);
         if (/not found|path|binary/i.test(message)) {
-          return NextResponse.json({ error: message }, { status: 400 });
+          return NextResponse.json(
+            { error: message },
+            { status: /not found/i.test(message) ? 404 : 400 },
+          );
         }
         return NextResponse.json(
           { error: "Internal server error" },

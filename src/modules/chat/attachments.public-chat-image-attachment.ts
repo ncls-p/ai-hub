@@ -1,5 +1,7 @@
 import "pdf-parse/worker";
 
+import { canReadSharedConversationAsset } from "./conversation-asset-access";
+
 import { storage } from "@/server/infrastructure/storage";
 import {
   ChatAttachmentMetadata,
@@ -11,7 +13,24 @@ import {
   assertSafeAttachmentId,
   metadataObjectKey,
 } from "./attachments.code-text-extensions";
-import { assertChatAttachmentAccess } from "./attachments.extract-attachment-text";
+async function assertReadableAttachment(
+  metadata: ChatAttachmentMetadata,
+  input: { workspaceId?: string; userId: string },
+) {
+  if (input.workspaceId && metadata.workspaceId !== input.workspaceId) {
+    throw new Error("Attachment not found.");
+  }
+  if (metadata.createdByUserId === input.userId) return;
+  if (
+    !(await canReadSharedConversationAsset(
+      metadata,
+      input.userId,
+      "attachment",
+    ))
+  ) {
+    throw new Error("Attachment not found.");
+  }
+}
 
 export function publicChatImageAttachment(
   metadata: ChatAttachmentMetadata,
@@ -66,11 +85,7 @@ export async function getChatAttachmentBytes(input: {
   userId: string;
 }) {
   const metadata = await getChatAttachment(input.attachmentId);
-  if (input.workspaceId) {
-    assertChatAttachmentAccess(metadata, input.workspaceId, input.userId);
-  } else if (metadata.createdByUserId !== input.userId) {
-    throw new Error("Attachment not found.");
-  }
+  await assertReadableAttachment(metadata, input);
   const bytes = await storage.download(metadata.objectKey);
   return { metadata, bytes };
 }
@@ -96,7 +111,7 @@ export async function getChatAttachmentExtractedText(input: {
   userId: string;
 }): Promise<{ metadata: ChatFileAttachmentMetadata; text: string }> {
   const metadata = await getChatAttachment(input.attachmentId);
-  assertChatAttachmentAccess(metadata, input.workspaceId, input.userId);
+  await assertReadableAttachment(metadata, input);
   if (metadata.kind !== "chat_file") {
     throw new Error("Attachment is not a file.");
   }

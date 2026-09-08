@@ -1,4 +1,8 @@
-import { handleRoute, requireWorkspaceMemberAsync } from "@/lib/route-handler";
+import { originalDocumentDisposition } from "@/modules/knowledge/document-metadata";
+import {
+  handleRoute,
+  requireResourcePermissionAsync,
+} from "@/lib/route-handler";
 import { getKnowledgeBase } from "@/modules/knowledge/use-cases";
 import { db } from "@/server/infrastructure/db";
 import { documents } from "@/server/infrastructure/db/schema";
@@ -27,9 +31,12 @@ export async function GET(
     if (!parsedParams.success || !parsedQuery.success) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
-    const forbidden = await requireWorkspaceMemberAsync(
+    const forbidden = await requireResourcePermissionAsync(
       session.user.id,
       parsedQuery.data.workspaceId,
+      "knowledgeBases.viewAllowed",
+      "knowledge_base",
+      parsedParams.data.knowledgeBaseId,
     );
     if (forbidden) return forbidden;
     const knowledgeBase = await getKnowledgeBase(
@@ -52,14 +59,10 @@ export async function GET(
           eq(documents.id, parsedParams.data.documentId),
           eq(documents.knowledgeBaseId, knowledgeBase.id),
           eq(documents.workspaceId, parsedQuery.data.workspaceId),
-          eq(documents.status, "ready"),
         ),
       )
       .limit(1);
-    if (
-      !document?.objectStorageKey ||
-      document.mimeType !== "application/pdf"
-    ) {
+    if (!document?.objectStorageKey) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     const bytes = await storage.download(document.objectStorageKey);
@@ -68,10 +71,11 @@ export async function GET(
     new Uint8Array(body).set(bytes);
     return new Response(body, {
       headers: {
-        "Content-Type": "application/pdf",
+        "Content-Type": document.mimeType ?? "application/octet-stream",
         "Content-Length": String(bytes.byteLength),
-        "Content-Disposition": `inline; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(document.title)}`,
-        "Cache-Control": "private, max-age=300",
+        "Content-Disposition": `${originalDocumentDisposition(document.mimeType, req.nextUrl.searchParams.get("download") === "1")}; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(document.title)}`,
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
         "X-Content-Type-Options": "nosniff",
       },
     });

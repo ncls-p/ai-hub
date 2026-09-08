@@ -14,14 +14,12 @@ export function KnowledgeDocumentTableBranch4({
   const {
     docForm,
     documentInputRef,
-    documentTotalCount,
     dragActive,
     folderInputRef,
     handleFileDrop,
     ingestDocument,
     ingestSelectedFiles,
     lastUpload,
-    selectedId,
     setDocForm,
     setDragActive,
     t,
@@ -29,12 +27,7 @@ export function KnowledgeDocumentTableBranch4({
   } = model;
   return (
     <div className="p-3">
-      <AdvancedSection
-        key={`${selectedId}:${documentTotalCount === 0 ? "empty" : "populated"}`}
-        label={t("addDocuments")}
-        hint={t("addDocumentsHint")}
-        defaultOpen={documentTotalCount === 0}
-      >
+      <div>
         <input
           id="knowledge-file-upload"
           ref={documentInputRef}
@@ -63,7 +56,7 @@ export function KnowledgeDocumentTableBranch4({
         />
         <div
           className={cn(
-            "flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed px-5 py-5 text-center transition-colors",
+            "flex min-h-24 flex-col items-center justify-center rounded-xl border border-dashed px-5 py-5 text-center transition-colors",
             dragActive
               ? "border-primary bg-primary/6"
               : "border-primary/20 bg-primary/[0.025]",
@@ -157,7 +150,7 @@ export function KnowledgeDocumentTableBranch4({
               aria-label={t("documentContent")}
               name="document-content"
               autoComplete="off"
-              className="min-h-32"
+              className="min-h-24"
               placeholder={t("documentContentPlaceholder")}
               value={docForm.content}
               onChange={(e) =>
@@ -176,7 +169,7 @@ export function KnowledgeDocumentTableBranch4({
             </Button>
           </div>
         </AdvancedSection>
-      </AdvancedSection>
+      </div>
     </div>
   );
 }

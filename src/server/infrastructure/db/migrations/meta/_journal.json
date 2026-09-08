@@ -414,6 +414,13 @@
       "when": 1788595200000,
       "tag": "0058_permission_delegation",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788852190065,
+      "tag": "0059_resource_sharing",
+      "breakpoints": true
     }
   ]
 }

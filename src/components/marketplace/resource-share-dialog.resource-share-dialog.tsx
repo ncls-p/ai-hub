@@ -1,12 +1,12 @@
 "use client";
 
+import { downloadResourcePackage } from "./download-resource-package";
 import type { PublishPreviewResult } from "@/modules/marketplace/use-cases";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ResourceShareDialogView } from "./resource-share-dialog.resource-share-dialog.view";
 import {
-  PlatformUser,
   ShareStep,
   ShareableResource,
   previewQueryParams,
@@ -28,8 +28,11 @@ export function useResourceShareDialogController({
   const t = useTranslations("marketplace.share");
   const tVisibility = useTranslations("marketplace");
   const tCommon = useTranslations("common");
+  const tPackage = useTranslations("resourcePackage");
   const [step, setStep] = useState<ShareStep>("meta");
   const [preview, setPreview] = useState<PublishPreviewResult | null>(null);
+  const previewRequest = useRef(0);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -37,13 +40,15 @@ export function useResourceShareDialogController({
   const [changelog, setChangelog] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
-  const [users, setUsers] = useState<PlatformUser[]>([]);
-  const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
 
   const loadPreview = useCallback(async () => {
     if (!resource || !workspaceId) return;
+    const current = ++previewRequest.current;
+    setPreview(null);
+    setPreviewError(null);
     setPreviewLoading(true);
     try {
       const params = previewQueryParams(resource, workspaceId);
@@ -53,26 +58,30 @@ export function useResourceShareDialogController({
         throw new Error(err.error || t("toast.loadFailed"));
       }
       const data = (await res.json()) as PublishPreviewResult;
+      if (current !== previewRequest.current) return;
       setPreview(data);
       setName(data.name);
       setDescription(data.description ?? "");
       setVersion(data.suggestedVersion);
       setTagsInput(data.tags.join(", "));
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t("toast.loadFailed"),
-      );
+      if (current === previewRequest.current)
+        setPreviewError(
+          error instanceof Error ? error.message : t("toast.loadFailed"),
+        );
       return;
     } finally {
-      setPreviewLoading(false);
+      if (current === previewRequest.current) setPreviewLoading(false);
     }
   }, [resource, workspaceId, t]);
 
   useEffect(() => {
+    const request = previewRequest;
+    let disposed = false;
     if (open && resource && workspaceId) {
       queueMicrotask(() => {
+        if (disposed) return;
         setStep("choose");
-        setSearch("");
         setSelectedUserId("");
         setBusy(false);
         setVisibility("public");
@@ -80,21 +89,11 @@ export function useResourceShareDialogController({
         void loadPreview();
       });
     }
+    return () => {
+      disposed = true;
+      request.current++;
+    };
   }, [open, resource, workspaceId, loadPreview]);
-
-  const publisherUserId =
-    resource?.kind === "marketplace_item" ? resource.publisherUserId : null;
-
-  const filteredUsers = useMemo(
-    () =>
-      users.filter(
-        (u) =>
-          u.id !== publisherUserId &&
-          (u.name.toLowerCase().includes(search.toLowerCase()) ||
-            u.email.toLowerCase().includes(search.toLowerCase())),
-      ),
-    [users, search, publisherUserId],
-  );
 
   const tags = useMemo(
     () =>
@@ -239,13 +238,19 @@ export function useResourceShareDialogController({
     t,
   ]);
 
-  const loadUsers = useCallback(async () => {
-    if (users.length > 0) return;
-    const res = await fetch("/api/admin/users");
-    if (!res.ok) throw new Error(t("toast.usersFailed"));
-    const data = await res.json();
-    setUsers(Array.isArray(data) ? data : (data.users ?? []));
-  }, [users.length, t]);
+  const handleExport = useCallback(async () => {
+    if (!resource || !workspaceId || busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await downloadResourcePackage(resource, workspaceId, tPackage("failed"));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : tPackage("failed"));
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, [resource, workspaceId, tPackage]);
 
   const finish = useCallback(() => {
     onSuccessAction?.();
@@ -253,7 +258,8 @@ export function useResourceShareDialogController({
   }, [onCloseAction, onSuccessAction]);
 
   const handlePublishToMarketplace = useCallback(async () => {
-    if (!resource) return;
+    if (!resource || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       await publishToMarketplace();
@@ -265,19 +271,21 @@ export function useResourceShareDialogController({
       );
       return;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }, [resource, publishToMarketplace, name, finish, t]);
 
   const handleShareWithUser = useCallback(async () => {
-    if (!resource || !selectedUserId) return;
+    if (!resource || !selectedUserId || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       const itemId = await createOrUpdateDraft();
       const shareRes = await fetch(`/api/marketplace/items/${itemId}/share`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUserId: selectedUserId }),
+        body: JSON.stringify({ targetEmail: selectedUserId.trim() }),
       });
       if (!shareRes.ok) {
         const err = await shareRes.json().catch(() => ({}));
@@ -291,6 +299,7 @@ export function useResourceShareDialogController({
       );
       return;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }, [resource, selectedUserId, createOrUpdateDraft, name, finish, t]);
@@ -304,22 +313,22 @@ export function useResourceShareDialogController({
     kind: "ready",
     busy,
     description,
-    filteredUsers,
     handlePublishToMarketplace,
     handleShareWithUser,
-    loadUsers,
+    handleExport,
+    tPackage,
     name,
     onCloseAction,
     open,
     preview,
     previewLoading,
+    previewError,
+    loadPreview,
     resource,
     resourceSubjectKey,
-    search,
     selectedUserId,
     setDescription,
     setName,
-    setSearch,
     setSelectedUserId,
     setStep,
     setTagsInput,

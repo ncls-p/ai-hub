@@ -2,7 +2,7 @@ import {
   installAgentManifest,
   installPostInstallFlags,
 } from "@/modules/marketplace/install-helpers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   customToolManifest,
   mcpManifest,
@@ -255,3 +255,7 @@ describe("installPostInstallFlags", () => {
     ).toEqual({ requiresCredentials: false });
   });
 });
+
+vi.mock("@/modules/auth/workspace-access", () => ({
+  hasResourcePermissionForRequest: vi.fn().mockResolvedValue(true),
+}));

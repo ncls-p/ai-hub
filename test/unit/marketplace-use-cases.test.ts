@@ -1,3 +1,6 @@
+vi.mock("@/modules/resource-package/permissions", () => ({
+  requirePackageInstallPermissions: vi.fn().mockResolvedValue(undefined),
+}));
 import {
   getMarketplaceItem,
   getMarketplaceItemWithShares,
@@ -27,6 +30,7 @@ type UpdateChain = {
 };
 
 type InsertChain = {
+  onConflictDoUpdate: ReturnType<typeof vi.fn>;
   values: ReturnType<typeof vi.fn>;
   returning: ReturnType<typeof vi.fn>;
 };
@@ -48,6 +52,7 @@ vi.mock("@/server/infrastructure/db", () => {
     returning: vi.fn().mockResolvedValue([]),
   };
   const insertChain: InsertChain = {
+    onConflictDoUpdate: vi.fn().mockReturnThis(),
     values: vi.fn().mockReturnThis(),
     returning: vi.fn().mockResolvedValue([]),
   };

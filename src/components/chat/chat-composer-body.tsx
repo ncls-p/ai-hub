@@ -40,6 +40,7 @@ interface ChatComposerBodyProps {
   onInputChange: ChatComposerProps["onInputChange"];
   onStop: ChatComposerProps["onStop"];
   onRemoveAttachment: ChatComposerProps["onRemoveAttachment"];
+  onEditText?: (id: string, content: string) => Promise<boolean>;
   onPromptSuggestionClick: ChatComposerProps["onPromptSuggestionClick"];
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onPaste: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
@@ -142,6 +143,20 @@ export function ChatComposerBody(props: ChatComposerBodyProps) {
                 key={attachment.id}
                 attachment={attachment}
                 onRemove={props.onRemoveAttachment}
+                disabled={
+                  props.sending || props.uploadingAttachment || !props.canChat
+                }
+                onEditText={props.onEditText}
+                onRestoreText={
+                  props.onRemoveAttachment
+                    ? (id, content) => {
+                        props.onInputChange(
+                          [props.input, content].filter(Boolean).join("\n\n"),
+                        );
+                        props.onRemoveAttachment?.(id);
+                      }
+                    : undefined
+                }
               />
             ))}
           </AttachmentGroup>

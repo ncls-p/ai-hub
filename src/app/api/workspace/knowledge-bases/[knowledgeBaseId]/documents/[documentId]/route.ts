@@ -1,7 +1,7 @@
+import { renameKnowledgeDocument } from "@/modules/knowledge/document-metadata";
 import {
   handleRoute,
   requireResourcePermissionAsync,
-  requireWorkspaceMemberAsync,
 } from "@/lib/route-handler";
 import { canManageTenantGlobals } from "@/modules/admin/auth";
 import {
@@ -15,7 +15,14 @@ import { z } from "zod";
 
 const querySchema = z.object({ workspaceId: z.uuid() });
 const patchBodySchema = z.object({
-  action: z.enum(["retry", "reindex"]).optional(),
+  action: z.enum(["retry", "reindex", "rename"]).optional(),
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .max(512)
+    .refine((value) => !/[\x00-\x1f\x7f]/.test(value), "Invalid document name")
+    .optional(),
 });
 
 export async function GET(
@@ -36,9 +43,12 @@ export async function GET(
       if (!parsed.success || !parsedParams.success) {
         return NextResponse.json({ error: "Invalid request" }, { status: 400 });
       }
-      const forbidden = await requireWorkspaceMemberAsync(
+      const forbidden = await requireResourcePermissionAsync(
         session.user.id,
         parsed.data.workspaceId,
+        "knowledgeBases.viewAllowed",
+        "knowledge_base",
+        parsedParams.data.knowledgeBaseId,
       );
       if (forbidden) return forbidden;
 
@@ -101,7 +111,10 @@ export async function DELETE(
       expectedError: (error) => {
         const msg =
           error instanceof Error ? error.message : "Internal server error";
-        return NextResponse.json({ error: msg }, { status: 400 });
+        return NextResponse.json(
+          { error: msg },
+          { status: msg.includes("not found") ? 404 : 400 },
+        );
       },
     },
   );
@@ -140,6 +153,23 @@ export async function PATCH(
         session,
         parsed.data.workspaceId,
       );
+      if (parsedBody.data.action === "rename") {
+        if (!parsedBody.data.title)
+          return NextResponse.json(
+            { error: "A document name is required" },
+            { status: 400 },
+          );
+        return NextResponse.json({
+          document: await renameKnowledgeDocument({
+            documentId,
+            knowledgeBaseId,
+            workspaceId: parsed.data.workspaceId,
+            userId: session.user.id,
+            canManageGlobal,
+            title: parsedBody.data.title,
+          }),
+        });
+      }
       const requeue =
         parsedBody.data.action === "reindex"
           ? reindexDocument
@@ -158,7 +188,10 @@ export async function PATCH(
       expectedError: (error) => {
         const msg =
           error instanceof Error ? error.message : "Internal server error";
-        return NextResponse.json({ error: msg }, { status: 400 });
+        return NextResponse.json(
+          { error: msg },
+          { status: msg.includes("not found") ? 404 : 400 },
+        );
       },
     },
   );

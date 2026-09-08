@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { canReadConversationAsset } from "@/modules/chat/conversation-asset-access";
 
-import {
-  handleRoute,
-  requireWorkspacePermissionAsync,
-} from "@/lib/route-handler";
+import { handleRoute } from "@/lib/route-handler";
 import {
   getChatAttachment,
   getChatAttachmentExtractedText,
@@ -26,7 +24,13 @@ export async function GET(
         return NextResponse.json({ error: "Invalid request" }, { status: 400 });
       }
       const metadata = await getChatAttachment(parsed.data.attachmentId);
-      if (metadata.createdByUserId !== session.user.id) {
+      if (
+        !(await canReadConversationAsset(
+          metadata,
+          session.user.id,
+          "attachment",
+        ))
+      ) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
       if (metadata.kind !== "chat_file") {
@@ -35,16 +39,10 @@ export async function GET(
           { status: 400 },
         );
       }
-      const forbidden = await requireWorkspacePermissionAsync(
-        session.user.id,
-        metadata.workspaceId,
-        "agents.chat",
-      );
-      if (forbidden) return forbidden;
       const extracted = await getChatAttachmentExtractedText({
         attachmentId: metadata.id,
         workspaceId: metadata.workspaceId,
-        userId: session.user.id,
+        userId: metadata.createdByUserId,
       });
       const previewTruncated =
         extracted.text.length > maxChatAttachmentPreviewChars;
@@ -59,7 +57,7 @@ export async function GET(
         },
         {
           headers: {
-            "Cache-Control": "private, max-age=60",
+            "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
           },
         },

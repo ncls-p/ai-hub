@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getWorkspace: vi.fn(),
   getFileBytes: vi.fn(),
   requirePermission: vi.fn(),
+  canRead: vi.fn(),
 }));
 
 vi.mock("@/lib/route-handler", () => ({
@@ -36,6 +37,10 @@ vi.mock("@/modules/code-workspace/storage", () => ({
   getCodeWorkspaceFileBytes: mocks.getFileBytes,
 }));
 
+vi.mock("@/modules/chat/conversation-asset-access", () => ({
+  canReadConversationAsset: mocks.canRead,
+}));
+
 import { GET } from "@/app/api/workspace/code-projects/[projectId]/preview/[[...path]]/route";
 
 const projectId = "22222222-2222-4222-8222-222222222222";
@@ -63,6 +68,7 @@ async function responseBytes(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.canRead.mockResolvedValue(true);
   mocks.getWorkspace.mockResolvedValue({
     id: projectId,
     workspaceId: "44444444-4444-4444-8444-444444444444",
@@ -114,4 +120,11 @@ describe("code workspace preview media responses", () => {
       expect(await responseBytes(response)).toEqual([]);
     }
   });
+});
+
+it("rechecks authorization even when a recipient retains the exact preview token", async () => {
+  mocks.canRead.mockResolvedValue(false);
+  const response = await GET(request(), params);
+  expect(response.status).toBe(404);
+  expect(mocks.getFileBytes).not.toHaveBeenCalled();
 });

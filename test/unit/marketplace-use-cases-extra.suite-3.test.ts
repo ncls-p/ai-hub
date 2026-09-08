@@ -1,3 +1,6 @@
+vi.mock("@/modules/resource-package/permissions", () => ({
+  requirePackageInstallPermissions: vi.fn().mockResolvedValue(undefined),
+}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const helperMocks = vi.hoisted(() => ({
   upsertMarketplaceDraft: vi.fn(async (input: unknown) => ({ draft: input })),

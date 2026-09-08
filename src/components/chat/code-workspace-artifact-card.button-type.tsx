@@ -179,6 +179,7 @@ export function openCodeWorkspaceWindow(url: string, name: string) {
 }
 
 type CodeWorkspaceFilePayload = {
+  canEdit?: boolean;
   content?: string;
   error?: string;
 };
@@ -198,18 +199,18 @@ async function requestCodeWorkspaceJson<T>(
 
 export async function loadCodeWorkspaceFileContent(
   projectId: string,
-  path: string,
+  path: string | null,
   fallbackError: string,
 ) {
   const data = await requestCodeWorkspaceJson<CodeWorkspaceFilePayload>(
-    `/api/workspace/code-projects/${projectId}/files?path=${encodeURIComponent(path)}`,
+    `/api/workspace/code-projects/${projectId}/files${path ? `?path=${encodeURIComponent(path)}` : ""}`,
     undefined,
     fallbackError,
   );
-  if (typeof data?.content !== "string") {
+  if (!data || (path && typeof data.content !== "string")) {
     throw new Error(data?.error || fallbackError);
   }
-  return data.content;
+  return { content: data.content ?? "", canEdit: data.canEdit === true };
 }
 
 export async function requestUpdatedCodeWorkspaceArtifact(

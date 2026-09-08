@@ -39,7 +39,12 @@ export async function resolveAgentVersion(
       ? db
           .select()
           .from(agentVersions)
-          .where(eq(agentVersions.id, agent.activeVersionId))
+          .where(
+            and(
+              eq(agentVersions.id, agent.activeVersionId),
+              eq(agentVersions.agentId, agentId),
+            ),
+          )
           .limit(1)
       : db
           .select()

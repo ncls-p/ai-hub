@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import {
-  handleRoute,
-  requireWorkspacePermissionAsync,
-} from "@/lib/route-handler";
+import { handleRoute } from "@/lib/route-handler";
 import {
   getCodeWorkspace,
   getCodeWorkspaceFileBytes,
 } from "@/modules/code-workspace/storage";
+
+import { canReadConversationAsset } from "@/modules/chat/conversation-asset-access";
 
 const paramsSchema = z.object({
   projectId: z.uuid(),
@@ -29,19 +28,6 @@ const previewCsp = [
   "base-uri 'none'",
   "form-action 'none'",
 ].join("; ");
-
-async function canRevealPreviewToken(
-  metadata: Awaited<ReturnType<typeof getCodeWorkspace>>,
-  userId: string,
-) {
-  if (metadata.createdByUserId !== userId) return false;
-  const forbidden = await requireWorkspacePermissionAsync(
-    userId,
-    metadata.workspaceId,
-    "agents.chat",
-  );
-  return !forbidden;
-}
 
 function arrayBufferFromBytes(bytes: Uint8Array) {
   const buffer = new ArrayBuffer(bytes.byteLength);
@@ -146,12 +132,18 @@ export async function GET(
         return NextResponse.json({ error: "Invalid request" }, { status: 400 });
       }
       const metadata = await getCodeWorkspace(parsed.data.projectId);
+      if (
+        !(await canReadConversationAsset(
+          metadata,
+          session.user.id,
+          "code_workspace",
+        ))
+      ) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
       const segments = parsed.data.path ?? [];
       const [previewToken, ...filePathSegments] = segments;
       if (previewToken !== metadata.previewToken) {
-        if (!(await canRevealPreviewToken(metadata, session.user.id))) {
-          return NextResponse.json({ error: "Not found" }, { status: 404 });
-        }
         const legacyPath = segments.join("/") || metadata.rootFile || "";
         const encodedLegacyPath = legacyPath
           .split("/")

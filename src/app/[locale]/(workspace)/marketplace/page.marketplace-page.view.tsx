@@ -1,3 +1,4 @@
+import { ResourcePackageImport } from "@/components/marketplace/resource-package-import";
 import { DestructiveConfirmationDialog } from "@/components/destructive-confirmation-dialog";
 import { ResourceShareDialog } from "@/components/marketplace/resource-share-dialog";
 import { PageEmptyState } from "@/components/page-empty-state";
@@ -55,6 +56,9 @@ export function MarketplacePageView({ model }: { model: Model }) {
     <WorkspacePage
       title={tMarketplace("title")}
       description={tMarketplace("description")}
+      actions={
+        <ResourcePackageImport key={workspaceId} workspaceId={workspaceId} />
+      }
     >
       {!hasMarketplaceItems ? (
         <PageEmptyState

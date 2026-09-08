@@ -95,13 +95,21 @@ export async function shareMarketplaceItem(input: {
     .from(users)
     .where(eq(users.id, input.targetUserId))
     .limit(1);
-  if (!targetUser) throw new Error("Target user not found");
+  if (!targetUser || targetUser.banned)
+    throw new Error("Target user not found");
 
   const [share] = await db
     .insert(marketplaceItemShares)
     .values({
       itemId: input.itemId,
       sharedWithUserId: input.targetUserId,
+    })
+    .onConflictDoUpdate({
+      target: [
+        marketplaceItemShares.itemId,
+        marketplaceItemShares.sharedWithUserId,
+      ],
+      set: { sharedAt: new Date() },
     })
     .returning();
 

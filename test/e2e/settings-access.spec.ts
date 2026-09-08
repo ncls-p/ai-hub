@@ -1,3 +1,4 @@
+import { retryRateLimitedAuth } from "./fixtures.auth-rate-limit";
 import { expect, test } from "@playwright/test";
 import {
   e2eMember,
@@ -52,10 +53,12 @@ test("a standard member can find personal settings and change their password", a
         ),
       )
       .toBe(true);
-    const signIn = await page.request.post("/api/auth/sign-in/email", {
-      headers: { Origin: new URL(page.url()).origin },
-      data: { email: e2eMember.email, password: newPassword },
-    });
+    const signIn = await retryRateLimitedAuth(() =>
+      page.request.post("/api/auth/sign-in/email", {
+        headers: { Origin: new URL(page.url()).origin },
+        data: { email: e2eMember.email, password: newPassword },
+      }),
+    );
     expect(signIn.status(), await signIn.text()).toBe(200);
     const forbidden = await page.request.get("/api/admin/users");
     expect(forbidden.status()).toBe(403);

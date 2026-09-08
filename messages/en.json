@@ -225,14 +225,19 @@
       "publicFailed": "Unable to update the public link",
       "copyPublicLink": "Copy public link",
       "copied": "Public link copied",
-      "ephemeralCannotShare": "Temporary conversations cannot be shared."
+      "ephemeralCannotShare": "Temporary conversations cannot be shared.",
+      "publicFiles": "Include downloadable files",
+      "publicFilesDescription": "Anyone with this link can download the attached files and code ZIPs. Files are excluded by default.",
+      "retry": "Retry",
+      "copyFailed": "Unable to copy the link"
     },
     "publicConversation": {
       "loading": "Loading shared conversation…",
       "notFound": "This shared conversation is unavailable.",
       "sharedBy": "Shared conversation with {agent}",
       "readOnly": "Public read-only view",
-      "user": "User"
+      "user": "User",
+      "download": "Download {name}"
     },
     "configureProvider": "Connect AI",
     "enabledTools": "{count} tools enabled",
@@ -359,7 +364,13 @@
       "configureAssistant": "Configure assistant",
       "codeFiles": "ZIP/code",
       "images": "Images",
-      "documents": "PDF/Word/PPTX/MD"
+      "documents": "PDF/Word/PPTX/MD",
+      "editPastedText": "Edit pasted text",
+      "restorePastedText": "Move text to message",
+      "pastedTextEditHint": "Edit the full pasted text, then save the attachment or move it back into your message.",
+      "pastedTextContent": "Pasted text",
+      "savePastedText": "Save attachment",
+      "pastedTextLoadFailed": "The pasted text could not be loaded. Your attachment has been kept."
     },
     "sidebar": {
       "workspace": "Workspace",
@@ -1692,7 +1703,16 @@
     "reindexAllConfirmDescription": "All documents in {name} will be queued and re-embedded with the current model configuration. This can take a while for large collections.",
     "reindexQueued": "{count, plural, =0 {No documents to reindex} one {# document queued for reindexing} other {# documents queued for reindexing}}",
     "reindexFailed": "Failed to reindex",
-    "toastDocumentReindexed": "Document queued for reindexing"
+    "toastDocumentReindexed": "Document queued for reindexing",
+    "originalPreviewDescription": "Original uploaded file.",
+    "downloadOriginal": "Download original",
+    "originalPreviewUnsupported": "This format cannot be previewed in your browser. Download the original file to open it.",
+    "originalPreviewFailed": "The original file could not be loaded.",
+    "downloadOriginalAria": "Download {name}",
+    "renameAria": "Rename {name}",
+    "renameDocument": "Rename document",
+    "renameDescription": "Change the file name without changing its contents or indexing.",
+    "renameFailed": "The document could not be renamed."
   },
   "tools": {
     "title": "Tools & integrations",
@@ -4122,5 +4142,29 @@
       "deleted": "Task deleted",
       "deleteFailed": "Unable to delete task"
     }
+  },
+  "resourcePackage": {
+    "import": "Import JSON",
+    "export": "Export JSON",
+    "exportDescription": "Download this resource with its bundled skills, tools, MCP servers and specialists. Connection credentials are excluded.",
+    "description": "Choose a Maiah JSON package, review its contents, then create copies in the current project.",
+    "file": "JSON resource package",
+    "tooLarge": "The file must be smaller than 10 MB.",
+    "failed": "The resource package could not be processed.",
+    "imported": "Imported {name}",
+    "copies": "New copies are created. Existing resources and permissions are preserved. Review imported integrations before using them.",
+    "credentials": "Connection credentials must be configured in this project.",
+    "models": "Models to check after import: {names}. Only matching connections in this project can be reused.",
+    "knowledge": "Knowledge bases to reconnect: {names}. The package contains their references, without their documents.",
+    "cancel": "Cancel",
+    "preview": "Review package",
+    "confirm": "Import resources",
+    "types": {
+      "agent": "Assistant",
+      "skill": "Skill",
+      "mcp_preset": "MCP server",
+      "custom_tool": "Custom tool"
+    },
+    "recipientEmail": "Recipient email"
   }
 }

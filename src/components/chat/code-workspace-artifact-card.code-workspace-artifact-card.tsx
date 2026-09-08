@@ -51,6 +51,7 @@ export function useCodeWorkspaceArtifactCardController({
     initialCodeWorkspacePath(artifact, initialPath),
   );
   const [content, setContent] = useState("");
+  const [canEdit, setCanEdit] = useState(false);
   const [fileReloadKey, setFileReloadKey] = useState(0);
   const [loadingFile, setLoadingFile] = useState(false);
   const [savingFile, setSavingFile] = useState(false);
@@ -161,14 +162,11 @@ export function useCodeWorkspaceArtifactCardController({
   }, [currentArtifact, selectedPath]);
 
   useEffect(() => {
-    if (!selectedPath || selectedFile?.binary) {
-      queueMicrotask(() => setContent(""));
-      return;
-    }
-    const filePath = selectedPath;
+    const filePath = selectedFile?.binary ? null : selectedPath;
     let cancelled = false;
     async function loadSelectedFile() {
       setLoadingFile(true);
+      setCanEdit(false);
       setError(null);
       try {
         const fileContent = await loadCodeWorkspaceFileContent(
@@ -176,7 +174,10 @@ export function useCodeWorkspaceArtifactCardController({
           filePath,
           t("loadFileFailed"),
         );
-        if (!cancelled) setContent(fileContent);
+        if (!cancelled) {
+          setContent(fileContent.content);
+          setCanEdit(fileContent.canEdit);
+        }
       } catch (loadError) {
         if (!cancelled) {
           setError(
@@ -202,7 +203,7 @@ export function useCodeWorkspaceArtifactCardController({
   ]);
 
   async function saveSelectedFile() {
-    if (!selectedPath || selectedFile?.binary) return;
+    if (!canEdit || !selectedPath || selectedFile?.binary) return;
     setSavingFile(true);
     setError(null);
     try {
@@ -225,7 +226,7 @@ export function useCodeWorkspaceArtifactCardController({
   }
 
   async function deleteSelectedFile() {
-    if (!deletePath) return;
+    if (!canEdit || !deletePath) return;
     setSavingFile(true);
     setError(null);
     try {
@@ -252,6 +253,7 @@ export function useCodeWorkspaceArtifactCardController({
 
   return {
     kind: "ready",
+    canEdit,
     content,
     currentArtifact,
     deletePath,

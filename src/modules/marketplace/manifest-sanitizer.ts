@@ -1,3 +1,8 @@
+import {
+  sanitizeManifestJsonSchema,
+  isManifestJsonSchemaKey,
+} from "./manifest-json-schema";
+import { sanitizePortableConnection } from "./portable-connection";
 import type { MarketplaceManifest } from "./manifest-types";
 
 const BLOCKED_MANIFEST_KEYS = new Set([
@@ -21,7 +26,7 @@ function normalizedKey(key: string) {
   return key.replace(/[^a-z0-9]/gi, "").toLowerCase();
 }
 
-function isSecretKey(key: string) {
+export function isMarketplaceSecretKey(key: string) {
   const normalized = normalizedKey(key);
   return (
     BLOCKED_MANIFEST_KEYS.has(normalized) ||
@@ -38,8 +43,30 @@ function sanitizeValue(value: unknown): unknown {
 
   const sanitized: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
-    if (isSecretKey(key)) continue;
-    sanitized[key] = sanitizeValue(child);
+    if (isMarketplaceSecretKey(key)) continue;
+    sanitized[key] = isManifestJsonSchemaKey(key)
+      ? sanitizeManifestJsonSchema(child)
+      : sanitizeValue(child);
+  }
+  if (typeof sanitized.transport === "string") {
+    const connection = sanitizePortableConnection({
+      url: typeof sanitized.url === "string" ? sanitized.url : undefined,
+      args:
+        Array.isArray(sanitized.args) &&
+        sanitized.args.every((arg) => typeof arg === "string")
+          ? sanitized.args
+          : undefined,
+    });
+    if (connection.url !== undefined) sanitized.url = connection.url;
+    if (connection.args !== undefined) sanitized.args = connection.args;
+    if (connection.redacted) sanitized.requiresCredentials = true;
+  }
+  if (typeof sanitized.n8nWorkflowUrl === "string") {
+    const connection = sanitizePortableConnection({
+      url: sanitized.n8nWorkflowUrl,
+    });
+    sanitized.n8nWorkflowUrl = connection.url;
+    if (connection.redacted) sanitized.requiresCredentials = true;
   }
   return sanitized;
 }
@@ -61,6 +88,10 @@ export function containsMarketplaceSecretMaterial(value: unknown): boolean {
 
   return Object.entries(value).some(
     ([key, child]) =>
-      isSecretKey(key) || containsMarketplaceSecretMaterial(child),
+      isMarketplaceSecretKey(key) ||
+      (isManifestJsonSchemaKey(key)
+        ? JSON.stringify(child) !==
+          JSON.stringify(sanitizeManifestJsonSchema(child))
+        : containsMarketplaceSecretMaterial(child)),
   );
 }

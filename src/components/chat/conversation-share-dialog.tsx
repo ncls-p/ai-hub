@@ -1,10 +1,9 @@
 "use client";
 
 import { CopyIcon, Globe2Icon, Share2Icon, Trash2Icon } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { useConversationSharing } from "./use-conversation-sharing";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,113 +31,32 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useReleaseBodyPointerEvents } from "./use-release-body-pointer-events";
 
-type ShareRow = {
-  userId: string;
-  name: string;
-  email: string;
-  canContinue: boolean;
-  continuationMode: "shared" | "fork";
-};
-
-type SharePayload = {
-  shares: ShareRow[];
-  publicShareId: string | null;
-  isEphemeral: boolean;
-};
-
 export function ConversationShareDialog({
   conversationId,
 }: {
   conversationId: string;
 }) {
-  const t = useTranslations("chat.share");
-  const locale = useLocale();
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [payload, setPayload] = useState<SharePayload | null>(null);
-  const [email, setEmail] = useState("");
-  const [canContinue, setCanContinue] = useState(false);
-  const [continuationMode, setContinuationMode] = useState<"shared" | "fork">(
-    "fork",
-  );
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `/api/workspace/conversations/${conversationId}/share`,
-      );
-      if (!response.ok) throw new Error(t("loadFailed"));
-      setPayload((await response.json()) as SharePayload);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("loadFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [conversationId, t]);
-
-  useEffect(() => {
-    if (open) queueMicrotask(() => void load());
-  }, [open, load]);
+  const {
+    t,
+    open,
+    setOpen,
+    loading,
+    saving,
+    payload,
+    error,
+    load,
+    email,
+    setEmail,
+    canContinue,
+    setCanContinue,
+    continuationMode,
+    setContinuationMode,
+    publicUrl,
+    addShare,
+    removeShare,
+    setPublic,
+  } = useConversationSharing(conversationId);
   useReleaseBodyPointerEvents(open);
-
-  async function addShare() {
-    if (!email.trim()) return;
-    setSaving(true);
-    try {
-      const response = await fetch(
-        `/api/workspace/conversations/${conversationId}/share`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            targetEmail: email.trim(),
-            canContinue,
-            continuationMode,
-          }),
-        },
-      );
-      const data = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      if (!response.ok) throw new Error(data?.error || t("saveFailed"));
-      setEmail("");
-      await load();
-      toast.success(t("shared"));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("saveFailed"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function removeShare(userId: string) {
-    const response = await fetch(
-      `/api/workspace/conversations/${conversationId}/share?userId=${userId}`,
-      { method: "DELETE" },
-    );
-    if (!response.ok) return toast.error(t("removeFailed"));
-    await load();
-  }
-
-  async function setPublic(nextPublic: boolean) {
-    const response = await fetch(
-      `/api/workspace/conversations/${conversationId}/share`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ public: nextPublic }),
-      },
-    );
-    if (!response.ok) return toast.error(t("publicFailed"));
-    await load();
-  }
-
-  const publicUrl =
-    payload?.publicShareId && typeof window !== "undefined"
-      ? `${window.location.origin}/${locale}/share/${payload.publicShareId}`
-      : null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -158,6 +76,14 @@ export function ConversationShareDialog({
           <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>{t("description")}</DialogDescription>
         </DialogHeader>
+        {error && (
+          <div role="alert">
+            <p>{error}</p>
+            <Button variant="outline" onClick={() => void load()}>
+              {t("retry")}
+            </Button>
+          </div>
+        )}
         {loading && !payload ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             {t("loading")}
@@ -221,7 +147,12 @@ export function ConversationShareDialog({
             ) : null}
             <Button
               type="button"
-              disabled={saving || !email.trim()}
+              disabled={
+                saving ||
+                loading ||
+                payload.isEphemeral ||
+                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+              }
               onClick={() => void addShare()}
             >
               <Share2Icon data-icon="inline-start" aria-hidden="true" />
@@ -254,6 +185,7 @@ export function ConversationShareDialog({
                       variant="ghost"
                       size="icon"
                       aria-label={t("remove")}
+                      disabled={saving || loading}
                       onClick={() => void removeShare(share.userId)}
                     >
                       <Trash2Icon aria-hidden="true" />
@@ -279,11 +211,29 @@ export function ConversationShareDialog({
               </div>
               <Switch
                 id="conversation-public"
-                disabled={payload.isEphemeral}
+                disabled={payload.isEphemeral || saving || loading}
                 checked={Boolean(payload.publicShareId)}
                 onCheckedChange={(checked) => void setPublic(checked)}
               />
             </Field>
+            {publicUrl && (
+              <Field orientation="horizontal">
+                <div className="flex-1">
+                  <FieldLabel htmlFor="conversation-public-files">
+                    {t("publicFiles")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {t("publicFilesDescription")}
+                  </FieldDescription>
+                </div>
+                <Switch
+                  id="conversation-public-files"
+                  checked={payload.publicShareIncludesFiles}
+                  disabled={saving || loading}
+                  onCheckedChange={(checked) => void setPublic(true, checked)}
+                />
+              </Field>
+            )}
             {publicUrl ? (
               <Button
                 type="button"
@@ -292,6 +242,7 @@ export function ConversationShareDialog({
                   void navigator.clipboard
                     .writeText(publicUrl)
                     .then(() => toast.success(t("copied")))
+                    .catch(() => toast.error(t("copyFailed")))
                 }
               >
                 <CopyIcon data-icon="inline-start" aria-hidden="true" />

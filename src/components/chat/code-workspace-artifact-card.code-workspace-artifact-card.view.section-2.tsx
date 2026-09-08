@@ -46,6 +46,7 @@ export function CodeWorkspaceArtifactCardSection2({
     paneId,
     popoutWindows,
     saveSelectedFile,
+    canEdit,
     savingFile,
     selectedFile,
     selectedPath,
@@ -181,7 +182,12 @@ export function CodeWorkspaceArtifactCardSection2({
                 variant={OUTLINE_VARIANT}
                 size="sm"
                 className="h-7 px-2 text-[11px]"
-                disabled={!selectedPath || selectedFile?.binary || savingFile}
+                disabled={
+                  !canEdit ||
+                  !selectedPath ||
+                  selectedFile?.binary ||
+                  savingFile
+                }
                 onClick={() => void saveSelectedFile()}
               >
                 <SaveIcon className={COMPACT_ICON_CLASS} aria-hidden="true" />
@@ -192,7 +198,7 @@ export function CodeWorkspaceArtifactCardSection2({
                 variant={GHOST_VARIANT}
                 size="sm"
                 className="h-7 px-2 text-[11px] text-destructive hover:text-destructive"
-                disabled={!selectedPath || savingFile}
+                disabled={!canEdit || !selectedPath || savingFile}
                 onClick={() => setDeletePath(selectedPath)}
                 aria-label={t("deleteFile")}
               >
@@ -213,7 +219,7 @@ export function CodeWorkspaceArtifactCardSection2({
             <CodeWorkspaceEditor
               value={loadingFile ? t("loadingFile") : content}
               filePath={selectedPath}
-              disabled={!selectedPath || loadingFile || savingFile}
+              disabled={!canEdit || !selectedPath || loadingFile || savingFile}
               onChange={setContent}
             />
           )}

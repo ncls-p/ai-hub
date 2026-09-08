@@ -119,5 +119,8 @@ export async function listResourceShareTargets(
     pendingVersionIds = delegations.map(({ versionId }) => versionId);
   }
 
+  if (pendingVersionIds.some((id) => !visitedVersionIds.has(id))) {
+    throw new Error("The dependency graph is too deep to share completely");
+  }
   return [...targets.values()];
 }

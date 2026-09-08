@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { encryptValue } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
 import { enqueueDocumentIngestion } from "@/modules/knowledge/queue";
@@ -70,83 +71,76 @@ export async function ingestTextDocument(input: {
 
   const config = await effectiveRagConfig(knowledgeBase.ragConfigJson);
   const chunks = chunkText(input.content, config.chunking);
-  const document = await db.transaction(async (tx) => {
-    const [document] = await tx
-      .insert(documents)
-      .values({
-        workspaceId: input.workspaceId,
-        knowledgeBaseId: input.knowledgeBaseId,
-        title: input.title,
-        sourceType: input.sourceType ?? "text",
-        mimeType: input.mimeType ?? "text/plain",
-        status: "processing",
-        processingProgress: 20,
-        processingStage: "chunked",
-        createdById: input.userId,
-      })
-      .returning();
-
-    if (chunks.length > 0) {
-      await tx.insert(documentChunks).values(
-        await Promise.all(
-          chunks.map(async (chunk, index) => ({
-            documentId: document.id,
-            chunkIndex: index,
-            contentEncrypted: await encryptValue(chunk),
-            tokenCount: Math.ceil(chunk.length / 4),
-            metadataJson: { source: input.sourceType ?? "text" },
-          })),
-        ),
-      );
-    }
-
-    if (chunks.length === 0) {
-      const [failed] = await tx
-        .update(documents)
-        .set({
-          status: "failed",
-          processingProgress: 100,
-          processingStage: "failed",
-          errorMessage: "Document was empty",
-          updatedAt: new Date(),
-        })
-        .where(eq(documents.id, document.id))
-        .returning();
-      return failed;
-    }
-
-    return document;
-  });
-
-  if (
-    input.originalBytes &&
-    (input.originalMimeType === "application/pdf" ||
-      input.title.toLowerCase().endsWith(".pdf"))
-  ) {
-    try {
-      const objectStorageKey = `knowledge/${input.workspaceId}/${document.id}/source.pdf`;
-      await storage.upload(
-        objectStorageKey,
-        input.originalBytes,
-        "application/pdf",
-      );
-      await db
-        .update(documents)
-        .set({
+  const documentId = randomUUID();
+  const objectStorageKey = input.originalBytes
+    ? `knowledge/${input.workspaceId}/${documentId}/source`
+    : null;
+  if (objectStorageKey && input.originalBytes)
+    await storage.upload(
+      objectStorageKey,
+      input.originalBytes,
+      input.mimeType ?? input.originalMimeType,
+    );
+  let document;
+  try {
+    document = await db.transaction(async (tx) => {
+      const [document] = await tx
+        .insert(documents)
+        .values({
+          id: documentId,
           objectStorageKey,
-          mimeType: "application/pdf",
-          updatedAt: new Date(),
+          workspaceId: input.workspaceId,
+          knowledgeBaseId: input.knowledgeBaseId,
+          title: input.title,
+          sourceType: input.sourceType ?? "text",
+          mimeType: input.mimeType ?? "text/plain",
+          status: "processing",
+          processingProgress: 20,
+          processingStage: "chunked",
+          createdById: input.userId,
         })
-        .where(eq(documents.id, document.id));
-    } catch (error) {
-      logger.warn(
-        "Knowledge PDF source could not be stored for native preview",
-        {
-          documentId: document.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
-    }
+        .returning();
+
+      if (chunks.length > 0) {
+        await tx.insert(documentChunks).values(
+          await Promise.all(
+            chunks.map(async (chunk, index) => ({
+              documentId: document.id,
+              chunkIndex: index,
+              contentEncrypted: await encryptValue(chunk),
+              tokenCount: Math.ceil(chunk.length / 4),
+              metadataJson: { source: input.sourceType ?? "text" },
+            })),
+          ),
+        );
+      }
+
+      if (chunks.length === 0) {
+        const [failed] = await tx
+          .update(documents)
+          .set({
+            status: "failed",
+            processingProgress: 100,
+            processingStage: "failed",
+            errorMessage: "Document was empty",
+            updatedAt: new Date(),
+          })
+          .where(eq(documents.id, document.id))
+          .returning();
+        return failed;
+      }
+
+      return document;
+    });
+  } catch (error) {
+    if (objectStorageKey)
+      await storage.delete(objectStorageKey).catch((cleanupError) => {
+        logger.warn("Original document cleanup failed", {
+          documentId,
+          error: String(cleanupError),
+        });
+      });
+    throw error;
   }
 
   await audit.emit({

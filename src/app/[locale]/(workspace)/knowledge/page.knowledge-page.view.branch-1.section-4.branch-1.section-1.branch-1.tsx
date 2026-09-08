@@ -1,19 +1,10 @@
-import { Badge } from "@/components/ui/badge";
+import { KnowledgeDocumentRow } from "./page.document-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  EyeIcon,
-  FileTextIcon,
-  RefreshCwIcon,
-  RotateCcwIcon,
-  SearchIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import type { KnowledgePageViewModel } from "./page.knowledge-page.view";
-import { statusLabel, statusVariant } from "./page.status-variant";
+import { statusLabel } from "./page.status-variant";
 export function KnowledgeDocumentTableBranch1({
   model,
 }: {
@@ -26,15 +17,10 @@ export function KnowledgeDocumentTableBranch1({
     documentPageCount,
     documentSearch,
     documentTotalCount,
-    openDocumentPreview,
-    reindexDocument,
-    retryDocument,
     safeDocumentPage,
-    selectedBaseCanEdit,
     setDocumentFilter,
     setDocumentPage,
     setDocumentSearch,
-    setPendingDelete,
     t,
     visibleDocuments,
   } = model;
@@ -121,139 +107,7 @@ export function KnowledgeDocumentTableBranch1({
       ) : (
         <div className="divide-y divide-border/55">
           {visibleDocuments.map((doc) => (
-            <article
-              key={doc.id}
-              className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 px-3 py-2.5 transition-colors hover:bg-muted/25 sm:gap-3"
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/55 bg-background text-muted-foreground">
-                <FileTextIcon className="size-3.5" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <button
-                    type="button"
-                    className="min-w-0 truncate text-left text-xs font-medium hover:text-primary disabled:cursor-default disabled:hover:text-foreground"
-                    disabled={doc.status !== "ready"}
-                    onClick={() => void openDocumentPreview(doc.id)}
-                  >
-                    {doc.title}
-                  </button>
-                  <span className="hidden shrink-0 text-[0.65rem] text-muted-foreground sm:inline">
-                    {new Date(doc.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <div
-                    className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-muted sm:max-w-44"
-                    role="progressbar"
-                    aria-label={t("documentProgress", {
-                      name: doc.title,
-                    })}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={doc.processingProgress}
-                  >
-                    <div
-                      className={cn(
-                        "h-full rounded-full transition-[width] duration-500",
-                        doc.status === "failed"
-                          ? "bg-destructive"
-                          : "bg-primary",
-                      )}
-                      style={{
-                        width: `${doc.processingProgress}%`,
-                      }}
-                    />
-                  </div>
-                  <span className="w-8 text-right text-[0.65rem] tabular-nums text-muted-foreground">
-                    {doc.processingProgress}%
-                  </span>
-                  <span className="hidden truncate text-[0.65rem] text-muted-foreground md:inline">
-                    {t(`processingStage.${doc.processingStage}`)}
-                  </span>
-                </div>
-                {doc.errorMessage ? (
-                  <p
-                    className={cn(
-                      "mt-1 truncate text-[0.65rem]",
-                      doc.status === "ready"
-                        ? "text-warning"
-                        : "text-destructive",
-                    )}
-                    title={doc.errorMessage}
-                  >
-                    {doc.errorMessage}
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Badge
-                  variant={statusVariant(doc.status)}
-                  className="hidden text-[0.62rem] sm:inline-flex"
-                >
-                  {statusLabel(doc.status, t)}
-                </Badge>
-                {doc.status === "ready" ? (
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={t("previewAria", {
-                      name: doc.title,
-                    })}
-                    onClick={() => void openDocumentPreview(doc.id)}
-                  >
-                    <EyeIcon aria-hidden="true" />
-                  </Button>
-                ) : null}
-                {selectedBaseCanEdit && doc.status === "failed" ? (
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={t("retryAria", {
-                      name: doc.title,
-                    })}
-                    onClick={() => void retryDocument(doc.id)}
-                  >
-                    <RefreshCwIcon aria-hidden="true" />
-                  </Button>
-                ) : null}
-                {selectedBaseCanEdit ? (
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={doc.status === "processing"}
-                    aria-label={t("reindexAria", {
-                      name: doc.title,
-                    })}
-                    onClick={() => void reindexDocument(doc.id)}
-                  >
-                    <RotateCcwIcon aria-hidden="true" />
-                  </Button>
-                ) : null}
-                {selectedBaseCanEdit ? (
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={t("deleteAria", {
-                      name: doc.title,
-                    })}
-                    onClick={() =>
-                      setPendingDelete({
-                        kind: "document",
-                        id: doc.id,
-                        name: doc.title,
-                      })
-                    }
-                  >
-                    <Trash2Icon aria-hidden="true" />
-                  </Button>
-                ) : null}
-              </div>
-            </article>
+            <KnowledgeDocumentRow key={doc.id} doc={doc} model={model} />
           ))}
         </div>
       )}

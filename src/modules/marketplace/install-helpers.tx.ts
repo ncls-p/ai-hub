@@ -55,7 +55,7 @@ export async function resolveProviderId(
       .limit(1);
     if (byName) return byName.id;
   }
-  return providerId ?? null;
+  return null;
 }
 
 export async function resolveModelId(
@@ -64,7 +64,7 @@ export async function resolveModelId(
   modelId: string | null | undefined,
   modelName: string | null | undefined,
 ) {
-  if (!providerId) return modelId ?? null;
+  if (!providerId) return null;
   if (modelId) {
     const [byId] = await tx
       .select({ id: aiModels.id })
@@ -89,7 +89,7 @@ export async function resolveModelId(
       .limit(1);
     if (byName) return byName.id;
   }
-  return modelId ?? null;
+  return null;
 }
 
 export async function installMcpPreset(

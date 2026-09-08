@@ -26,7 +26,11 @@ test.describe("chat page", () => {
   test("routes code and generic ZIP files through their matching upload flows", async ({
     page,
   }) => {
-    await ensureE2EAssistant();
+    const { workspaceId } = await ensureE2EAssistant();
+    const selection = await page.request.patch("/api/workspaces", {
+      data: { workspaceId },
+    });
+    expect(selection.ok()).toBe(true);
     let codeUploads = 0;
     let attachmentUploads = 0;
     await page.route("**/api/workspace/code-projects/upload", async (route) => {
@@ -65,13 +69,22 @@ test.describe("chat page", () => {
     );
 
     await page.goto("/en/chat");
-    const fileInput = page.locator('[data-slot="chat-composer-file-input"]');
+    const uploadButton = page.getByRole("button", {
+      name: "Upload files",
+      exact: true,
+    });
     const codeZip = new JSZip();
     codeZip.file(
       "entrypoints/content.tsx",
       "export const Content = () => null;",
     );
-    await fileInput.setInputFiles({
+    // Open the real picker so the composer must be ready and interactive before
+    // files are selected; the hidden SSR input can exist before its handlers.
+    const [codePicker] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      uploadButton.click(),
+    ]);
+    await codePicker.setFiles({
       name: "code.zip",
       mimeType: "application/zip",
       buffer: await codeZip.generateAsync({ type: "nodebuffer" }),
@@ -85,7 +98,11 @@ test.describe("chat page", () => {
     const genericZip = new JSZip();
     genericZip.file("documents/notes.txt", "Notes");
     genericZip.file("documents/report.pdf", "%PDF-1.4");
-    await fileInput.setInputFiles({
+    const [documentPicker] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      uploadButton.click(),
+    ]);
+    await documentPicker.setFiles({
       name: "documents.zip",
       mimeType: "application/zip",
       buffer: await genericZip.generateAsync({ type: "nodebuffer" }),

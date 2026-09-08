@@ -1,3 +1,6 @@
+vi.mock("@/modules/resource-package/permissions", () => ({
+  requirePackageInstallPermissions: vi.fn().mockResolvedValue(undefined),
+}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const helperMocks = vi.hoisted(() => ({
@@ -284,6 +287,9 @@ describe("marketplace draft creation", () => {
       ids.workspaceId,
       "Agent",
       "Desc",
+      undefined,
+      undefined,
+      ids.userId,
     );
     expect(helperMocks.upsertMarketplaceDraft).toHaveBeenCalledWith(
       expect.objectContaining({ type: "agent", status: "published" }),

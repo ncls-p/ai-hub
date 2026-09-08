@@ -127,6 +127,8 @@ export async function POST(
                 content: file.content,
                 sourceType: "upload",
                 mimeType: file.mimeType,
+                originalBytes: file.originalBytes,
+                originalMimeType: file.originalMimeType,
               }),
             );
           }

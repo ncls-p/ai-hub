@@ -1,3 +1,4 @@
+import { ResourcePackageError } from "@/modules/resource-package/schema";
 import {
   handleRoute,
   requireWorkspacePermissionAsync,
@@ -72,6 +73,11 @@ export async function GET(req: NextRequest) {
     {
       logLabel: "Failed to get publish preview",
       expectedError: (error) => {
+        if (error instanceof ResourcePackageError)
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.status },
+          );
         const message =
           error instanceof Error ? error.message : "Internal server error";
         return NextResponse.json(

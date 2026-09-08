@@ -1,3 +1,6 @@
+import { db } from "@/server/infrastructure/db";
+import { users } from "@/server/infrastructure/db/schema";
+import { eq } from "drizzle-orm";
 import { requireMarketplaceItemMutationPermission } from "@/app/api/marketplace/items/marketplace-route-auth";
 import { handleRoute } from "@/lib/route-handler";
 import {
@@ -7,7 +10,12 @@ import {
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-const shareSchema = z.object({ targetUserId: z.uuid() });
+const shareSchema = z.union([
+  z.strictObject({ targetUserId: z.uuid() }),
+  z.strictObject({
+    targetEmail: z.string().trim().toLowerCase().pipe(z.email()),
+  }),
+]);
 
 function marketplaceErrorHandler(error: unknown) {
   const message =
@@ -40,10 +48,25 @@ export async function POST(
           { status: 400 },
         );
 
+      const targetUserId =
+        "targetUserId" in parsed.data
+          ? parsed.data.targetUserId
+          : (
+              await db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, parsed.data.targetEmail))
+                .limit(1)
+            )[0]?.id;
+      if (!targetUserId)
+        return NextResponse.json(
+          { error: "Target user not found" },
+          { status: 404 },
+        );
       const share = await shareMarketplaceItem({
         itemId,
         userId: session.user.id,
-        targetUserId: parsed.data.targetUserId,
+        targetUserId,
       });
       return NextResponse.json(share);
     },

@@ -18,6 +18,7 @@ export function CodeWorkspaceArtifactCardSection3({
   model: CodeWorkspaceArtifactCardViewModel;
 }) {
   const {
+    canEdit,
     currentArtifact,
     paneId,
     setPublishOpen,
@@ -92,6 +93,7 @@ export function CodeWorkspaceArtifactCardSection3({
           variant={OUTLINE_VARIANT}
           size="sm"
           className="h-10 rounded-xl px-3 text-[11px]"
+          disabled={!canEdit}
           onClick={() => setPublishOpen(true)}
         >
           <GithubIcon className={COMPACT_ICON_CLASS} aria-hidden="true" />

@@ -1,3 +1,4 @@
+import { requirePackageInstallPermissions } from "@/modules/resource-package/permissions";
 import { logHandledError } from "@/lib/logger";
 import { audit } from "@/server/domain/services/audit";
 import { db } from "@/server/infrastructure/db";
@@ -36,6 +37,11 @@ export async function installMarketplaceItem(input: {
     if (!version) throw new Error("Marketplace item has no version");
 
     const manifest = sanitizeMarketplaceManifest(version.manifestJson);
+    await requirePackageInstallPermissions(
+      manifest,
+      input.workspaceId,
+      input.userId,
+    );
     const postInstall = installPostInstallFlags(manifest);
 
     const { installedResource, install } = await db.transaction(async (tx) => {
