@@ -1,3 +1,4 @@
+import { ResourcePackageError } from "@/modules/resource-package/schema";
 import {
   handleRoute,
   requireWorkspacePermissionAsync,
@@ -69,7 +70,11 @@ export async function GET(req: NextRequest) {
     const featuredOnly =
       searchParams.get("featuredOnly") === "true" || undefined;
     const sortBy = searchParams.get("sortBy") as
-      "featured" | "newest" | "downloads" | "rating" | undefined;
+      | "featured"
+      | "newest"
+      | "downloads"
+      | "rating"
+      | undefined;
     const status = searchParams.get("status") || undefined;
     if (status && !(await isPlatformAdminSession(session))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -171,6 +176,11 @@ export async function POST(req: NextRequest) {
     {
       logLabel: "Failed to create marketplace item",
       expectedError: (error) => {
+        if (error instanceof ResourcePackageError)
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.status },
+          );
         const message =
           error instanceof Error ? error.message : "Internal server error";
         return NextResponse.json(

@@ -1,3 +1,5 @@
+import { resolveInstalledAgentModel } from "./install-agent-model";
+import { hasResourcePermissionForRequest } from "@/modules/auth/workspace-access";
 import {
   agentKnowledgeBindings,
   agents,
@@ -16,8 +18,6 @@ import { installAgentSpecialists } from "./install-helpers.install-agent-special
 import {
   installCustomTool,
   installMcpPreset,
-  resolveModelId,
-  resolveProviderId,
   slugify,
   Tx,
 } from "./install-helpers.tx";
@@ -28,8 +28,8 @@ export async function installAgentManifest(
   input: {
     workspaceId: string;
     userId: string;
-    itemId: string;
-    versionId: string;
+    itemId?: string;
+    versionId?: string;
     versionLabel: string;
     manifest: AgentMarketplaceManifest;
     itemDescription?: string | null;
@@ -99,8 +99,8 @@ export async function installAgentManifest(
       name: input.manifest.name,
       slug: `${slugify(input.manifest.name)}-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`,
       description: input.manifest.description ?? input.itemDescription,
-      visibility: "workspace",
-      sourceType: "marketplace_install",
+      visibility: input.itemId ? "workspace" : "private",
+      sourceType: input.itemId ? "marketplace_install" : "custom",
       marketplaceItemId: input.itemId,
       marketplaceVersionId: input.versionId,
       createdById: input.userId,
@@ -108,25 +108,16 @@ export async function installAgentManifest(
     })
     .returning();
 
-  const providerId = await resolveProviderId(
-    tx,
-    input.workspaceId,
-    input.manifest.agent.providerId,
-    input.manifest.agent.providerName,
-  );
-  const modelId = await resolveModelId(
-    tx,
-    providerId,
-    input.manifest.agent.modelId,
-    input.manifest.agent.modelName,
-  );
+  const { providerId, modelId } = await resolveInstalledAgentModel(tx, input);
 
   const [agentVersion] = await tx
     .insert(agentVersions)
     .values({
       agentId: installedAgent.id,
       versionNumber: 1,
-      name: `Installed from marketplace ${input.versionLabel}`,
+      name: input.itemId
+        ? `Installed from marketplace ${input.versionLabel}`
+        : "Imported from JSON",
       systemPrompt: input.manifest.agent.systemPrompt ?? null,
       providerId,
       modelId,
@@ -220,6 +211,22 @@ export async function installAgentManifest(
 
   for (const binding of input.manifest.skillBindings ?? []) {
     let skillId = skillRefToId.get(binding.ref);
+    if (!skillId && binding.bundled) {
+      const [skill] = await tx
+        .insert(agentSkills)
+        .values({
+          workspaceId: input.workspaceId,
+          createdById: input.userId,
+          name: binding.ref,
+          markdownFilesJson: binding.bundled.markdownFiles,
+          sourcePackage: binding.bundled.sourcePackage ?? null,
+          sourceSkillName: binding.bundled.sourceSkillName ?? null,
+          installCommand: binding.bundled.installCommand ?? null,
+          metadataJson: binding.bundled.metadata ?? null,
+        })
+        .returning();
+      skillId = skill.id;
+    }
     if (!skillId) {
       const [skill] = await tx
         .select({ id: agentSkills.id })
@@ -237,22 +244,6 @@ export async function installAgentManifest(
         )
         .limit(1);
       skillId = skill?.id;
-    }
-    if (!skillId && binding.bundled) {
-      const [skill] = await tx
-        .insert(agentSkills)
-        .values({
-          workspaceId: input.workspaceId,
-          createdById: input.userId,
-          name: binding.ref,
-          markdownFilesJson: binding.bundled.markdownFiles,
-          sourcePackage: binding.bundled.sourcePackage ?? null,
-          sourceSkillName: binding.bundled.sourceSkillName ?? null,
-          installCommand: binding.bundled.installCommand ?? null,
-          metadataJson: binding.bundled.metadata ?? null,
-        })
-        .returning();
-      skillId = skill.id;
     }
     if (!skillId) continue;
     await tx.insert(agentSkillBindings).values({
@@ -277,7 +268,17 @@ export async function installAgentManifest(
         ),
       )
       .limit(1);
-    if (!kb) continue;
+    if (
+      !kb ||
+      !(await hasResourcePermissionForRequest(
+        input.userId,
+        input.workspaceId,
+        "knowledgeBases.viewAllowed",
+        "knowledge_base",
+        kb.id,
+      ))
+    )
+      continue;
     await tx.insert(agentKnowledgeBindings).values({
       agentVersionId: agentVersion.id,
       knowledgeBaseId: kb.id,

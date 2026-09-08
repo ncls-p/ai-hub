@@ -17,6 +17,8 @@ export interface KnowledgeBase {
   usesDefaultRagConfig: boolean;
 }
 export interface DocumentRow {
+  mimeType?: string | null;
+  objectStorageKey?: string | null;
   id: string;
   title: string;
   status: string;

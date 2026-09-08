@@ -1,3 +1,4 @@
+import { getAuthorizedConversation } from "../conversation-route-access";
 import { handleRoute } from "@/lib/route-handler";
 import {
   listConversationShares,
@@ -18,21 +19,20 @@ const shareSchema = z.object({
   canContinue: z.boolean().default(false),
   continuationMode: z.enum(["shared", "fork"]).default("fork"),
 });
-const publicSchema = z.object({ public: z.boolean() });
+const publicSchema = z.object({
+  public: z.boolean(),
+  includeFiles: z.boolean().optional(),
+});
 
 async function getOwnedConversation(conversationId: string, userId: string) {
-  const [conversation] = await db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.id, conversationId),
-        eq(conversations.userId, userId),
-        eq(conversations.status, "active"),
-      ),
-    )
-    .limit(1);
-  return conversation ?? null;
+  const access = await getAuthorizedConversation(
+    userId,
+    Promise.resolve({ conversationId }),
+    "conversations.viewOwn",
+  );
+  return access.ok && access.access.role === "owner"
+    ? access.conversation
+    : null;
 }
 
 export async function GET(
@@ -58,6 +58,7 @@ export async function GET(
       shares: await listConversationShares(conversation.id, session.user.id),
       publicShareId: conversation.publicShareId,
       publicSharedAt: conversation.publicSharedAt,
+      publicShareIncludesFiles: conversation.publicShareIncludesFiles,
       isEphemeral: conversation.isEphemeral,
     });
   });
@@ -145,6 +146,10 @@ export async function PATCH(
       .set({
         publicShareId,
         publicSharedAt,
+        publicShareIncludesFiles:
+          parsedBody.data.public &&
+          (parsedBody.data.includeFiles ??
+            conversation.publicShareIncludesFiles),
         updatedAt: new Date(),
       })
       .where(eq(conversations.id, conversation.id));

@@ -225,14 +225,19 @@
       "publicFailed": "Impossible de modifier le lien public",
       "copyPublicLink": "Copier le lien public",
       "copied": "Lien public copié",
-      "ephemeralCannotShare": "Les conversations éphémères ne peuvent pas être partagées."
+      "ephemeralCannotShare": "Les conversations éphémères ne peuvent pas être partagées.",
+      "publicFiles": "Inclure les fichiers téléchargeables",
+      "publicFilesDescription": "Toute personne possédant ce lien pourra télécharger les pièces jointes et les ZIP de code. Les fichiers sont exclus par défaut.",
+      "retry": "Réessayer",
+      "copyFailed": "Impossible de copier le lien"
     },
     "publicConversation": {
       "loading": "Chargement de la conversation partagée…",
       "notFound": "Cette conversation partagée n’est pas disponible.",
       "sharedBy": "Conversation partagée avec {agent}",
       "readOnly": "Vue publique en lecture seule",
-      "user": "Utilisateur"
+      "user": "Utilisateur",
+      "download": "Télécharger {name}"
     },
     "configureProvider": "Connecter l’IA",
     "enabledTools": "Outils activés {count}",
@@ -359,7 +364,13 @@
       "configureAssistant": "Configurer l’assistant",
       "codeFiles": "ZIP/code",
       "images": "Images",
-      "documents": "PDF/Word/PPTX/MD"
+      "documents": "PDF/Word/PPTX/MD",
+      "editPastedText": "Modifier le texte collé",
+      "restorePastedText": "Remettre le texte dans le message",
+      "pastedTextEditHint": "Modifiez le texte collé complet, puis enregistrez la pièce jointe ou remettez le texte dans votre message.",
+      "pastedTextContent": "Texte collé",
+      "savePastedText": "Enregistrer la pièce jointe",
+      "pastedTextLoadFailed": "Le texte collé n’a pas pu être chargé. Votre pièce jointe a été conservée."
     },
     "sidebar": {
       "workspace": "Espace de travail",
@@ -1692,7 +1703,16 @@
     "reindexAllConfirmDescription": "Tous les documents de {name} seront remis en file et réindexés avec la configuration de modèles actuelle. Cela peut prendre du temps pour les grandes collections.",
     "reindexQueued": "{count, plural, =0 {Aucun document à réindexer} one {# document remis en file pour réindexation} other {# documents remis en file pour réindexation}}",
     "reindexFailed": "Échec de la réindexation",
-    "toastDocumentReindexed": "Document remis en file pour réindexation"
+    "toastDocumentReindexed": "Document remis en file pour réindexation",
+    "originalPreviewDescription": "Fichier original téléversé.",
+    "downloadOriginal": "Télécharger l’original",
+    "originalPreviewUnsupported": "Ce format ne peut pas être prévisualisé dans le navigateur. Téléchargez le fichier original pour l’ouvrir.",
+    "originalPreviewFailed": "Le fichier original n’a pas pu être chargé.",
+    "downloadOriginalAria": "Télécharger {name}",
+    "renameAria": "Renommer {name}",
+    "renameDocument": "Renommer le document",
+    "renameDescription": "Modifiez le nom du fichier sans changer son contenu ni son indexation.",
+    "renameFailed": "Le document n’a pas pu être renommé."
   },
   "tools": {
     "title": "Outils & intégrations",
@@ -4122,5 +4142,29 @@
       "deleted": "Tâche supprimée",
       "deleteFailed": "Impossible de supprimer la tâche"
     }
+  },
+  "resourcePackage": {
+    "import": "Importer un JSON",
+    "export": "Exporter en JSON",
+    "exportDescription": "Télécharger cette ressource avec ses skills, outils, serveurs MCP et spécialistes inclus. Les identifiants de connexion sont exclus.",
+    "description": "Choisissez un paquet JSON Maiah, vérifiez son contenu, puis créez des copies dans le projet actuel.",
+    "file": "Paquet de ressources JSON",
+    "tooLarge": "Le fichier doit faire moins de 10 Mo.",
+    "failed": "Le paquet de ressources n’a pas pu être traité.",
+    "imported": "{name} importé",
+    "copies": "De nouvelles copies sont créées. Les ressources et permissions existantes sont conservées. Vérifiez les intégrations importées avant de les utiliser.",
+    "credentials": "Les identifiants de connexion doivent être configurés dans ce projet.",
+    "models": "Modèles à vérifier après import : {names}. Seules les connexions correspondantes de ce projet peuvent être réutilisées.",
+    "knowledge": "Bases de connaissances à reconnecter : {names}. Le paquet contient leurs références, sans leurs documents.",
+    "cancel": "Annuler",
+    "preview": "Vérifier le paquet",
+    "confirm": "Importer les ressources",
+    "types": {
+      "agent": "Assistant",
+      "skill": "Skill",
+      "mcp_preset": "Serveur MCP",
+      "custom_tool": "Outil personnalisé"
+    },
+    "recipientEmail": "Adresse e-mail du destinataire"
   }
 }

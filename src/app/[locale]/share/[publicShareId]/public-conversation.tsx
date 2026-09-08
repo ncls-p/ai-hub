@@ -15,7 +15,7 @@ type Payload = {
   messages: Array<{
     id: string;
     role: "user" | "assistant";
-    parts: Array<{ type: string; content: string }>;
+    parts: Array<{ type: string; content: string; downloadUrl?: string }>;
   }>;
 };
 
@@ -92,7 +92,18 @@ export function PublicConversation({
                 {message.parts
                   .filter((part) => part.content.trim().length > 0)
                   .map((part, index) => (
-                    <ChatMarkdown key={index}>{part.content}</ChatMarkdown>
+                    <div key={index}>
+                      {part.type === "file" && part.downloadUrl ? (
+                        <a
+                          href={part.downloadUrl}
+                          className="block break-words py-2 text-primary underline underline-offset-4"
+                        >
+                          {t("download", { name: part.content })}
+                        </a>
+                      ) : (
+                        <ChatMarkdown>{part.content}</ChatMarkdown>
+                      )}
+                    </div>
                   ))}
               </div>
             </article>

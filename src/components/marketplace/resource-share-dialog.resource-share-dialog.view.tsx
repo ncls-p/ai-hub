@@ -18,8 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
-import { Globe, Share2, Star, User, Users } from "lucide-react";
+import { Download, Globe, Share2, User, Users } from "lucide-react";
 import {
   getVisibilityHint,
   getVisibilityLabel,
@@ -39,22 +38,22 @@ export function ResourceShareDialogView({ model }: { model: Model }) {
   const {
     busy,
     description,
-    filteredUsers,
     handlePublishToMarketplace,
     handleShareWithUser,
-    loadUsers,
+    handleExport,
+    tPackage,
     name,
     onCloseAction,
     open,
     preview,
     previewLoading,
+    previewError,
+    loadPreview,
     resource,
     resourceSubjectKey,
-    search,
     selectedUserId,
     setDescription,
     setName,
-    setSearch,
     setSelectedUserId,
     setStep,
     setTagsInput,
@@ -67,7 +66,10 @@ export function ResourceShareDialogView({ model }: { model: Model }) {
     visibility,
   } = model;
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onCloseAction()}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && !busy && onCloseAction()}
+    >
       <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -88,6 +90,14 @@ export function ResourceShareDialogView({ model }: { model: Model }) {
           </p>
         </DialogHeader>
 
+        {previewError && (
+          <div role="alert">
+            <p className="text-sm text-destructive">{previewError}</p>
+            <Button variant="outline" onClick={() => void loadPreview()}>
+              {tCommon("retry")}
+            </Button>
+          </div>
+        )}
         {previewLoading && step === "meta" ? (
           <div className="flex justify-center py-8">
             <Spinner className="size-6" />
@@ -164,6 +174,13 @@ export function ResourceShareDialogView({ model }: { model: Model }) {
         {step === "choose" ? (
           <div className="grid gap-3">
             <ShareOptionCard
+              icon={Download}
+              title={tPackage("export")}
+              description={tPackage("exportDescription")}
+              onClick={() => void handleExport()}
+              disabled={busy}
+            />
+            <ShareOptionCard
               icon={Globe}
               title={t("options.publish.title")}
               description={t("options.publish.description")}
@@ -174,57 +191,25 @@ export function ResourceShareDialogView({ model }: { model: Model }) {
               icon={Users}
               title={t("options.user.title")}
               description={t("options.user.description")}
-              onClick={() => {
-                void loadUsers().then(() => setStep("user"));
-              }}
+              onClick={() => setStep("user")}
               disabled={busy}
             />
           </div>
         ) : null}
 
         {step === "user" ? (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="share-recipient-email">
+              {tPackage("recipientEmail")}
+            </Label>
             <Input
-              aria-label={t("searchUser")}
-              placeholder={t("searchUser")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              id="share-recipient-email"
+              type="email"
+              autoComplete="email"
+              value={selectedUserId}
+              onChange={(event) => setSelectedUserId(event.target.value)}
+              disabled={busy}
             />
-            <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border/70 p-1">
-              {filteredUsers.length === 0 ? (
-                <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-                  {t("noUsers")}
-                </p>
-              ) : (
-                filteredUsers.map((user) => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm",
-                      selectedUserId === user.id
-                        ? "bg-primary/10 font-medium"
-                        : "hover:bg-muted",
-                    )}
-                    onClick={() =>
-                      setSelectedUserId(
-                        selectedUserId === user.id ? "" : user.id,
-                      )
-                    }
-                  >
-                    <span className="truncate">
-                      {user.name}{" "}
-                      <span className="text-muted-foreground">
-                        ({user.email})
-                      </span>
-                    </span>
-                    {selectedUserId === user.id ? (
-                      <Star className="size-3 shrink-0 fill-primary text-primary" />
-                    ) : null}
-                  </button>
-                ))
-              )}
-            </div>
           </div>
         ) : null}
 
@@ -239,7 +224,7 @@ export function ResourceShareDialogView({ model }: { model: Model }) {
                 {tCommon("back")}
               </Button>
               <Button
-                disabled={!name.trim() || busy}
+                disabled={!preview || previewLoading || !name.trim() || busy}
                 onClick={() => void handlePublishToMarketplace()}
               >
                 {busy ? <Spinner className="size-4 mr-1" /> : null}
@@ -263,7 +248,12 @@ export function ResourceShareDialogView({ model }: { model: Model }) {
                 {tCommon("back")}
               </Button>
               <Button
-                disabled={!selectedUserId || busy}
+                disabled={
+                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(selectedUserId.trim()) ||
+                  !preview ||
+                  previewLoading ||
+                  busy
+                }
                 onClick={() => void handleShareWithUser()}
               >
                 {busy ? <Spinner className="size-4 mr-1" /> : null}

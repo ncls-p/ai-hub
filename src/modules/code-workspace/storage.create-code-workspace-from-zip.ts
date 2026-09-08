@@ -1,3 +1,4 @@
+import { canReadSharedConversationAsset } from "@/modules/chat/conversation-asset-access";
 import JSZip from "jszip";
 import { randomUUID } from "node:crypto";
 
@@ -156,13 +157,30 @@ export function assertCodeWorkspaceAccess(
   }
 }
 
+async function assertReadableCodeWorkspace(
+  metadata: CodeWorkspaceMetadata,
+  input: { workspaceId: string; userId?: string },
+) {
+  if (metadata.workspaceId !== input.workspaceId)
+    throw new Error("Code workspace not found.");
+  if (!input.userId || metadata.createdByUserId === input.userId) return;
+  if (
+    !(await canReadSharedConversationAsset(
+      metadata,
+      input.userId,
+      "code_workspace",
+    ))
+  )
+    throw new Error("Code workspace not found.");
+}
+
 export async function listCodeWorkspaceFiles(input: {
   projectId: string;
   workspaceId: string;
   userId?: string;
 }) {
   const metadata = await getCodeWorkspace(input.projectId);
-  assertCodeWorkspaceAccess(metadata, input.workspaceId, input.userId);
+  await assertReadableCodeWorkspace(metadata, input);
   return codeWorkspaceArtifact(metadata);
 }
 
@@ -173,7 +191,7 @@ export async function readCodeWorkspaceFile(input: {
   filePath: string;
 }): Promise<CodeWorkspaceReadResult> {
   const metadata = await getCodeWorkspace(input.projectId);
-  assertCodeWorkspaceAccess(metadata, input.workspaceId, input.userId);
+  await assertReadableCodeWorkspace(metadata, input);
   const projectPath = normalizeWorkspacePath(input.filePath);
   const summary = metadata.files.find((file) => file.path === projectPath);
   if (!summary) throw new Error("File not found in code workspace.");

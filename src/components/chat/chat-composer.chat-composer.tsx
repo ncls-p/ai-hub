@@ -272,7 +272,23 @@ export function ChatComposer({
     )
       return;
     event.preventDefault();
-    void handleSelectedFiles([createPastedTextUploadFile(text)]);
+    const textarea = event.currentTarget;
+    setUploadingAttachment(true);
+    void (async () => {
+      try {
+        if (
+          (await onUploadChatAttachment(createPastedTextUploadFile(text))) !==
+          false
+        )
+          return;
+      } catch {
+        toast.error(t("unavailable"));
+      } finally {
+        setUploadingAttachment(false);
+      }
+      // Keep the original paste, including text typed while the upload ran.
+      onInputChange(textarea.value ? `${textarea.value}\n\n${text}` : text);
+    })();
   }
 
   return (
@@ -357,6 +373,23 @@ export function ChatComposer({
         onInputChange={onInputChange}
         onStop={onStop}
         onRemoveAttachment={onRemoveAttachment}
+        onEditText={
+          onUploadChatAttachment
+            ? async (id, content) => {
+                setUploadingAttachment(true);
+                try {
+                  return (
+                    (await onUploadChatAttachment(
+                      createPastedTextUploadFile(content),
+                      id,
+                    )) !== false
+                  );
+                } finally {
+                  setUploadingAttachment(false);
+                }
+              }
+            : undefined
+        }
         onPromptSuggestionClick={onPromptSuggestionClick}
         onFileChange={(event) => void handleFileChange(event)}
         onPaste={handlePaste}

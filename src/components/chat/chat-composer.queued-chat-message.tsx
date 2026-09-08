@@ -1,5 +1,6 @@
 "use client";
 
+import { PastedTextActions } from "./pasted-text-actions";
 import { FileIcon, Maximize2Icon, XIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -40,7 +41,10 @@ export interface ChatComposerProps {
   onQueuedMessageChange?: (id: string, content: string) => void;
   onQueuedMessageCancel?: (id: string) => void;
   onUploadCodeWorkspace?: (files: File[]) => Promise<void>;
-  onUploadChatAttachment?: (file: File) => Promise<void>;
+  onUploadChatAttachment?: (
+    file: File,
+    replaceAttachmentId?: string,
+  ) => Promise<boolean | void>;
   attachments?: ChatAttachment[];
   onRemoveAttachment?: (attachmentId: string) => void;
   todoList?: ChatTodoList | null;
@@ -132,7 +136,13 @@ function attachmentSubtitle(
 export function AttachmentPreview({
   attachment,
   onRemove,
+  onEditText,
+  onRestoreText,
+  disabled,
 }: {
+  disabled?: boolean;
+  onEditText?: (id: string, text: string) => Promise<boolean>;
+  onRestoreText?: (id: string, text: string) => void;
   attachment: ChatAttachment;
   onRemove?: (attachmentId: string) => void;
 }) {
@@ -177,6 +187,7 @@ export function AttachmentPreview({
             type="button"
             className="size-10 rounded-lg text-muted-foreground hover:text-foreground"
             aria-label={t("removeFile", { name: attachment.fileName })}
+            disabled={disabled}
             onClick={() => onRemove?.(attachment.id)}
           >
             <XIcon aria-hidden="true" />
@@ -200,6 +211,12 @@ export function AttachmentPreview({
           <AttachmentDescription>{subtitle}</AttachmentDescription>
         </AttachmentContent>
         <AttachmentActions>
+          <PastedTextActions
+            attachment={attachment}
+            disabled={disabled}
+            onEdit={onEditText}
+            onRestore={onRestoreText}
+          />
           {canPreview ? (
             <AttachmentAction
               type="button"
@@ -214,6 +231,7 @@ export function AttachmentPreview({
             type="button"
             className="size-10 rounded-lg text-muted-foreground hover:text-foreground"
             aria-label={t("removeFile", { name: attachment.fileName })}
+            disabled={disabled}
             onClick={() => onRemove?.(attachment.id)}
           >
             <XIcon aria-hidden="true" />

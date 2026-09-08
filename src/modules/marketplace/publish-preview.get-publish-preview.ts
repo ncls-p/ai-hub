@@ -40,7 +40,12 @@ export async function getPublishPreview(input: {
       .from(marketplaceItems)
       .where(eq(marketplaceItems.id, input.itemId))
       .limit(1);
-    if (!item) throw new Error("Marketplace item not found");
+    if (
+      !item ||
+      item.publisherUserId !== input.userId ||
+      item.publisherWorkspaceId !== input.workspaceId
+    )
+      throw new Error("Marketplace item not found");
     const [versionRow] = item.latestVersionId
       ? await db
           .select()
@@ -90,6 +95,9 @@ export async function getPublishPreview(input: {
       input.workspaceId,
       agent.name,
       agent.description,
+      undefined,
+      undefined,
+      input.userId,
     );
     name = agent.name;
     description = agent.description;

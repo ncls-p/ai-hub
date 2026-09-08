@@ -110,6 +110,8 @@ describe("getPublishPreview", () => {
           {
             id: itemId,
             name: "My Agent",
+            publisherUserId: "user-1",
+            publisherWorkspaceId: "ws-1",
             description: "desc",
             tagsJson: ["ai"],
             status: "draft",
@@ -142,6 +144,8 @@ describe("getPublishPreview", () => {
         {
           id: itemId,
           name: "Orphan Item",
+          publisherUserId: "user-1",
+          publisherWorkspaceId: "ws-1",
           description: null,
           tagsJson: null,
           status: "published",

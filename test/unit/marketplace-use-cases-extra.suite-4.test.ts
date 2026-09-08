@@ -1,3 +1,6 @@
+vi.mock("@/modules/resource-package/permissions", () => ({
+  requirePackageInstallPermissions: vi.fn().mockResolvedValue(undefined),
+}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const helperMocks = vi.hoisted(() => ({
@@ -64,6 +67,7 @@ vi.mock("@/server/infrastructure/db/access-resource-repository", () => ({
 vi.mock("@/lib/logger", () => ({ logHandledError: vi.fn() }));
 
 type Chain = {
+  onConflictDoUpdate: ReturnType<typeof vi.fn>;
   select: ReturnType<typeof vi.fn>;
   insert: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
@@ -80,6 +84,7 @@ type Chain = {
 function makeChain(): Chain {
   const c = {} as Chain;
   for (const key of [
+    "onConflictDoUpdate",
     "select",
     "insert",
     "update",
@@ -152,6 +157,7 @@ const published = { ...item, status: "published", visibility: "public" };
 
 function resetChain(chain: Chain) {
   for (const key of [
+    "onConflictDoUpdate",
     "select",
     "insert",
     "update",

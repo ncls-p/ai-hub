@@ -29,6 +29,7 @@ export function CodeWorkspaceArtifactCardSection1({
     popoutWindows,
     saveSelectedFile,
     savingFile,
+    canEdit,
     selectedFile,
     selectedPath,
     setContent,
@@ -73,7 +74,13 @@ export function CodeWorkspaceArtifactCardSection1({
                 type={BUTTON_TYPE}
                 variant={OUTLINE_VARIANT}
                 size="sm"
-                disabled={!selectedPath || selectedFile?.binary || savingFile}
+                disabled={
+                  !canEdit ||
+                  !selectedPath ||
+                  selectedFile?.binary ||
+                  loadingFile ||
+                  savingFile
+                }
                 onClick={() => void saveSelectedFile()}
               >
                 <SaveIcon className={COMPACT_ICON_CLASS} aria-hidden="true" />
@@ -94,7 +101,7 @@ export function CodeWorkspaceArtifactCardSection1({
           <CodeWorkspaceEditor
             value={loadingFile ? t("loadingFile") : content}
             filePath={selectedPath}
-            disabled={!selectedPath || loadingFile || savingFile}
+            disabled={!canEdit || !selectedPath || loadingFile || savingFile}
             onChange={setContent}
             className="min-h-0 flex-1"
           />

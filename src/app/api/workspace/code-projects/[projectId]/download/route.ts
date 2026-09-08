@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { canReadConversationAsset } from "@/modules/chat/conversation-asset-access";
 
-import {
-  handleRoute,
-  requireWorkspacePermissionAsync,
-} from "@/lib/route-handler";
+import { handleRoute } from "@/lib/route-handler";
 import {
   createCodeWorkspaceZip,
   getCodeWorkspace,
@@ -30,19 +28,19 @@ export async function GET(
         return NextResponse.json({ error: "Invalid request" }, { status: 400 });
       }
       const metadata = await getCodeWorkspace(parsed.data.projectId);
-      if (metadata.createdByUserId !== session.user.id) {
+      if (
+        !(await canReadConversationAsset(
+          metadata,
+          session.user.id,
+          "code_workspace",
+        ))
+      ) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
-      const forbidden = await requireWorkspacePermissionAsync(
-        session.user.id,
-        metadata.workspaceId,
-        "agents.chat",
-      );
-      if (forbidden) return forbidden;
       const zip = await createCodeWorkspaceZip({
         projectId: metadata.id,
         workspaceId: metadata.workspaceId,
-        userId: session.user.id,
+        userId: metadata.createdByUserId,
       });
       return new Response(arrayBufferFromBytes(zip.bytes), {
         headers: {

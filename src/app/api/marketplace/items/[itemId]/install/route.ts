@@ -1,3 +1,4 @@
+import { ResourcePackageError } from "@/modules/resource-package/schema";
 import {
   handleRoute,
   requireWorkspacePermissionAsync,
@@ -40,6 +41,11 @@ export async function POST(
     {
       logLabel: "Failed to install marketplace item",
       expectedError: (error) => {
+        if (error instanceof ResourcePackageError)
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.status },
+          );
         const message =
           error instanceof Error ? error.message : "Internal server error";
         const isNotFound =

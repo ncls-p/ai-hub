@@ -103,6 +103,9 @@ export const conversations = pgTable(
       .default(24 * 60),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     publicShareId: uuid("public_share_id"),
+    publicShareIncludesFiles: boolean("public_share_includes_files")
+      .notNull()
+      .default(false),
     publicSharedAt: timestamp("public_shared_at", { withTimezone: true }),
     createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
       .notNull()
@@ -344,5 +347,13 @@ export const messageParts = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("message_parts_message").on(t.messageId, t.sortOrder)],
+  (t) => [
+    index("message_parts_message").on(t.messageId, t.sortOrder),
+    index("message_parts_attachment_reference")
+      .on(sql`(${t.metadataJson}->>'id')`)
+      .where(sql`${t.type} = 'file'`),
+    index("message_parts_code_reference")
+      .on(sql`(${t.metadataJson}->>'projectId')`)
+      .where(sql`${t.type} = 'file'`),
+  ],
 );

@@ -1,3 +1,4 @@
+import { sanitizePortableConnection } from "./portable-connection";
 import { db } from "@/server/infrastructure/db";
 import {
   agentSkills,
@@ -111,6 +112,10 @@ export async function buildCustomToolManifest(
     parseCredentialFields(req.fieldsJson),
   );
 
+  const connection = sanitizePortableConnection({
+    url: tool.n8nWorkflowUrl ?? undefined,
+  });
+
   return {
     type: "custom_tool",
     name,
@@ -120,11 +125,11 @@ export async function buildCustomToolManifest(
       inputSchema: jsonRecord(tool.inputSchemaJson) ?? undefined,
       outputSchema: jsonRecord(tool.outputSchemaJson) ?? undefined,
       n8nWorkflowId: tool.n8nWorkflowId ?? undefined,
-      n8nWorkflowUrl: tool.n8nWorkflowUrl ?? undefined,
+      n8nWorkflowUrl: connection.url,
       metadata: jsonRecord(tool.metadataJson) ?? undefined,
       credentialSchema:
         credentialSchema.length > 0 ? credentialSchema : undefined,
-      requiresCredentials: credentialSchema.length > 0,
+      requiresCredentials: credentialSchema.length > 0 || connection.redacted,
     },
   };
 }
@@ -139,8 +144,12 @@ export function buildMcpPresetManifest(
   const args = Array.isArray(server.argsJson)
     ? (server.argsJson as string[])
     : undefined;
+  const connection = sanitizePortableConnection({
+    url: server.url ?? undefined,
+    args,
+  });
   const credentialSchema = mcpCredentialSchema(server);
-  const hasCredentials = credentialSchema.length > 0;
+  const hasCredentials = credentialSchema.length > 0 || connection.redacted;
 
   return {
     type: "mcp_preset",
@@ -151,8 +160,8 @@ export function buildMcpPresetManifest(
       serverName: server.name,
       transport: server.transport,
       command: server.command ?? undefined,
-      args,
-      url: server.url ?? undefined,
+      args: connection.args,
+      url: connection.url,
       enabled: server.enabled,
       requireApproval: server.requireApproval,
       healthStatus: server.healthStatus ?? undefined,

@@ -227,6 +227,7 @@ export async function getDirectResourceSharing(input: {
         and(
           eq(roleBindings.resourceType, input.resourceType),
           eq(roleBindings.resourceId, input.resourceId),
+          eq(roleBindings.grantSource, "direct"),
           eq(roleBindings.principalType, "user"),
           inArray(
             roleBindings.roleId,
@@ -344,6 +345,7 @@ export const replaceDirectResourceSharing = policyMutation(
         and(
           eq(roleBindings.resourceType, input.resourceType),
           eq(roleBindings.resourceId, input.resourceId),
+          eq(roleBindings.grantSource, "direct"),
           eq(roleBindings.principalType, "user"),
           inArray(
             roleBindings.roleId,
@@ -409,6 +411,7 @@ export const replaceDirectResourceSharing = policyMutation(
               and(
                 eq(roleBindings.resourceType, input.resourceType),
                 eq(roleBindings.resourceId, input.resourceId),
+                eq(roleBindings.grantSource, "direct"),
                 inArray(
                   roleBindings.roleId,
                   directShareRoleIds(input.resourceType, sharing),
@@ -441,6 +444,11 @@ export const replaceDirectResourceSharing = policyMutation(
                     : viewerRole.id,
                 resourceType: target.type,
                 resourceId: target.id,
+                grantSource:
+                  target.type === input.resourceType &&
+                  target.id === input.resourceId
+                    ? "direct"
+                    : `agent:${input.resourceId}`,
                 conditionJson:
                   input.resourceType === "agent"
                     ? {

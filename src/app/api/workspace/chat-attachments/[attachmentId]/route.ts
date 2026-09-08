@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { canReadConversationAsset } from "@/modules/chat/conversation-asset-access";
 
+import { handleRoute } from "@/lib/route-handler";
 import {
-  handleRoute,
-  requireWorkspacePermissionAsync,
-} from "@/lib/route-handler";
-import { getChatAttachmentBytes } from "@/modules/chat/attachments";
+  getChatAttachment,
+  getChatAttachmentBytes,
+} from "@/modules/chat/attachments";
 
 const paramsSchema = z.object({ attachmentId: z.uuid() });
 
@@ -39,16 +40,21 @@ export async function GET(
       if (!parsed.success) {
         return NextResponse.json({ error: "Invalid request" }, { status: 400 });
       }
+      const metadata = await getChatAttachment(parsed.data.attachmentId);
+      if (
+        !(await canReadConversationAsset(
+          metadata,
+          session.user.id,
+          "attachment",
+        ))
+      ) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
       const attachment = await getChatAttachmentBytes({
-        attachmentId: parsed.data.attachmentId,
-        userId: session.user.id,
+        attachmentId: metadata.id,
+        workspaceId: metadata.workspaceId,
+        userId: metadata.createdByUserId,
       });
-      const forbidden = await requireWorkspacePermissionAsync(
-        session.user.id,
-        attachment.metadata.workspaceId,
-        "agents.chat",
-      );
-      if (forbidden) return forbidden;
       return new Response(arrayBufferFromBytes(attachment.bytes), {
         headers: {
           "Content-Type": attachment.metadata.mimeType,
@@ -58,7 +64,7 @@ export async function GET(
             attachment.metadata.fileName,
             attachment.metadata.mimeType,
           ),
-          "Cache-Control": "private, max-age=300",
+          "Cache-Control": "no-store",
           "Content-Security-Policy": "default-src 'none'; sandbox",
           "X-Content-Type-Options": "nosniff",
         },

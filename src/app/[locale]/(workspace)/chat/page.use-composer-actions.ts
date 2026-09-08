@@ -149,8 +149,11 @@ export function useComposerActions(c: ComposerActionsContext) {
     }
   }
 
-  async function uploadChatAttachment(file: File) {
-    if (!c.workspaceId || !c.canChat) return;
+  async function uploadChatAttachment(
+    file: File,
+    replaceAttachmentId?: string,
+  ) {
+    if (!c.workspaceId || !c.canChat) return false;
     try {
       const data = await uploadDocumentInChunks<{
         attachment?: ChatAttachment;
@@ -163,18 +166,26 @@ export function useComposerActions(c: ComposerActionsContext) {
       });
       if (!data.attachment)
         throw new Error(data.error || c.t("attachments.uploadFailed"));
-      c.setAttachments((current) => [...current, data.attachment!]);
+      c.setAttachments((current) =>
+        replaceAttachmentId
+          ? current.map((item) =>
+              item.id === replaceAttachmentId ? data.attachment! : item,
+            )
+          : [...current, data.attachment!],
+      );
       toast.success(
         data.attachment.kind === "chat_image"
           ? c.t("attachments.imageAttached")
           : c.t("attachments.fileAttached"),
       );
+      return true;
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
           : c.t("attachments.uploadFailed"),
       );
+      return false;
     }
   }
   function submitSuggestion(content: string) {

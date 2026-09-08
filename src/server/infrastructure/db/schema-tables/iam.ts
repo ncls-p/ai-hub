@@ -84,6 +84,7 @@ export const roleBindings = pgTable(
     resourceType: roleBindingResourceTypeEnum("resource_type").notNull(),
     resourceId: uuid("resource_id").notNull(),
     conditionJson: jsonb("condition_json"),
+    grantSource: text("grant_source").notNull().default("direct"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdById: uuid(CREATED_BY_USER_ID_COLUMN).references(() => users.id),
     createdAt: timestamp(CREATED_AT_COLUMN, { withTimezone: true })
@@ -103,6 +104,7 @@ export const roleBindings = pgTable(
       t.roleId,
       t.resourceType,
       t.resourceId,
+      t.grantSource,
     ),
   ],
 );

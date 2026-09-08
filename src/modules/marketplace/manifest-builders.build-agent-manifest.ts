@@ -1,3 +1,4 @@
+import { requirePackageResourceAccess } from "@/modules/resource-package/permissions";
 import { db } from "@/server/infrastructure/db";
 import {
   agentKnowledgeBindings,
@@ -38,13 +39,30 @@ export async function buildAgentManifest(
   description?: string | null,
   pinnedVersionId?: string,
   ancestry: ReadonlySet<string> = new Set(),
+  actorUserId?: string,
+  budget = { agents: 0 },
 ): Promise<AgentMarketplaceManifest> {
   if (ancestry.has(agentId)) {
     throw new Error("Delegation cycle detected while packaging orchestrator");
   }
-  if (ancestry.size >= 256) {
+  if (++budget.agents > 256 || ancestry.size >= 20) {
     throw new Error("Delegation graph is too large to publish safely");
   }
+  const requireAccess = async (
+    resourceType: Parameters<
+      typeof requirePackageResourceAccess
+    >[0]["resourceType"],
+    resourceId: string,
+  ) => {
+    if (actorUserId)
+      await requirePackageResourceAccess({
+        workspaceId,
+        userId: actorUserId,
+        resourceType,
+        resourceId,
+      });
+  };
+  await requireAccess("agent", agentId);
   const resolved = await resolveAgentVersion(agentId, pinnedVersionId);
   if (!resolved) throw new Error("Agent not found");
   const { agent, agentVersion, providerName, modelName } = resolved;
@@ -72,6 +90,8 @@ export async function buildAgentManifest(
       null,
       binding.childAgentVersionId,
       nextAncestry,
+      actorUserId,
+      budget,
     );
     specialists.push({
       instructions: binding.instructions,
@@ -97,9 +117,18 @@ export async function buildAgentManifest(
   const portableToolBindings: PortableToolBinding[] = [];
   for (const binding of toolBindings) {
     const portable = await resolveToolBindingRef(binding, workspaceId);
+    if (!portable && actorUserId)
+      throw new Error("A tool dependency is not available for export");
     if (portable) portableToolBindings.push(portable);
   }
 
+  for (const binding of skillBindingsRows)
+    await requireAccess("skill", binding.skillId);
+  for (const binding of knowledgeBindingsRows)
+    await requireAccess("knowledge_base", binding.knowledgeBaseId);
+  if (agentVersion.providerId)
+    await requireAccess("provider", agentVersion.providerId);
+  if (agentVersion.modelId) await requireAccess("model", agentVersion.modelId);
   const skillIds = skillBindingsRows.map((b) => b.skillId);
   const skills =
     skillIds.length > 0
@@ -162,6 +191,7 @@ export async function buildAgentManifest(
         )
         .limit(1);
       if (!server) continue;
+      await requireAccess("mcp_server", server.id);
       seenMcpServers.add(server.id);
       const serverTools = await db
         .select()
@@ -190,6 +220,7 @@ export async function buildAgentManifest(
         )
         .limit(1);
       if (!tool) continue;
+      await requireAccess("custom_tool", tool.id);
       seenCustomTools.add(tool.id);
       bundledCustomTools.push(
         await buildCustomToolManifest(tool, tool.name, tool.description),

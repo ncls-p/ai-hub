@@ -39,6 +39,9 @@ export async function prepareAgentMarketplaceDraft(input: {
     input.workspaceId,
     name,
     description,
+    undefined,
+    undefined,
+    input.userId,
   );
   return { agent, description, manifest, name };
 }
