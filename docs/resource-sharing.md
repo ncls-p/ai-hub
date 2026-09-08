@@ -4,7 +4,7 @@ Resources can be shared as live project access, as an installable marketplace it
 
 | Mechanism | Recipient receives | Revocation |
 | --- | --- | --- |
-| Direct resource share | Access to the original resource and the dependencies of a shared agent | Removing that share removes its grants; other independent shares remain effective |
+| Direct resource share | Access to the original resource and the dependencies of a shared agent | Removing that share removes its grants; other independent shares remain effective, including after cloning a project |
 | Named chat share | Read access to the conversation, uploaded attachments and code projects | Access is checked again for each download, extracted-text read and code preview |
 | Public chat link | Text; downloadable files only when the owner explicitly enables them | Disabling the link or file option, archiving, or expiry blocks subsequent requests |
 | Marketplace / JSON import | Independent copies in the recipient's project | Removing access to the source does not delete previously installed copies |

@@ -182,6 +182,19 @@ export async function cloneWorkflowsAndAccess(context: WorkspaceCloneContext) {
       .get(source.resourceType)
       ?.get(source.resourceId);
     if (!mappedResourceId) continue;
+    let conditionJson = source.conditionJson;
+    let grantSource = source.grantSource;
+    const condition = conditionJson as {
+      source?: string;
+      rootAgentId?: string;
+    } | null;
+    if (condition?.source === "agent_direct_share" && condition.rootAgentId) {
+      const rootAgentId = agentMap.get(condition.rootAgentId);
+      // A dependency grant must remain attached to its cloned root, never the source project.
+      if (!rootAgentId) continue;
+      conditionJson = { ...condition, rootAgentId };
+      if (grantSource !== "direct") grantSource = `agent:${rootAgentId}`;
+    }
     await tx
       .insert(roleBindings)
       .values({
@@ -190,6 +203,8 @@ export async function cloneWorkflowsAndAccess(context: WorkspaceCloneContext) {
         principalId,
         roleId: roleMap.get(source.roleId) ?? source.roleId,
         resourceId: mappedResourceId,
+        conditionJson,
+        grantSource,
         createdById: input.actorUserId,
         createdAt: new Date(),
       })
