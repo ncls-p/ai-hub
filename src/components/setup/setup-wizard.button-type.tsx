@@ -38,17 +38,6 @@ export type ProviderModel = {
   enabled?: boolean;
 };
 
-export function slugify(value: string) {
-  return (
-    value
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 64) || "assistant"
-  );
-}
-
 export function defaultAuthType(kind: ProviderKind): ProviderAuthType {
   if (kind === "dragonfly") return "x-api-key";
   if (kind === "vercel-ai-gateway") return "gateway";

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { logger } from "@/lib/logger";
 import { insertDelegationBindingsForVersion } from "@/modules/agent/delegation-use-cases";
 import { ONBOARDING_TOOL_PRESET } from "@/modules/agent/onboarding-tools";
@@ -37,7 +38,7 @@ export async function createAgent(input: CreateAgentInput) {
     workspaceId,
     userId,
     name,
-    slug,
+    slug = randomUUID(),
     kind = "assistant",
     description,
     logoUrl,

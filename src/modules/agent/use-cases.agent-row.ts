@@ -22,15 +22,13 @@ export type AgentVersionRow = typeof agentVersions.$inferSelect;
 type AgentSharingMode = "personal" | "marketplace" | "specific_user";
 type AgentKind = "assistant" | "orchestrator";
 export type AgentCurationLabel =
-  | "recommended"
-  | "organization_created"
-  | "none";
+  "recommended" | "organization_created" | "none";
 
 export interface CreateAgentInput {
   workspaceId: string;
   userId: string;
   name: string;
-  slug: string;
+  slug?: string;
   kind?: AgentKind;
   description?: string;
   logoUrl?: string | null;

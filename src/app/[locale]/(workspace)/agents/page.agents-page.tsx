@@ -14,7 +14,6 @@ import {
   Agent,
   AgentAccessForm,
   AgentAccessOptions,
-  slugifyAgentName,
 } from "./page.icon-size-class";
 
 export function useAgentsPageController() {
@@ -53,7 +52,6 @@ export function useAgentsPageController() {
     kind: "assistant" as Agent["kind"],
     templateId: "blank",
     name: "",
-    slug: "",
     description: "",
     systemPrompt: "",
     promptSuggestions: "",
@@ -121,7 +119,6 @@ export function useAgentsPageController() {
       ...current,
       templateId: template.id,
       name,
-      slug: slugifyAgentName(name),
       description: tList(template.descriptionKey),
       systemPrompt: tList(template.promptKey),
       promptSuggestions: template.suggestionKeys
@@ -132,7 +129,6 @@ export function useAgentsPageController() {
 
   const handleCreate = async () => {
     if (!workspaceId || !form.name.trim()) return;
-    const slug = form.slug.trim() || slugifyAgentName(form.name);
     setCreating(true);
     try {
       const res = await fetch("/api/workspace/agents", {
@@ -141,7 +137,6 @@ export function useAgentsPageController() {
         body: JSON.stringify({
           kind: form.kind,
           name: form.name.trim(),
-          slug,
           description: form.description.trim() || undefined,
           systemPrompt: form.systemPrompt.trim() || undefined,
           promptSuggestions: form.promptSuggestions
@@ -175,7 +170,6 @@ export function useAgentsPageController() {
         kind: "assistant",
         templateId: "blank",
         name: "",
-        slug: "",
         description: "",
         systemPrompt: "",
         promptSuggestions: "",

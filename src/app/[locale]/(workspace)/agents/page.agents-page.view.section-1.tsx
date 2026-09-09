@@ -24,7 +24,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { AgentsPageViewModel } from "./page.agents-page.view";
-import { AGENT_TEMPLATES, slugifyAgentName } from "./page.icon-size-class";
+import { AGENT_TEMPLATES } from "./page.icon-size-class";
 export function AgentsPageSection1({ model }: { model: AgentsPageViewModel }) {
   const {
     accessOptions,
@@ -147,7 +147,6 @@ export function AgentsPageSection1({ model }: { model: AgentsPageViewModel }) {
                 setForm({
                   ...form,
                   name: e.target.value,
-                  slug: slugifyAgentName(e.target.value),
                 })
               }
             />
@@ -186,22 +185,6 @@ export function AgentsPageSection1({ model }: { model: AgentsPageViewModel }) {
             storageKey="advanced:agent-create"
           >
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="agent-slug">{tList("slug")}</Label>
-                <Input
-                  id="agent-slug"
-                  name="agent-slug"
-                  autoComplete="off"
-                  placeholder={tList("slugPlaceholder")}
-                  value={form.slug}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      slug: e.target.value,
-                    })
-                  }
-                />
-              </div>
               {canAdminCurate ? (
                 <div className="rounded-xl border border-border/70 p-3">
                   <div className="flex flex-col gap-3 text-sm">
@@ -275,7 +258,6 @@ export function AgentsPageSection1({ model }: { model: AgentsPageViewModel }) {
             disabled={
               creating ||
               !form.name.trim() ||
-              !form.slug.trim() ||
               (form.accessScope === "team" && !form.accessTeamId)
             }
           >

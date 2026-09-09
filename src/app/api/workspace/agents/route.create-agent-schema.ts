@@ -30,7 +30,7 @@ const promptSuggestionsSchema = z
 export const createAgentSchema = z
   .object({
     name: z.string().min(1).max(255),
-    slug: slugSchema,
+    slug: slugSchema.optional(),
     kind: z.enum(["assistant", "orchestrator"]).default("assistant"),
     description: z.string().max(2048).optional(),
     logoUrl: agentLogoUrlSchema.optional(),

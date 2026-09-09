@@ -153,6 +153,21 @@ describe("agent creation route tool presets", () => {
     expect(input).not.toHaveProperty("toolBindings");
   });
 
+  it("accepts creation without a slug and preserves the display name", async () => {
+    const response = await POST(
+      createRequest({
+        workspaceId,
+        name: "助手 🤖",
+        accessScope: "private",
+      }) as never,
+    );
+    expect(response.status).toBe(201);
+    expect(routeMocks.createAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "助手 🤖" }),
+    );
+    expect(routeMocks.createAgent.mock.calls[0][0]).not.toHaveProperty("slug");
+  });
+
   it("returns a conflict when Drizzle wraps a duplicate assistant slug", async () => {
     routeMocks.createAgent.mockRejectedValueOnce(
       new DrizzleQueryError(

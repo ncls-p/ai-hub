@@ -84,6 +84,27 @@ describe("createAgent", () => {
     );
   });
 
+  it("generates different UUID slugs for assistants with the same name", async () => {
+    const slugs: string[] = [];
+    for (let index = 0; index < 2; index++) {
+      dbModule._tx.returning
+        .mockResolvedValueOnce([fakeAgent])
+        .mockResolvedValueOnce([fakeVersion]);
+      await createAgent({
+        workspaceId: "ws-1",
+        userId: "user-1",
+        name: "助手 🤖",
+      });
+      const values = dbModule._tx.values.mock.calls.at(-2)?.[0];
+      expect(values.name).toBe("助手 🤖");
+      expect(values.slug).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+      slugs.push(values.slug);
+    }
+    expect(slugs[0]).not.toBe(slugs[1]);
+  });
+
   it("applies the exact approval-free onboarding tool preset", async () => {
     const insertedAgent = { ...fakeAgent, activeVersionId: null };
     const version = { ...fakeVersion };

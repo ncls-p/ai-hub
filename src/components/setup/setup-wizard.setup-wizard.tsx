@@ -14,7 +14,6 @@ import {
   SetupWizardProps,
   StepId,
   defaultAuthType,
-  slugify,
 } from "./setup-wizard.button-type";
 import { createSetupProviderForm } from "./setup-wizard.provider-form";
 import {
@@ -217,7 +216,6 @@ export function useSetupWizardController({
             body: JSON.stringify({
               workspaceId,
               name: agentForm.name,
-              slug: slugify(agentForm.name),
               systemPrompt: "",
               providerId,
               modelId: modelDbId,
