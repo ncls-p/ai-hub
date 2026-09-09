@@ -148,14 +148,7 @@ export const updateAgentSchema = z.object({
     .optional(),
 });
 
-export function isUniqueConstraintError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  );
-}
+export { isUniqueConstraintError } from "@/lib/database-errors";
 
 export async function GET(
   req: NextRequest,

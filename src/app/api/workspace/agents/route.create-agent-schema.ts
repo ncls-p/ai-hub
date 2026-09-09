@@ -96,14 +96,7 @@ export const listAgentsSchema = z.object({
   includeModelMeta: z.boolean().optional(),
 });
 
-export function isUniqueConstraintError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  );
-}
+export { isUniqueConstraintError } from "@/lib/database-errors";
 
 export async function getModelMetaByVersionId(
   versionIds: Array<string | null | undefined>,

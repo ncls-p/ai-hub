@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DrizzleQueryError } from "drizzle-orm";
 
 const routeMocks = vi.hoisted(() => ({
   canManageTenantGlobals: vi.fn().mockResolvedValue(false),
@@ -150,5 +151,31 @@ describe("agent creation route tool presets", () => {
     const input = routeMocks.createAgent.mock.calls[0]?.[0];
     expect(input).not.toHaveProperty("toolPreset");
     expect(input).not.toHaveProperty("toolBindings");
+  });
+
+  it("returns a conflict when Drizzle wraps a duplicate assistant slug", async () => {
+    routeMocks.createAgent.mockRejectedValueOnce(
+      new DrizzleQueryError(
+        "insert into agents ...",
+        [],
+        Object.assign(
+          new Error("duplicate key value violates unique constraint"),
+          { code: "23505", constraint: "agents_workspace_slug_unique" },
+        ),
+      ),
+    );
+    const response = await POST(
+      createRequest({
+        workspaceId,
+        name: "test",
+        slug: "test",
+        accessScope: "private",
+      }) as never,
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "Agent slug already exists in this workspace",
+    });
   });
 });

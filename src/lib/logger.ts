@@ -66,6 +66,15 @@ export const logger = {
       data: {
         ...(data || {}),
         ...(error && { error: error.message, stack: error.stack }),
+        ...(error?.cause instanceof Error && {
+          cause: {
+            message: error.cause.message,
+            ...("code" in error.cause && { code: error.cause.code }),
+            ...("constraint" in error.cause && {
+              constraint: error.cause.constraint,
+            }),
+          },
+        }),
       },
     });
   },
