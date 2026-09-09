@@ -1,13 +1,9 @@
 "use client";
 
-import {
-  CommandIcon,
-  Loader2,
-  MessageSquareIcon,
-  PlusIcon,
-} from "lucide-react";
+import { Loader2, MessageSquareIcon, PlusIcon } from "lucide-react";
 import { useLocale } from "next-intl";
 
+import { MaiahAnimatedMark } from "@/components/chat/maiah-animated-mark";
 import type { CodeWorkspaceArtifact } from "@/components/chat/chat-types";
 import { Button } from "@/components/ui/button";
 import {
@@ -140,15 +136,7 @@ export function EmptyConversationState({
   return (
     <div className="empty-chat-hero mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-start px-4 pb-12 animate-in-fade">
       <div className="flex max-w-3xl flex-col items-center text-center">
-        <div
-          className="orbit-hero-mark empty-chat-hero__mark"
-          aria-hidden="true"
-        >
-          <span />
-          <i />
-          <b />
-          <CommandIcon className="size-5" />
-        </div>
+        <MaiahAnimatedMark />
         <p className="workspace-page-kicker empty-chat-hero__kicker text-[0.62rem]">
           {hero?.kicker ?? t("heroKicker")}
         </p>

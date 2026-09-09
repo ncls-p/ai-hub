@@ -176,6 +176,12 @@
   .empty-chat-hero {
     padding-top: clamp(2rem, 6vh, 5rem);
   }
+  .maiah-animated-mark {
+    display: block;
+    width: 9rem;
+    height: auto;
+    flex-shrink: 0;
+  }
   .empty-chat-hero__mark {
     margin-bottom: clamp(1rem, 2.5vh, 1.75rem);
   }
@@ -189,18 +195,9 @@
     .empty-chat-hero {
       padding-top: 1rem;
     }
-    .orbit-hero-mark.empty-chat-hero__mark {
-      width: 3rem;
-      height: 3rem;
+    .maiah-animated-mark.empty-chat-hero__mark {
+      width: 6rem;
       margin-bottom: 0.875rem;
-    }
-    .orbit-hero-mark.empty-chat-hero__mark::before {
-      width: 4.1rem;
-      height: 1.4rem;
-    }
-    .orbit-hero-mark.empty-chat-hero__mark::after {
-      width: 3.8rem;
-      height: 3.8rem;
     }
     .empty-chat-hero__kicker {
       margin-bottom: 0.625rem;
@@ -216,78 +213,15 @@
     .empty-chat-hero {
       padding-top: 0.75rem;
     }
-    .orbit-hero-mark.empty-chat-hero__mark {
-      width: 2.5rem;
-      height: 2.5rem;
+    .maiah-animated-mark.empty-chat-hero__mark {
+      width: 5rem;
       margin-bottom: 0.625rem;
-    }
-    .orbit-hero-mark.empty-chat-hero__mark::before {
-      width: 3.5rem;
-      height: 1.2rem;
-    }
-    .orbit-hero-mark.empty-chat-hero__mark::after {
-      width: 3.2rem;
-      height: 3.2rem;
     }
     .empty-chat-hero__kicker {
       margin-bottom: 0.45rem;
     }
     .empty-chat-hero__title {
       font-size: clamp(1.7rem, min(3.5vw, 4.8vh), 2.5rem);
-    }
-  }
-  .orbit-hero-mark {
-    position: relative;
-    display: grid;
-    width: 4.5rem;
-    height: 4.5rem;
-    place-items: center;
-    border: 1px solid color-mix(in oklch, var(--primary) 34%, transparent);
-    border-radius: 999px;
-    color: var(--primary);
-  }
-  .orbit-hero-mark::before,
-  .orbit-hero-mark::after {
-    position: absolute;
-    width: 6rem;
-    height: 2rem;
-    border: 1px solid color-mix(in oklch, var(--primary) 28%, transparent);
-    border-radius: 999px;
-    content: "";
-    transform: rotate(-24deg);
-  }
-  .orbit-hero-mark::after {
-    width: 5.4rem;
-    height: 5.4rem;
-    border-style: dashed;
-    transform: rotate(32deg);
-    animation: orbit-hero-turn 14s linear infinite;
-  }
-  .orbit-hero-mark > span,
-  .orbit-hero-mark > i,
-  .orbit-hero-mark > b {
-    position: absolute;
-    width: 0.35rem;
-    height: 0.35rem;
-    border-radius: 999px;
-    background: var(--primary);
-    box-shadow: 0 0 0.8rem color-mix(in oklch, var(--primary) 80%, transparent);
-  }
-  .orbit-hero-mark > span {
-    right: 0.2rem;
-    top: 0.2rem;
-  }
-  .orbit-hero-mark > i {
-    bottom: 0.25rem;
-    left: 0.3rem;
-  }
-  .orbit-hero-mark > b {
-    left: -0.45rem;
-    top: 0.8rem;
-  }
-  @keyframes orbit-hero-turn {
-    to {
-      transform: rotate(392deg);
     }
   }
   .composer-box {
