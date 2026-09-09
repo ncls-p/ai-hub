@@ -186,16 +186,15 @@ test.describe("chat page", () => {
   });
 
   test("agent selector is present when agents exist", async ({ page }) => {
-    await page.goto("/en/chat");
-    await page.waitForTimeout(2000);
+    const { agentId } = await ensureE2EAssistant();
+    await page.goto(`/en/chat?agentId=${agentId}`);
 
     // Agent selector should be present in the chat sidebar
     const agentSelector = page
       .getByRole("button", { name: /Current assistant/i })
       .first();
-    if (await agentSelector.isVisible()) {
-      await expect(agentSelector).toBeVisible();
-    }
+    await expect(agentSelector).toBeVisible();
+    await expect(agentSelector).toContainText("E2E model");
   });
 
   test("keeps every queued attachment visible in a responsive grid", async ({

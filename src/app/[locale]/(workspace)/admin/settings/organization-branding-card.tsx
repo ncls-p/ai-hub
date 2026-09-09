@@ -178,6 +178,7 @@ function OrganizationBrandingContent() {
           <Label>{t("logo")}</Label>
           <button
             type="button"
+            aria-label={t("chooseLogo")}
             disabled={!branding.canManage}
             onClick={() => inputRef.current?.click()}
             className="mt-2 grid h-28 w-full place-items-center overflow-hidden rounded-xl border border-dashed bg-muted/25 transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -201,6 +202,8 @@ function OrganizationBrandingContent() {
           <input
             ref={inputRef}
             type="file"
+            aria-label={t("chooseLogo")}
+            disabled={!branding.canManage}
             accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
             className="sr-only"
             onChange={(event) => void onFile(event.target.files?.[0])}

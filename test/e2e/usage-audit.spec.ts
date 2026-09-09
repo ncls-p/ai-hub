@@ -35,9 +35,7 @@ test.describe("usage page", () => {
 
     // Filter controls (operation, from, to) may be present
     const filterSection = page.getByText(/Filters/i).first();
-    if (await filterSection.isVisible()) {
-      await expect(filterSection).toBeVisible();
-    }
+    await expect(filterSection).toBeVisible();
   });
 });
 
@@ -66,8 +64,6 @@ test.describe("audit page", () => {
     await page.waitForTimeout(2000);
 
     const filterSection = page.getByText(/Filters/i).first();
-    if (await filterSection.isVisible()) {
-      await expect(filterSection).toBeVisible();
-    }
+    await expect(filterSection).toBeVisible();
   });
 });

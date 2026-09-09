@@ -58,26 +58,24 @@ test.describe("setup wizard", () => {
 
 test.describe("setup wizard provider step", () => {
   test("provider form has required fields", async ({ page }) => {
+    // Hold the provider step deterministic regardless of earlier suite mutations.
+    await page.route("**/api/workspace/providers?workspaceId=*", (route) =>
+      route.fulfill({ json: [] }),
+    );
     await page.goto("/en/setup");
     await page.waitForTimeout(2000);
 
     // Connection name field
     const nameInput = page.getByLabel(/Connection|Name/i).first();
-    if (await nameInput.isVisible()) {
-      await expect(nameInput).toBeVisible();
-    }
+    await expect(nameInput).toBeVisible();
 
     // Service URL field
     const urlInput = page.getByLabel(/Service|URL/i).first();
-    if (await urlInput.isVisible()) {
-      await expect(urlInput).toBeVisible();
-    }
+    await expect(urlInput).toBeVisible();
 
     // API key field
     const apiKeyInput = page.getByLabel(/API key/i).first();
-    if (await apiKeyInput.isVisible()) {
-      await expect(apiKeyInput).toBeVisible();
-    }
+    await expect(apiKeyInput).toBeVisible();
   });
 
   test("offers discovered models during the first setup", async ({ page }) => {

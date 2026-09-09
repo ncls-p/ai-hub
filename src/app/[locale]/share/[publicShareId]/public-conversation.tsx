@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
+import { Button } from "@/components/ui/button";
 
 type Payload = {
   conversation: {
@@ -24,9 +25,23 @@ export function PublicConversation({
 }: {
   publicShareId: string;
 }) {
+  return (
+    <PublicConversationContent
+      key={publicShareId}
+      publicShareId={publicShareId}
+    />
+  );
+}
+
+function PublicConversationContent({
+  publicShareId,
+}: {
+  publicShareId: string;
+}) {
   const t = useTranslations("chat.publicConversation");
   const [payload, setPayload] = useState<Payload | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const [failure, setFailure] = useState<"notFound" | "loadError" | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -34,20 +49,37 @@ export function PublicConversation({
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error("not_found");
-        setPayload((await response.json()) as Payload);
+        if (controller.signal.aborted) return;
+        if (response.status === 404 || response.status === 410) {
+          setFailure("notFound");
+          return;
+        }
+        if (!response.ok) throw new Error("load_failed");
+        const nextPayload = (await response.json()) as Payload;
+        if (!controller.signal.aborted) setPayload(nextPayload);
       })
-      .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === "AbortError"))
-          setNotFound(true);
+      .catch(() => {
+        if (!controller.signal.aborted) setFailure("loadError");
       });
     return () => controller.abort();
-  }, [publicShareId]);
+  }, [publicShareId, attempt]);
 
-  if (notFound) {
+  if (failure) {
     return (
       <main className="mx-auto flex min-h-svh max-w-xl items-center justify-center p-6 text-center">
-        <p>{t("notFound")}</p>
+        <div className="flex flex-col items-center gap-4">
+          <p role="alert">{t(failure)}</p>
+          {failure === "loadError" && (
+            <Button
+              onClick={() => {
+                setFailure(null);
+                setAttempt((value) => value + 1);
+              }}
+            >
+              {t("retry")}
+            </Button>
+          )}
+        </div>
       </main>
     );
   }

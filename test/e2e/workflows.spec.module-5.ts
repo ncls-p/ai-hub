@@ -7,7 +7,10 @@ test("executes JavaScript and Python workflow steps in the local sandbox", async
 }) => {
   test.skip(
     process.env.E2E_DOCKER_SANDBOX !== "true" &&
-      !existsSync(".data/sandbox-runner/sandbox.sock"),
+      !existsSync(
+        process.env.SANDBOX_RUNNER_SOCKET ??
+          ".data/sandbox-runner/sandbox.sock",
+      ),
     "The optional local sandbox runner is not available.",
   );
 

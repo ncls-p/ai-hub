@@ -192,21 +192,15 @@ test.describe("agent CRUD", () => {
 
 test.describe("agent detail page", () => {
   test("navigate to agent detail page", async ({ page }) => {
-    await page.goto("/en/agents");
-    await page.waitForTimeout(2000);
-
-    // Click on the first agent if any exist
-    const firstAgentLink = page
-      .getByRole("link", { name: /Configure/i })
-      .first();
-
-    if (await firstAgentLink.isVisible()) {
-      await firstAgentLink.click();
-      await page.waitForTimeout(2000);
-
-      // Should navigate to agent detail page
-      const url = page.url();
-      expect(url).toMatch(/\/en\/agents\//);
-    }
+    const { agentId } = await ensureE2EAssistant();
+    await login(page);
+    await page.goto(`/en/agents/${agentId}`);
+    await expect(
+      page.getByRole("combobox", { name: "Provider" }),
+    ).toBeEnabled();
+    await expect(page.getByRole("combobox", { name: "Model" })).toBeEnabled();
+    await expect(
+      page.getByRole("textbox", { name: "Name", exact: true }),
+    ).toHaveValue("E2E menu assistant");
   });
 });

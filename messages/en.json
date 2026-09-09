@@ -234,6 +234,8 @@
     "publicConversation": {
       "loading": "Loading shared conversation…",
       "notFound": "This shared conversation is unavailable.",
+      "loadError": "The shared conversation could not be loaded. Please try again.",
+      "retry": "Try again",
       "sharedBy": "Shared conversation with {agent}",
       "readOnly": "Public read-only view",
       "user": "User",
