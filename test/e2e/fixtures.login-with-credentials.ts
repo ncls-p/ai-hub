@@ -1,6 +1,6 @@
 import { retryRateLimitedAuth } from "./fixtures.auth-rate-limit";
 // Shared fixtures and helpers for all e2e tests
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { authenticationState, e2eUser } from "./fixtures.e2e-user";
 
 export async function loginWithCredentials(
@@ -26,7 +26,10 @@ export async function login(page: Page) {
   if (authenticationState.cookies) {
     await page.context().addCookies(authenticationState.cookies);
     await page.goto("/en/chat", { waitUntil: "domcontentloaded" });
-    if (/\/en\/(chat|setup)/.test(page.url())) return;
+    if (/\/en\/(chat|setup)/.test(page.url())) {
+      await restorePrimaryWorkspace(page);
+      return;
+    }
     authenticationState.cookies = null;
   }
 
@@ -44,4 +47,28 @@ export async function login(page: Page) {
   });
   await page.waitForURL(/\/en\/(chat|setup)/, { timeout: 15_000 });
   authenticationState.cookies = await page.context().cookies();
+  await restorePrimaryWorkspace(page);
+}
+
+// Ordinary tests start in the fixture's primary project. Tests of persisted
+// workspace selection deliberately use loginWithCredentials instead.
+async function restorePrimaryWorkspace(page: Page) {
+  const response = await page.request.get("/api/workspaces");
+  expect(response.status()).toBe(200);
+  const rows = (await response.json()) as Array<{
+    workspace: { id: string; slug: string };
+    organization: { slug: string };
+    isActive: boolean;
+  }>;
+  const primary = rows.find(
+    (row) =>
+      row.workspace.slug === "main" && row.organization.slug === "deodis",
+  );
+  if (!primary) throw new Error("Primary E2E workspace is missing");
+  if (primary.isActive) return;
+  const selected = await page.request.patch("/api/workspaces", {
+    data: { workspaceId: primary.workspace.id },
+  });
+  expect(selected.status()).toBe(204);
+  await page.goto("/en/chat");
 }

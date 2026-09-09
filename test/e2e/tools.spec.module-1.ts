@@ -106,14 +106,17 @@ test.describe("tools hub page", () => {
     await page.waitForTimeout(2000);
 
     const searchInput = page.getByPlaceholder(/Search tools/i).first();
-    if (await searchInput.isVisible()) {
-      await searchInput.fill("calc");
-      await page.waitForTimeout(500);
-
-      // Results should update
-      const pageContent = page.locator(".page-content").first();
-      await expect(pageContent).toBeVisible();
-    }
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill("calc");
+    const calculator = page.getByRole("heading", {
+      name: "Calculator",
+      exact: true,
+    });
+    await expect(calculator).toBeVisible();
+    await searchInput.fill("qa-no-tools-match-this-query");
+    await expect(calculator).toHaveCount(0);
+    await searchInput.clear();
+    await expect(calculator).toBeVisible();
   });
 
   test("keeps a large skills library compact and searchable", async ({

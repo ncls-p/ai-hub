@@ -1,3 +1,8 @@
+import { beforeEach, expect } from "vitest";
+
+// A test that never reaches an assertion must not silently pass.
+beforeEach(() => expect.hasAssertions());
+
 const testEnv = {
   NODE_ENV: "test",
   BETTER_AUTH_SECRET: "test-secret-for-unit-tests",

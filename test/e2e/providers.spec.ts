@@ -20,12 +20,16 @@ test.describe("providers page", () => {
   });
 
   test("shows empty state when no providers", async ({ page }) => {
+    await page.route("**/api/workspace/providers?**", (route) =>
+      route.fulfill({ json: [] }),
+    );
     await page.goto("/en/providers");
-    await page.waitForTimeout(2000);
-
     await expect(
-      page.getByText(/No connections|Add|Connect AI/i).first(),
-    ).toBeVisible({ timeout: 10_000 });
+      page.getByText("No connections yet", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Connection actions/i }),
+    ).toHaveCount(0);
   });
 
   test("add connection button exists", async ({ page }) => {
@@ -34,9 +38,8 @@ test.describe("providers page", () => {
 
     const addBtn = page.getByRole("button", { name: /Add|Connect/i }).first();
 
-    if (await addBtn.isVisible()) {
-      await expect(addBtn).toBeEnabled();
-    }
+    await expect(addBtn).toBeVisible();
+    await expect(addBtn).toBeEnabled();
   });
 
   test("discovers and adds provider models after setup", async ({ page }) => {

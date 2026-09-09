@@ -30,15 +30,22 @@ test.describe("agents list page", () => {
   });
 
   test("shows empty state when no agents", async ({ page }) => {
+    await page.route("**/api/workspace/agents?**", (route) =>
+      route.fulfill({ json: { agents: [], canCreateAgent: true } }),
+    );
     await page.goto("/en/agents");
-    await page.waitForTimeout(2000);
-
-    // Should show either the agents list or empty state
     await expect(
-      page
-        .getByText(/No assistants|Create your first assistant|Assistants/i)
-        .first(),
+      page.getByText("No assistants yet", { exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Create your first assistant",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /More actions for/i }),
+    ).toHaveCount(0);
   });
 
   test("create agent button exists", async ({ page }) => {
@@ -49,20 +56,30 @@ test.describe("agents list page", () => {
       .getByRole("button", { name: createAssistantButtonName })
       .first();
 
-    if (await createBtn.isVisible()) {
-      await expect(createBtn).toBeEnabled();
-    }
+    await expect(createBtn).toBeVisible();
+    await expect(createBtn).toBeEnabled();
   });
 
   test("agent search filter exists", async ({ page }) => {
+    await ensureE2EAssistant();
     await page.goto("/en/agents");
     await page.waitForTimeout(2000);
 
-    // Search input may or may not be visible depending on state
-    const searchInput = page.getByPlaceholder(/Filter|Search/i).first();
-    if (await searchInput.isVisible()) {
-      await expect(searchInput).toBeVisible();
-    }
+    const searchInput = page.getByRole("textbox", {
+      name: "Search assistants",
+    });
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill("qa-no-assistant-matches-this-search");
+    await expect(searchInput).toHaveValue(
+      "qa-no-assistant-matches-this-search",
+    );
+    await expect(
+      page.getByRole("button", { name: /More actions for/i }),
+    ).toHaveCount(0);
+    await searchInput.clear();
+    await expect(
+      page.getByRole("main").getByText("E2E menu assistant", { exact: true }),
+    ).toBeVisible();
   });
 
   test("keeps conversation organization available across workspace pages", async ({

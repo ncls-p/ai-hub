@@ -51,7 +51,14 @@ test.describe("authentication", () => {
       await page.goto("/en/auth/signin");
       await page.getByRole("button", { name: /Sign In/i }).click();
 
-      // HTML5 required validation should prevent submission
+      await expect(page.getByLabel("Email")).toBeFocused();
+      expect(
+        await page
+          .getByLabel("Email")
+          .evaluate(
+            (element: HTMLInputElement) => element.validity.valueMissing,
+          ),
+      ).toBe(true);
       await expect(page).toHaveURL(/signin/);
     });
 
@@ -106,11 +113,17 @@ test.describe("authentication", () => {
       const createButton = page.getByRole("button", {
         name: /Create Account/i,
       });
-      if (await createButton.isVisible()) {
-        await createButton.click();
-        // Should stay on the same page
-        await expect(page).toHaveURL(/signup/);
-      }
+      await expect(createButton).toBeVisible();
+      await createButton.click();
+      await expect(page.getByLabel("Full name")).toBeFocused();
+      expect(
+        await page
+          .getByLabel("Full name")
+          .evaluate(
+            (element: HTMLInputElement) => element.validity.valueMissing,
+          ),
+      ).toBe(true);
+      await expect(page).toHaveURL(/signup/);
     });
   });
 
@@ -119,7 +132,7 @@ test.describe("authentication", () => {
       await login(page);
     });
 
-    test("sign out button exists in sidebar", async ({ page }) => {
+    test("sign out revokes access to the workspace", async ({ page }) => {
       const accountMenu = page.getByRole("button", {
         name: e2eUser.name,
         exact: true,
@@ -131,6 +144,11 @@ test.describe("authentication", () => {
           page.getByRole("menuitem", { name: /Sign out/i }),
         ).toBeVisible();
       }).toPass({ timeout: 10_000 });
+      await page.getByRole("menuitem", { name: /Sign out/i }).click();
+      await expect(page).toHaveURL(/\/auth\/signin/);
+      expect((await page.request.get("/api/workspaces")).status()).toBe(401);
+      await page.goto("/en/chat");
+      await expect(page).toHaveURL(/\/auth\/signin/);
     });
   });
 

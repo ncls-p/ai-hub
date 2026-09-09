@@ -69,5 +69,9 @@ test("persists the selected project for a fresh browser session", async ({
     ).toBeVisible();
   } finally {
     await privateContext.close();
+    const restored = await page.request.patch("/api/workspaces", {
+      data: { workspaceId: primaryWorkspace.workspace.id },
+    });
+    expect(restored.status()).toBe(204);
   }
 });

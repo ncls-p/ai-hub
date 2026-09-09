@@ -73,6 +73,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Reject high and critical dependency advisories
+        run: npm run security:check
+
       - name: Run database migrations
         run: npm run db:migrate
         env:
@@ -168,24 +171,29 @@ jobs:
           SERVER_PID=$!
           npm run worker > /tmp/worker.log 2>&1 &
           WORKER_PID=$!
-          trap 'kill ${SERVER_PID} ${WORKER_PID}' EXIT
+          node scripts/sandbox-runner.mjs > /tmp/sandbox.log 2>&1 &
+          SANDBOX_PID=$!
+          trap 'kill ${SERVER_PID} ${WORKER_PID} ${SANDBOX_PID}' EXIT
 
           for attempt in {1..60}; do
             if curl --fail --silent --show-error http://localhost:3000 > /dev/null \
-              && curl --fail --silent --show-error http://localhost:3001/health > /dev/null; then
+              && curl --fail --silent --show-error http://localhost:3001/health > /dev/null \
+              && test -S "${SANDBOX_RUNNER_SOCKET}"; then
               if npm run test:e2e -- --max-failures=1; then
                 exit 0
               fi
               cat /tmp/next.log
               cat /tmp/worker.log
+              cat /tmp/sandbox.log
               exit 1
             fi
             sleep 2
           done
 
-          echo "Next.js server or worker failed to become ready"
+          echo "Next.js server, worker or sandbox failed to become ready"
           cat /tmp/next.log
           cat /tmp/worker.log
+          cat /tmp/sandbox.log
           exit 1
         env:
           NODE_ENV: "production"
@@ -200,3 +208,17 @@ jobs:
           OBJECT_STORAGE_ACCESS_KEY_ID: "ci-runtime-access"
           OBJECT_STORAGE_SECRET_ACCESS_KEY: "ci-runtime-object-secret-2026"
           PLAYWRIGHT_BASE_URL: "http://localhost:3000"
+          SANDBOX_RUNNER_SOCKET: "/tmp/maiah-ci-sandbox.sock"
+          SANDBOX_RUN_ROOT: "/tmp/maiah-ci-sandbox-runs"
+
+      - name: Preserve test diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: quality-reports
+          path: |
+            coverage/
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

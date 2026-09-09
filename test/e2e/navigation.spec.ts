@@ -200,21 +200,20 @@ test.describe("sidebar interactions", () => {
       name: /Collapse chat sidebar/i,
     });
 
-    if (await toggleBtn.isVisible()) {
-      const initialWidth = await page
-        .locator('[data-slot="workspace-history-sidebar"]')
-        .boundingBox();
+    await expect(toggleBtn).toBeVisible();
+    const initialWidth = await page
+      .locator('[data-slot="workspace-history-sidebar"]')
+      .boundingBox();
 
-      await activate(toggleBtn);
-      await page.waitForTimeout(300);
+    await activate(toggleBtn);
+    await page.waitForTimeout(300);
 
-      const collapsedWidth = await page
-        .locator('[data-slot="workspace-history-sidebar"]')
-        .boundingBox();
+    const collapsedWidth = await page
+      .locator('[data-slot="workspace-history-sidebar"]')
+      .boundingBox();
 
-      // Sidebar should be narrower when collapsed
-      expect(collapsedWidth?.width).toBeLessThan(initialWidth?.width ?? 999);
-    }
+    // Sidebar should be narrower when collapsed
+    expect(collapsedWidth?.width).toBeLessThan(initialWidth?.width ?? 999);
   });
 
   test("active nav item is highlighted", async ({ page }) => {

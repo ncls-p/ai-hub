@@ -223,7 +223,7 @@ describe("skills – frontmatter parsing", () => {
 
 describe("skills – metadata validation", () => {
   it("accepts valid name", () => {
-    assertSkillMetadata("my-skill", "A description");
+    expect(() => assertSkillMetadata("my-skill", "A description")).not.toThrow();
   });
 
   it("rejects empty name", () => {

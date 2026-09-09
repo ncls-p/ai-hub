@@ -7,12 +7,13 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  esbuild: { jsx: "automatic" },
   test: {
     globals: true,
     environment: "node",
     testTimeout: 30_000,
     hookTimeout: 30_000,
-    include: ["test/**/*.test.ts"],
+    include: ["test/**/*.test.{ts,tsx}"],
     exclude: ["test/e2e/**"],
     setupFiles: ["./test/setup-env.ts"],
     coverage: {

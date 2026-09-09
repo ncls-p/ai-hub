@@ -234,6 +234,8 @@
     "publicConversation": {
       "loading": "Chargement de la conversation partagée…",
       "notFound": "Cette conversation partagée n’est pas disponible.",
+      "loadError": "Impossible de charger la conversation partagée. Réessayez.",
+      "retry": "Réessayer",
       "sharedBy": "Conversation partagée avec {agent}",
       "readOnly": "Vue publique en lecture seule",
       "user": "Utilisateur",

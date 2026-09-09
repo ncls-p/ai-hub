@@ -18,14 +18,12 @@ test.beforeEach(async ({ page }) => {
 test.describe("chat composer", () => {
   test("input field is present when agents exist", async ({ page }) => {
     await page.goto("/en/chat");
-    await page.waitForTimeout(2000);
-
-    // Chat composer / textarea should be present
     const composer = page.locator("textarea, [role='textbox']").first();
-
-    if (await composer.isVisible()) {
-      await expect(composer).toBeVisible();
-    }
+    await expect(composer).toBeVisible();
+    await expect(composer).toBeEditable();
+    await composer.fill("A draft that survives focus changes");
+    await composer.press("Tab");
+    await expect(composer).toHaveValue("A draft that survives focus changes");
   });
 
   test("keeps composer controls within the mobile viewport", async ({
