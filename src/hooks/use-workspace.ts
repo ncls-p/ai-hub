@@ -18,6 +18,7 @@ export type WorkspaceSummary = {
 };
 
 export type WorkspaceContextValue = {
+  sidebarNavConfig?: import("@/modules/navigation/sidebar-config").SidebarNavConfig;
   workspaceId: string | null;
   workspaces: WorkspaceSummary[];
   organizationName: string | null;
@@ -27,7 +28,7 @@ export type WorkspaceContextValue = {
   organizationHeroConfig: OrganizationHeroConfig | null;
   isLoading: boolean;
   error: string | null;
-  setWorkspaceId: (workspaceId: string) => void;
+  setWorkspaceId: (workspaceId: string) => void | Promise<boolean>;
   refresh: () => Promise<void>;
 };
 

@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import { applyOrganizationTheme } from "@/components/organization-theme";
 import {
   WorkspaceContext,
@@ -18,13 +20,40 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [workspaceId, setWorkspaceIdState] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [navigation, setNavigation] = useState<{
+    organizationId: string;
+    config:
+      | import("@/modules/navigation/sidebar-config").SidebarNavConfig
+      | null;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const setWorkspaceId = useCallback((nextWorkspaceId: string) => {
-    setWorkspaceIdState(nextWorkspaceId);
-    window.localStorage.setItem(ACTIVE_WORKSPACE_STORAGE_KEY, nextWorkspaceId);
-    void saveActiveWorkspace(nextWorkspaceId);
-  }, []);
+  const t = useTranslations("shell.workspaceSwitcher");
+  const selectionQueue = useRef(Promise.resolve(true));
+  const selectionRevision = useRef(0);
+  const setWorkspaceId = useCallback(
+    (nextWorkspaceId: string) => {
+      const revision = ++selectionRevision.current;
+      const saved = selectionQueue.current.then(() =>
+        saveActiveWorkspace(nextWorkspaceId),
+      );
+      selectionQueue.current = saved;
+      return saved.then((ok) => {
+        if (revision !== selectionRevision.current) return ok;
+        if (!ok) {
+          toast.error(t("failed"));
+          return false;
+        }
+        setWorkspaceIdState(nextWorkspaceId);
+        window.localStorage.setItem(
+          ACTIVE_WORKSPACE_STORAGE_KEY,
+          nextWorkspaceId,
+        );
+        return true;
+      });
+    },
+    [t],
+  );
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -73,9 +102,32 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     );
   }, [activeWorkspace]);
 
+  useEffect(() => {
+    if (!workspaceId) return;
+    const controller = new AbortController();
+    fetch(`/api/workspace/navigation?workspaceId=${workspaceId}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("navigation_unavailable");
+        return response.json();
+      })
+      .then((data) => {
+        if (!controller.signal.aborted) setNavigation(data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setNavigation(null);
+      });
+    return () => controller.abort();
+  }, [workspaceId, activeWorkspace]);
+
   const value = useMemo<WorkspaceContextValue>(
     () => ({
       workspaceId,
+      sidebarNavConfig:
+        navigation?.organizationId === activeWorkspace?.organizationId
+          ? (navigation?.config ?? undefined)
+          : undefined,
       workspaces,
       organizationName: activeWorkspace?.organizationName ?? null,
       organizationLogoUrl: activeWorkspace?.organizationLogoUrl ?? null,
@@ -88,6 +140,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       refresh,
     }),
     [
+      navigation,
+      activeWorkspace?.organizationId,
       workspaceId,
       workspaces,
       activeWorkspace?.organizationName,

@@ -1,4 +1,5 @@
 "use client";
+import { useSettingsOrganizationId } from "./organization-settings-context";
 import {
   SettingsDisabledNotice,
   SettingsFeatureToggle,
@@ -30,6 +31,7 @@ import {
   NONE,
 } from "./chat-automation-settings.none";
 export function ChatAutomationSettings() {
+  const organizationId = useSettingsOrganizationId();
   const t = useTranslations("admin.settingsPage.chatAutomation");
   const tPage = useTranslations("admin.settingsPage");
   const [state, setState] = useState<ChatAutomationState | null>(null);
@@ -43,7 +45,10 @@ export function ChatAutomationSettings() {
       setLoading(true);
       setLoadError(false);
       try {
-        const res = await fetch("/api/admin/chat-automation", { signal });
+        const res = await fetch(
+          `/api/admin/chat-automation?organizationId=${organizationId}`,
+          { signal },
+        );
         if (!res.ok) throw new Error(tPage("loadFailed"));
         const data = (await res.json()) as ChatAutomationState;
         if (signal?.aborted) return;
@@ -59,7 +64,7 @@ export function ChatAutomationSettings() {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [tPage],
+    [tPage, organizationId],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -84,15 +89,18 @@ export function ChatAutomationSettings() {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/chat-automation", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...config,
-          providerId: config.providerId || undefined,
-          modelId: config.modelId || undefined,
-        }),
-      });
+      const res = await fetch(
+        `/api/admin/chat-automation?organizationId=${organizationId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...config,
+            providerId: config.providerId || undefined,
+            modelId: config.modelId || undefined,
+          }),
+        },
+      );
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
         throw new Error(body.error || tPage("saveFailed"));
@@ -110,9 +118,12 @@ export function ChatAutomationSettings() {
   async function testConnection() {
     setTesting(true);
     try {
-      const res = await fetch("/api/admin/chat-automation/test", {
-        method: "POST",
-      });
+      const res = await fetch(
+        `/api/admin/chat-automation/test?organizationId=${organizationId}`,
+        {
+          method: "POST",
+        },
+      );
       const body = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
         throw new Error(body.error || t("testFailed"));

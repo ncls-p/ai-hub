@@ -42,10 +42,10 @@ describe("sidebar config server persistence", () => {
 
   it("returns null without settings and falls back to defaults for invalid values", async () => {
     chain.limit.mockResolvedValueOnce([]);
-    await expect(getSidebarNavConfig()).resolves.toBeNull();
+    await expect(getSidebarNavConfig("org-1")).resolves.toBeNull();
 
     chain.limit.mockResolvedValueOnce([{ valueJson: { bad: true } }]);
-    await expect(getSidebarNavConfig()).resolves.toEqual(
+    await expect(getSidebarNavConfig("org-1")).resolves.toEqual(
       defaultSidebarNavConfig(),
     );
   });
@@ -53,17 +53,19 @@ describe("sidebar config server persistence", () => {
   it("upserts and deletes sidebar navigation settings", async () => {
     const value = defaultSidebarNavConfig();
     chain.limit.mockResolvedValueOnce([{ valueJson: value }]);
-    await expect(setSidebarNavConfig(value, "user-1")).resolves.toEqual(value);
+    await expect(
+      setSidebarNavConfig(value, "user-1", "org-1"),
+    ).resolves.toEqual(value);
     expect(chain.values).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: "sidebarNavigation",
+        key: "sidebarNavigation:organization:org-1",
         valueJson: value,
         updatedById: "user-1",
       }),
     );
     expect(chain.onConflictDoUpdate).toHaveBeenCalled();
 
-    await deleteSidebarNavConfig();
+    await deleteSidebarNavConfig("org-1");
     expect(chain.delete).toHaveBeenCalled();
     expect(chain.where).toHaveBeenCalled();
   });

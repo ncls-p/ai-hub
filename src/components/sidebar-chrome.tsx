@@ -1,4 +1,5 @@
 "use client";
+import { WorkspaceContextSwitcher } from "./workspace-context-switcher";
 
 import { ChevronsUpDownIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -170,22 +171,7 @@ export function WorkspaceStatusFooter({
   name: string;
   context?: string | null;
 }) {
-  return (
-    <div className="mt-auto shrink-0 border-t border-sidebar-border/55 px-5 py-4">
-      <span className="flex items-center gap-2 text-xs font-medium text-sidebar-foreground">
-        <i
-          className="size-1.5 rounded-full bg-primary shadow-[0_0_10px_color-mix(in_oklch,var(--primary)_72%,transparent)]"
-          aria-hidden="true"
-        />
-        {name}
-      </span>
-      {context ? (
-        <span className="mt-1 block truncate pl-3.5 font-mono text-[0.58rem] uppercase tracking-[0.12em] text-muted-foreground">
-          {context}
-        </span>
-      ) : null}
-    </div>
-  );
+  return <WorkspaceContextSwitcher name={name} context={context} />;
 }
 
 export function sidebarNavItemClassName({

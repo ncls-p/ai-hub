@@ -39,10 +39,13 @@ export function resourceAvailabilityCondition(input: {
   id: AnyColumn;
   workspaceId: AnyColumn;
   activeWorkspaceId: string;
+  activeOrganizationId?: string;
   visibility?: AnyColumn;
   providerId?: AnyColumn;
 }): SQL {
-  const organizationId = sql`(select organization_id from workspaces where id = ${input.activeWorkspaceId})`;
+  const organizationId = input.activeOrganizationId
+    ? sql`${input.activeOrganizationId}`
+    : sql`(select organization_id from workspaces where id = ${input.activeWorkspaceId})`;
   return or(
     eq(input.workspaceId, input.activeWorkspaceId),
     sql`exists (select 1 from role_bindings b where b.principal_type = 'group' and b.principal_id = ${organizationId} and b.resource_type = ${input.type} and b.resource_id = ${input.id} and b.condition_json->>'source' = 'agent_scope' and (b.expires_at is null or b.expires_at > now()) and exists(select 1 from agents root where root.id::text = b.condition_json->>'rootAgentId' and root.archived_at is null))`,

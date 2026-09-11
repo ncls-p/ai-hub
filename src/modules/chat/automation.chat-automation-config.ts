@@ -1,3 +1,7 @@
+import {
+  automationModelAvailability,
+  automationProviderAvailability,
+} from "./automation.model-availability";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
@@ -7,6 +11,7 @@ import {
   aiModels,
   aiProviders,
   appSettings,
+  workspaces,
 } from "@/server/infrastructure/db/schema";
 import {
   type ProviderKind,
@@ -40,7 +45,8 @@ export type RuntimeModel = {
 };
 
 export type ResolveRuntimeResult =
-  { ok: true; runtime: RuntimeModel } | { ok: false; reason: string };
+  | { ok: true; runtime: RuntimeModel }
+  | { ok: false; reason: string };
 
 function defaultChatAutomationConfig(): ChatAutomationConfig {
   return {
@@ -55,11 +61,16 @@ function parseChatAutomationConfig(value: unknown): ChatAutomationConfig {
   return parsed.success ? parsed.data : defaultChatAutomationConfig();
 }
 
-export async function getChatAutomationConfig() {
+export async function getChatAutomationConfig(organizationId: string) {
   const [row] = await db
     .select({ valueJson: appSettings.valueJson })
     .from(appSettings)
-    .where(eq(appSettings.key, CHAT_AUTOMATION_SETTING_KEY))
+    .where(
+      eq(
+        appSettings.key,
+        `${CHAT_AUTOMATION_SETTING_KEY}:organization:${organizationId}`,
+      ),
+    )
     .limit(1);
   return parseChatAutomationConfig(row?.valueJson);
 }
@@ -67,12 +78,13 @@ export async function getChatAutomationConfig() {
 export async function setChatAutomationConfig(
   input: ChatAutomationConfig,
   updatedById: string,
+  organizationId: string,
 ) {
   const value = chatAutomationConfigSchema.parse(input);
   await db
     .insert(appSettings)
     .values({
-      key: CHAT_AUTOMATION_SETTING_KEY,
+      key: `${CHAT_AUTOMATION_SETTING_KEY}:organization:${organizationId}`,
       valueJson: value,
       updatedById,
       updatedAt: new Date(),
@@ -81,12 +93,12 @@ export async function setChatAutomationConfig(
       target: appSettings.key,
       set: { valueJson: value, updatedById, updatedAt: new Date() },
     });
-  return getChatAutomationConfig();
+  return getChatAutomationConfig(organizationId);
 }
 
-export async function getChatAutomationAdminState() {
+export async function getChatAutomationAdminState(organizationId: string) {
   const [config, providers] = await Promise.all([
-    getChatAutomationConfig(),
+    getChatAutomationConfig(organizationId),
     db
       .select({
         id: aiProviders.id,
@@ -95,7 +107,15 @@ export async function getChatAutomationAdminState() {
         enabled: aiProviders.enabled,
       })
       .from(aiProviders)
-      .where(and(eq(aiProviders.enabled, true), isNull(aiProviders.archivedAt)))
+      .innerJoin(workspaces, eq(workspaces.id, aiProviders.workspaceId))
+      .where(
+        and(
+          automationProviderAvailability(organizationId),
+          isNull(workspaces.archivedAt),
+          eq(aiProviders.enabled, true),
+          isNull(aiProviders.archivedAt),
+        ),
+      )
       .orderBy(aiProviders.name),
   ]);
 
@@ -108,7 +128,17 @@ export async function getChatAutomationAdminState() {
       enabled: aiModels.enabled,
     })
     .from(aiModels)
-    .where(eq(aiModels.enabled, true))
+    .innerJoin(aiProviders, eq(aiProviders.id, aiModels.providerId))
+    .innerJoin(workspaces, eq(workspaces.id, aiProviders.workspaceId))
+    .where(
+      and(
+        automationModelAvailability(organizationId),
+        isNull(workspaces.archivedAt),
+        eq(aiModels.enabled, true),
+        eq(aiProviders.enabled, true),
+        isNull(aiProviders.archivedAt),
+      ),
+    )
     .orderBy(aiModels.displayName, aiModels.modelId);
 
   return { config, providers, models };
@@ -135,6 +165,7 @@ export function validateChatAutomationConfigShape(
 
 export async function validateChatAutomationConfig(
   config: ChatAutomationConfig,
+  organizationId: string,
 ): Promise<{ ok: boolean; issues: ChatAutomationValidationIssue[] }> {
   const issues = validateChatAutomationConfigShape(config);
   if (issues.length > 0) {
@@ -144,7 +175,7 @@ export async function validateChatAutomationConfig(
     return { ok: true, issues: [] };
   }
 
-  const resolved = await resolveRuntimeModel(config);
+  const resolved = await resolveRuntimeModel(config, organizationId);
   if (!resolved.ok) {
     issues.push({
       code: "runtime_unavailable",

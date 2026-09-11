@@ -17,17 +17,33 @@ import {
 } from "./chat-automation-db.test.db-module";
 
 describe("chat automation runtime validation", () => {
+  it("does not decrypt credentials when the model is unavailable to the selected organization", async () => {
+    dbModule._c.limit
+      .mockResolvedValueOnce([provider])
+      .mockResolvedValueOnce([model])
+      .mockResolvedValueOnce([]);
+    expect(
+      (await validateChatAutomationConfig(enabledConfig, "other-org")).ok,
+    ).toBe(false);
+    expect(decryptValue).not.toHaveBeenCalled();
+  });
+
   it("rejects missing provider/model and unavailable runtime rows", async () => {
     await expect(
-      validateChatAutomationConfig({
-        enabled: true,
-        generateTitles: true,
-        generateSuggestions: true,
-      }),
+      validateChatAutomationConfig(
+        {
+          enabled: true,
+          generateTitles: true,
+          generateSuggestions: true,
+        },
+        "org-1",
+      ),
     ).resolves.toMatchObject({ ok: false });
 
     dbModule._c.limit.mockResolvedValueOnce([]);
-    await expect(validateChatAutomationConfig(enabledConfig)).resolves.toEqual({
+    await expect(
+      validateChatAutomationConfig(enabledConfig, "org-1"),
+    ).resolves.toEqual({
       ok: false,
       issues: [
         {
@@ -42,7 +58,9 @@ describe("chat automation runtime validation", () => {
     dbModule._c.limit
       .mockResolvedValueOnce([provider])
       .mockResolvedValueOnce([]);
-    await expect(validateChatAutomationConfig(enabledConfig)).resolves.toEqual({
+    await expect(
+      validateChatAutomationConfig(enabledConfig, "org-1"),
+    ).resolves.toEqual({
       ok: false,
       issues: [
         {
@@ -59,10 +77,14 @@ describe("chat automation runtime validation", () => {
       .mockResolvedValueOnce([{ valueJson: enabledConfig }])
       .mockResolvedValueOnce([provider])
       .mockResolvedValueOnce([model])
+      .mockResolvedValueOnce([{ id: "allowed" }])
       .mockResolvedValueOnce([provider])
-      .mockResolvedValueOnce([model]);
+      .mockResolvedValueOnce([model])
+      .mockResolvedValueOnce([{ id: "allowed" }]);
 
-    await expect(testChatAutomationConnection()).resolves.toEqual({ ok: true });
+    await expect(testChatAutomationConnection("org-1")).resolves.toEqual({
+      ok: true,
+    });
     expect(decryptValue).toHaveBeenCalledWith("api-key");
     expect(decryptValue).toHaveBeenCalledWith("header");
 
@@ -75,9 +97,11 @@ describe("chat automation runtime validation", () => {
       .mockResolvedValueOnce([{ valueJson: enabledConfig }])
       .mockResolvedValueOnce([provider])
       .mockResolvedValueOnce([model])
+      .mockResolvedValueOnce([{ id: "allowed" }])
       .mockResolvedValueOnce([provider])
-      .mockResolvedValueOnce([model]);
-    await expect(testChatAutomationConnection()).resolves.toEqual({
+      .mockResolvedValueOnce([model])
+      .mockResolvedValueOnce([{ id: "allowed" }]);
+    await expect(testChatAutomationConnection("org-1")).resolves.toEqual({
       ok: false,
       error: "Model returned an empty response.",
     });
@@ -88,9 +112,11 @@ describe("chat automation runtime validation", () => {
       .mockResolvedValueOnce([{ valueJson: enabledConfig }])
       .mockResolvedValueOnce([provider])
       .mockResolvedValueOnce([model])
+      .mockResolvedValueOnce([{ id: "allowed" }])
       .mockResolvedValueOnce([provider])
-      .mockResolvedValueOnce([model]);
-    await expect(testChatAutomationConnection()).resolves.toEqual({
+      .mockResolvedValueOnce([model])
+      .mockResolvedValueOnce([{ id: "allowed" }]);
+    await expect(testChatAutomationConnection("org-1")).resolves.toEqual({
       ok: false,
       error: "model down",
     });
@@ -104,6 +130,7 @@ describe("generateChatAutomationArtifacts", () => {
     ]);
     await expect(
       generateChatAutomationArtifacts({
+        workspaceId: "workspace-1",
         userMessage: "Bonjour aide moi",
         assistantText: "Bien sûr",
         fallbackTitle: "Fallback",
@@ -115,6 +142,7 @@ describe("generateChatAutomationArtifacts", () => {
       .mockResolvedValueOnce([{ valueJson: enabledConfig }])
       .mockResolvedValueOnce([]);
     const result = await generateChatAutomationArtifacts({
+      workspaceId: "workspace-1",
       userMessage: "Bonjour aide moi",
       assistantText: "Bien sûr",
       fallbackTitle: "Fallback",
@@ -140,9 +168,11 @@ describe("generateChatAutomationArtifacts", () => {
     dbModule._c.limit
       .mockResolvedValueOnce([{ valueJson: enabledConfig }])
       .mockResolvedValueOnce([provider])
-      .mockResolvedValueOnce([model]);
+      .mockResolvedValueOnce([model])
+      .mockResolvedValueOnce([{ id: "allowed" }]);
 
     const result = await generateChatAutomationArtifacts({
+      workspaceId: "workspace-1",
       userMessage: "Build a roadmap",
       assistantText: "Here is a plan",
       fallbackTitle: "Fallback",
@@ -161,9 +191,11 @@ describe("generateChatAutomationArtifacts", () => {
     dbModule._c.limit
       .mockResolvedValueOnce([{ valueJson: enabledConfig }])
       .mockResolvedValueOnce([provider])
-      .mockResolvedValueOnce([model]);
+      .mockResolvedValueOnce([model])
+      .mockResolvedValueOnce([{ id: "allowed" }]);
 
     const result = await generateChatAutomationArtifacts({
+      workspaceId: "workspace-1",
       userMessage: "Build a roadmap",
       assistantText: "Here is a plan",
       fallbackTitle: "Fallback",

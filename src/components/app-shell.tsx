@@ -1,4 +1,5 @@
 "use client";
+import { ImpersonationBanner } from "./impersonation-banner";
 
 import { usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
@@ -44,6 +45,7 @@ interface AppShellProps {
   currentUserId?: string;
   isAdmin?: boolean;
   sidebarNavConfig?: SidebarNavConfig;
+  impersonatedBy?: string | null;
 }
 
 const WorkspaceShellContext = createContext<WorkspaceShellState | null>(null);
@@ -156,11 +158,15 @@ export function AppShell({
   displayName,
   currentUserId,
   isAdmin,
-  sidebarNavConfig,
+  sidebarNavConfig: initialSidebarNavConfig,
+  impersonatedBy,
 }: AppShellProps) {
   const pathname = usePathname();
   const tShell = useTranslations("shell");
-  const { workspaceId } = useWorkspace();
+  const { workspaceId, sidebarNavConfig: organizationSidebarNavConfig } =
+    useWorkspace();
+  const sidebarNavConfig =
+    organizationSidebarNavConfig ?? initialSidebarNavConfig;
   const isChatRoute = pathname === "/chat" || pathname.startsWith("/chat/");
   const { orbitSection } = useShellRouteMetadata(pathname);
   const pendingToolCount = usePendingToolCount(workspaceId);
@@ -199,6 +205,10 @@ export function AppShell({
   return (
     <WorkspaceShellContext.Provider value={shellValue}>
       <div data-page="app-shell" className="app-shell">
+        <ImpersonationBanner
+          active={Boolean(impersonatedBy)}
+          name={displayName ?? ""}
+        />
         <a
           href="#workspace-main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-full focus:border focus:border-border/70 focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-lg"

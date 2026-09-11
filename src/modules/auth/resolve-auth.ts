@@ -10,6 +10,7 @@ export type AuthContext =
       email: string;
       name: string;
       role?: string | null;
+      impersonatedBy?: string;
     }
   | {
       type: "api_key";
@@ -53,6 +54,9 @@ export async function resolveAuthContext(
       email: session.user.email,
       name: session.user.name,
       role: session.user.role,
+      ...(session.session?.impersonatedBy
+        ? { impersonatedBy: session.session.impersonatedBy }
+        : {}),
     };
   }
 

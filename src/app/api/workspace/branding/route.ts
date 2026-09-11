@@ -10,7 +10,14 @@ import {
 import { THEME_TOKEN_KEYS } from "@/modules/organization/themes";
 import { ORGANIZATION_HERO_LOCALES } from "@/modules/organization/hero-branding";
 
-const querySchema = z.object({ workspaceId: z.uuid() });
+const querySchema = z
+  .object({
+    workspaceId: z.uuid().optional(),
+    organizationId: z.uuid().optional(),
+  })
+  .refine(
+    (value) => Boolean(value.workspaceId) !== Boolean(value.organizationId),
+  );
 const paletteSchema = z.record(
   z.enum(THEME_TOKEN_KEYS),
   z.string().regex(/^#[0-9a-fA-F]{6}$/),
@@ -36,7 +43,8 @@ const heroConfigSchema = z.object(
 );
 const updateSchema = z
   .strictObject({
-    workspaceId: z.uuid(),
+    workspaceId: z.uuid().optional(),
+    organizationId: z.uuid().optional(),
     theme: z.enum(ORGANIZATION_THEMES),
     themeConfig: themeConfigSchema.nullable().optional().default(null),
     heroConfig: heroConfigSchema.nullable().optional().default(null),
@@ -48,6 +56,10 @@ const updateSchema = z
       z.null(),
     ]),
   })
+  .refine(
+    (input) => Boolean(input.workspaceId) !== Boolean(input.organizationId),
+    { message: "Select one organization or project" },
+  )
   .refine((input) => input.theme !== "custom" || input.themeConfig !== null, {
     message: "A custom theme requires light and dark palettes",
     path: ["themeConfig"],
@@ -58,13 +70,16 @@ export async function GET(request: NextRequest) {
     request,
     async ({ session }) => {
       const parsed = querySchema.safeParse({
-        workspaceId: request.nextUrl.searchParams.get("workspaceId"),
+        workspaceId:
+          request.nextUrl.searchParams.get("workspaceId") ?? undefined,
+        organizationId:
+          request.nextUrl.searchParams.get("organizationId") ?? undefined,
       });
       if (!parsed.success) {
         return NextResponse.json({ error: "Invalid input" }, { status: 400 });
       }
       const branding = await getOrganizationBranding({
-        workspaceId: parsed.data.workspaceId,
+        ...parsed.data,
         userId: session.user.id,
       });
       return branding

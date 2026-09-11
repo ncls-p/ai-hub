@@ -1,5 +1,5 @@
 import { handleRoute } from "@/lib/route-handler";
-import { requireAdminApiSession } from "@/modules/admin/auth";
+import { requireOrganizationSettingsScope } from "@/modules/organization/settings-scope";
 import {
   defaultSidebarNavConfig,
   getSidebarNavCatalog,
@@ -25,12 +25,12 @@ const updateSchema = z.object({
     .min(1),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAdminApiSession();
+    const auth = await requireOrganizationSettingsScope(req);
     if (!auth.ok) return auth.response;
 
-    const saved = await getSidebarNavConfig();
+    const saved = await getSidebarNavConfig(auth.organizationId);
     return NextResponse.json({
       config: saved ?? defaultSidebarNavConfig(),
       catalog: getSidebarNavCatalog(),
@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest) {
   return handleRoute(
     req,
     async ({ session }) => {
-      const auth = await requireAdminApiSession();
+      const auth = await requireOrganizationSettingsScope(req);
       if (!auth.ok) return auth.response;
 
       const parsed = updateSchema.safeParse(await req.json());
@@ -68,23 +68,30 @@ export async function PATCH(req: NextRequest) {
         );
       }
 
-      const saved = await setSidebarNavConfig(config, session.user.id);
+      const saved = await setSidebarNavConfig(
+        config,
+        session.user.id,
+        auth.organizationId,
+      );
       return NextResponse.json({
         config: saved,
         catalog: getSidebarNavCatalog(),
         isCustomized: true,
       });
     },
-    { logLabel: "Failed to update sidebar navigation config" },
+    {
+      allowApiKey: false,
+      logLabel: "Failed to update sidebar navigation config",
+    },
   );
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   try {
-    const auth = await requireAdminApiSession();
+    const auth = await requireOrganizationSettingsScope(req);
     if (!auth.ok) return auth.response;
 
-    await deleteSidebarNavConfig();
+    await deleteSidebarNavConfig(auth.organizationId);
 
     return NextResponse.json({
       config: defaultSidebarNavConfig(),

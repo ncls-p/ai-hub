@@ -132,6 +132,14 @@ export async function listManagedOrganizations(
   return Promise.all(
     rows.map(async (organization) => ({
       canManageMembers: platformAdmin,
+      canManageSettings:
+        platformAdmin ||
+        (await authorization.hasPermission(
+          { principalType: "user", principalId: userId },
+          "organization.update",
+          "organization",
+          organization.id,
+        )),
       id: organization.id,
       name: organization.name,
       projects: visibleProjects.filter(

@@ -1,3 +1,4 @@
+import { ProjectTransferDialog } from "./project-transfer-dialog";
 import { GovernanceSelect } from "./governance-select";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { Building2Icon, PlusIcon } from "lucide-react";
@@ -110,6 +111,13 @@ export function AccessConsoleSection2({
           {snapshot.organization.name} · {t("inheritanceHint")}
         </p>
         <div className="flex flex-wrap gap-2 py-2">
+          {snapshot.actions.workspace["workspaces.transfer"] &&
+          snapshot.actions.organization["organization.transfer"] ? (
+            <ProjectTransferDialog
+              workspaceId={workspaceId}
+              onTransferred={() => load({ preserveData: true })}
+            />
+          ) : null}
           {canManageProjectLifecycle ||
           canManageOrganizationLifecycle ||
           snapshot.actions.workspace["workspaces.delete"] ||

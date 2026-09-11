@@ -1,3 +1,4 @@
+import { runWithRequestAuth } from "@/modules/auth/request-auth-context";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── DB mock ────────────────────────────────────────────────────────────
@@ -137,4 +138,30 @@ describe("audit.emit", () => {
       }),
     );
   });
+});
+
+it("records the responsible administrator for an impersonated action", async () => {
+  await runWithRequestAuth(
+    {
+      type: "user",
+      userId: "member",
+      name: "Member",
+      email: "member@example.test",
+      impersonatedBy: "admin",
+    },
+    () =>
+      audit.emit({
+        actorPrincipalType: "user",
+        actorPrincipalId: "member",
+        action: "agent.created",
+        outcome: "success",
+        metadata: { impersonatedBy: "untrusted" },
+      }),
+  );
+  expect(dbModule._insertChain.values).toHaveBeenCalledWith(
+    expect.objectContaining({
+      actorPrincipalId: "member",
+      metadataJson: { impersonatedBy: "admin" },
+    }),
+  );
 });

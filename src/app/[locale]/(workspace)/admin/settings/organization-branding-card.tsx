@@ -16,6 +16,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSettingsOrganizationId } from "@/components/admin/organization-settings-context";
 import { useWorkspace } from "@/hooks/use-workspace";
 import {
   type OrganizationTheme,
@@ -53,7 +54,11 @@ async function readLogo(file: File) {
 
 function OrganizationBrandingContent() {
   const t = useTranslations("settings.branding");
-  const { workspaceId, refresh } = useWorkspace();
+  const { workspaceId, workspaces, refresh } = useWorkspace();
+  const organizationId = useSettingsOrganizationId();
+  const scope = organizationId
+    ? `organizationId=${organizationId}`
+    : `workspaceId=${workspaceId}`;
   const inputRef = useRef<HTMLInputElement>(null);
   const [branding, setBranding] = useState<Branding | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -68,9 +73,9 @@ function OrganizationBrandingContent() {
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    if (!workspaceId) return;
+    if (!organizationId && !workspaceId) return;
     const controller = new AbortController();
-    void fetch(`/api/workspace/branding?workspaceId=${workspaceId}`, {
+    void fetch(`/api/workspace/branding?${scope}`, {
       signal: controller.signal,
     })
       .then((response) => {
@@ -90,7 +95,7 @@ function OrganizationBrandingContent() {
         if (error.name !== "AbortError") setLoadError(true);
       });
     return () => controller.abort();
-  }, [t, workspaceId, retry]);
+  }, [t, workspaceId, organizationId, scope, retry]);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -111,14 +116,14 @@ function OrganizationBrandingContent() {
   }
 
   async function save() {
-    if (!workspaceId || !branding?.canManage) return;
+    if ((!organizationId && !workspaceId) || !branding?.canManage) return;
     setSaving(true);
     try {
       const response = await fetch("/api/workspace/branding", {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          workspaceId,
+          ...(organizationId ? { organizationId } : { workspaceId }),
           logoUrl,
           theme,
           themeConfig,
@@ -126,7 +131,12 @@ function OrganizationBrandingContent() {
         }),
       });
       if (!response.ok) throw new Error("save_failed");
-      applyOrganizationTheme(theme, themeConfig);
+      if (
+        !organizationId ||
+        workspaces.find((project) => project.id === workspaceId)
+          ?.organizationId === organizationId
+      )
+        applyOrganizationTheme(theme, themeConfig);
       await refresh();
       setBranding({ ...branding, logoUrl, theme, themeConfig, heroConfig });
       toast.success(t("saved"));
@@ -272,12 +282,13 @@ function OrganizationBrandingContent() {
 
 export function OrganizationBrandingCard() {
   const { workspaceId, isLoading } = useWorkspace();
+  const organizationId = useSettingsOrganizationId();
   const t = useTranslations("settings.branding");
-  if (isLoading && !workspaceId)
+  if (isLoading && !workspaceId && !organizationId)
     return <Skeleton className="h-80 rounded-2xl" />;
-  if (!workspaceId)
+  if (!workspaceId && !organizationId)
     return (
       <p className="text-sm text-muted-foreground">{t("noOrganization")}</p>
     );
-  return <OrganizationBrandingContent key={workspaceId} />;
+  return <OrganizationBrandingContent key={organizationId ?? workspaceId} />;
 }

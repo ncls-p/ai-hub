@@ -1,3 +1,4 @@
+import { organizationIdForWorkspace } from "@/modules/organization/workspace-organization";
 import { applyUsageLimits } from "@/modules/usage/limited-language-model";
 import type { UsageLimitContext } from "@/modules/usage/usage-limits";
 import { generateText } from "ai";
@@ -118,7 +119,11 @@ export async function generateChatAutomationArtifacts(input: {
   fallbackTitle: string;
   generateSuggestions?: boolean;
 }) {
-  const config = await getChatAutomationConfig();
+  const organizationId = input.workspaceId
+    ? await organizationIdForWorkspace(input.workspaceId)
+    : null;
+  if (!organizationId) return { title: input.fallbackTitle, suggestions: [] };
+  const config = await getChatAutomationConfig(organizationId);
   const shouldGenerateTitle = config.enabled && config.generateTitles;
   const shouldGenerateSuggestions =
     config.enabled &&
@@ -128,7 +133,7 @@ export async function generateChatAutomationArtifacts(input: {
     return { title: input.fallbackTitle, suggestions: [] };
   }
 
-  const resolved = await resolveRuntimeModel(config);
+  const resolved = await resolveRuntimeModel(config, organizationId);
   if (!resolved.ok) {
     logHandledWarning(
       "Chat automation runtime unavailable, using local fallback",
