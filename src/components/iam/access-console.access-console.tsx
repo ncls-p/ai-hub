@@ -1,5 +1,6 @@
 "use client";
 
+import { personHasProjectAccess } from "@/modules/iam/filter-access-people";
 import { useAccessSnapshot } from "./use-access-snapshot";
 import { AccessProjectSelector } from "./access-project-selector";
 
@@ -67,6 +68,8 @@ export function useAccessConsoleController({
     scopeType: "workspace" as "organization" | "workspace",
   });
   const [peopleQuery, setPeopleQuery] = useState("");
+  const [peopleTeamId, setPeopleTeamId] = useState("all");
+  const [peopleProjectOnly, setPeopleProjectOnly] = useState(false);
   const [teamQuery, setTeamQuery] = useState("");
   const [roleQuery, setRoleQuery] = useState("");
   const [permissionQuery, setPermissionQuery] = useState("");
@@ -258,8 +261,18 @@ export function useAccessConsoleController({
     assignments: snapshot.assignments,
     teams: snapshot.teams,
   });
+  const selectedTeamId = snapshot.teams.some((team) => team.id === peopleTeamId)
+    ? peopleTeamId
+    : "all";
   const normalizedPeopleQuery = peopleQuery.trim().toLocaleLowerCase();
   const people = accessPeople.filter((person) => {
+    if (
+      selectedTeamId !== "all" &&
+      !person.teams.some((team) => team.id === selectedTeamId)
+    )
+      return false;
+    if (peopleProjectOnly && !personHasProjectAccess(person, snapshot))
+      return false;
     if (!normalizedPeopleQuery) return true;
     return [
       person.name,
@@ -370,6 +383,11 @@ export function useAccessConsoleController({
     pendingAction,
     people,
     peopleQuery,
+    peopleTeamId: selectedTeamId,
+    peopleProjectOnly,
+    setPeopleTeamId,
+    setPeopleProjectOnly,
+    totalPeopleCount: accessPeople.length,
     permissionQuery,
     platformUsers,
     previewSelectedMemberTransfer,

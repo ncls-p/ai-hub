@@ -1,3 +1,4 @@
+import { AccessPeopleFilters } from "./access-people-filters";
 import { SearchIcon } from "lucide-react";
 
 import {
@@ -60,6 +61,7 @@ export function AccessMainSection3({
                 aria-label={t("searchPeople")}
                 onChange={(event) => {
                   setPeopleQuery(event.target.value);
+                  model.setSelectedPeople([]);
                   setVisiblePeopleCount(25);
                 }}
               />
@@ -69,6 +71,8 @@ export function AccessMainSection3({
               <AccessPeopleBranch4 model={model} />
             ) : null}
           </div>
+
+          <AccessPeopleFilters model={model} />
 
           {people.length === 0 ? (
             <AccessPeopleBranch3 model={model} />

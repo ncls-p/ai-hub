@@ -18,11 +18,18 @@ function parseSidebarNavConfig(value: unknown): SidebarNavConfig {
   return parsed.success ? parsed.data : defaultSidebarNavConfig();
 }
 
-export async function getSidebarNavConfig(): Promise<SidebarNavConfig | null> {
+export async function getSidebarNavConfig(
+  organizationId: string,
+): Promise<SidebarNavConfig | null> {
   const [row] = await db
     .select({ valueJson: appSettings.valueJson })
     .from(appSettings)
-    .where(eq(appSettings.key, SIDEBAR_NAV_SETTING_KEY))
+    .where(
+      eq(
+        appSettings.key,
+        `${SIDEBAR_NAV_SETTING_KEY}:organization:${organizationId}`,
+      ),
+    )
     .limit(1);
   if (!row) return null;
   return parseSidebarNavConfig(row.valueJson);
@@ -31,12 +38,13 @@ export async function getSidebarNavConfig(): Promise<SidebarNavConfig | null> {
 export async function setSidebarNavConfig(
   input: SidebarNavConfig,
   updatedById: string,
+  organizationId: string,
 ) {
   const value = sidebarNavConfigSchema.parse(input);
   await db
     .insert(appSettings)
     .values({
-      key: SIDEBAR_NAV_SETTING_KEY,
+      key: `${SIDEBAR_NAV_SETTING_KEY}:organization:${organizationId}`,
       valueJson: value,
       updatedById,
       updatedAt: new Date(),
@@ -45,11 +53,16 @@ export async function setSidebarNavConfig(
       target: appSettings.key,
       set: { valueJson: value, updatedById, updatedAt: new Date() },
     });
-  return getSidebarNavConfig();
+  return getSidebarNavConfig(organizationId);
 }
 
-export async function deleteSidebarNavConfig() {
+export async function deleteSidebarNavConfig(organizationId: string) {
   await db
     .delete(appSettings)
-    .where(eq(appSettings.key, SIDEBAR_NAV_SETTING_KEY));
+    .where(
+      eq(
+        appSettings.key,
+        `${SIDEBAR_NAV_SETTING_KEY}:organization:${organizationId}`,
+      ),
+    );
 }

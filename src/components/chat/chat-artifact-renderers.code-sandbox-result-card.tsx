@@ -71,21 +71,22 @@ export function CodeSandboxResultCard({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {input?.code ? (
-            <Button
-              type={BUTTON_TYPE}
-              variant={GHOST_VARIANT}
-              size="sm"
-              className="h-10 rounded-xl px-3 text-[11px]"
-              onClick={() => setSourceOpen((current) => !current)}
-            >
-              {t("sourceCode")}
-              <span className="t-acc-chevron">
-                <ChevronDownIcon
-                  className={COMPACT_ICON_CLASS}
-                  aria-hidden="true"
-                />
-              </span>
-            </Button>
+            <CollapsibleTrigger asChild>
+              <Button
+                type={BUTTON_TYPE}
+                variant={GHOST_VARIANT}
+                size="sm"
+                className="h-10 rounded-xl px-3 text-[11px]"
+              >
+                {t("sourceCode")}
+                <span className="t-acc-chevron">
+                  <ChevronDownIcon
+                    className={COMPACT_ICON_CLASS}
+                    aria-hidden="true"
+                  />
+                </span>
+              </Button>
+            </CollapsibleTrigger>
           ) : null}
           <span
             className={cn(
@@ -101,8 +102,8 @@ export function CodeSandboxResultCard({
       </div>
       <div className="flex flex-col gap-3 p-3">
         {input?.code ? (
-          <CollapsibleContent forceMount className="t-acc-panel">
-            <div className="t-acc-panel-inner">
+          <CollapsibleContent>
+            <div>
               <div className="flex flex-col gap-2 rounded-xl bg-muted/20 p-2.5 shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--border)_55%,transparent)]">
                 <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   <span>{t("executedCode", { language })}</span>

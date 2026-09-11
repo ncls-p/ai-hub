@@ -1,3 +1,4 @@
+import { getRequestAuthContext } from "@/modules/auth/request-auth-context";
 import { logHandledError } from "@/lib/logger";
 import { db } from "@/server/infrastructure/db";
 import { auditEvents } from "@/server/infrastructure/db/schema";
@@ -19,6 +20,9 @@ export interface AuditEventInput {
 export const audit = {
   async emit(event: AuditEventInput): Promise<void> {
     try {
+      const context = getRequestAuthContext();
+      const impersonatedBy =
+        context?.type === "user" ? context.impersonatedBy : undefined;
       await db.insert(auditEvents).values({
         organizationId: event.organizationId || null,
         workspaceId: event.workspaceId || null,
@@ -30,7 +34,9 @@ export const audit = {
         outcome: event.outcome,
         ipAddress: event.ipAddress || null,
         userAgent: event.userAgent || null,
-        metadataJson: event.metadata || null,
+        metadataJson: impersonatedBy
+          ? { ...event.metadata, impersonatedBy }
+          : event.metadata || null,
       });
     } catch (error) {
       logHandledError("Failed to write audit event", {

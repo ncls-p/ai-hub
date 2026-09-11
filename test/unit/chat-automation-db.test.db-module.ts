@@ -1,3 +1,6 @@
+vi.mock("@/modules/organization/workspace-organization", () => ({
+  organizationIdForWorkspace: vi.fn().mockResolvedValue("org-1"),
+}));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { decryptValue } from "@/lib/crypto";
@@ -35,6 +38,7 @@ vi.mock("@/server/infrastructure/providers", () => ({
 type Chain = {
   select: ReturnType<typeof vi.fn>;
   insert: ReturnType<typeof vi.fn>;
+  innerJoin: ReturnType<typeof vi.fn>;
   from: ReturnType<typeof vi.fn>;
   where: ReturnType<typeof vi.fn>;
   orderBy: ReturnType<typeof vi.fn>;
@@ -49,6 +53,7 @@ function makeChain(): Chain {
     "select",
     "insert",
     "from",
+    "innerJoin",
     "where",
     "orderBy",
     "values",
@@ -79,6 +84,7 @@ export function resetDb() {
     "select",
     "insert",
     "from",
+    "innerJoin",
     "where",
     "orderBy",
     "values",
@@ -138,6 +144,7 @@ describe("chat automation config", () => {
     const result = await setChatAutomationConfig(
       { enabled: false, generateTitles: true, generateSuggestions: false },
       "user-1",
+      "org-1",
     );
 
     expect(dbModule.db.insert).toHaveBeenCalled();
@@ -155,7 +162,7 @@ describe("chat automation config", () => {
       .mockResolvedValueOnce([{ id: providerId, name: "OpenAI" }])
       .mockResolvedValueOnce([{ id: modelId, modelId: "gpt" }]);
 
-    const result = await getChatAutomationAdminState();
+    const result = await getChatAutomationAdminState("org-1");
 
     expect(result.config.enabled).toBe(true);
     expect(result.providers).toHaveLength(1);

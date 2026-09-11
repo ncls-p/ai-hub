@@ -2410,7 +2410,15 @@
       "retry": "Retry",
       "noOrganization": "No active organization. Choose a project from your account menu."
     },
-    "accountTitle": "My account"
+    "accountTitle": "My account",
+    "organizationCustomization": {
+      "title": "Organization customization",
+      "description": "Name, appearance, navigation, and title and suggestion generation apply only to the selected organization.",
+      "organization": "Organization to customize",
+      "retry": "Retry",
+      "loading": "Loading…",
+      "readOnly": "You can view this organization; customization requires management permissions."
+    }
   },
   "admin": {
     "platformSettingsTitle": "App settings",
@@ -3666,6 +3674,49 @@
       "joinTeam": "Add to team {team}",
       "directAccessHint": "The roles below apply only to this project. Access inherited from the organization or teams is preserved.",
       "chooseRole": "Choose a role"
+    },
+    "navigation": {
+      "label": "Access sections",
+      "hint": "Access combines user, team and organization roles. Choose the project in People and permissions.",
+      "access": {
+        "title": "People and permissions",
+        "description": "Manage people, their teams, roles and resource access for the selected project."
+      },
+      "organizations": {
+        "title": "Organizations and projects",
+        "description": "Create an organization and add its members and projects. The first project can be created later."
+      },
+      "sharing": {
+        "title": "Organization sharing",
+        "description": "Choose a resource and the organizations that can use it. Editing rights stay with the source project."
+      },
+      "limits": {
+        "title": "Usage limits",
+        "description": "Set LLM limits by user, team or organization, then narrow them by provider and model."
+      }
+    },
+    "filters": {
+      "organization": "Organization",
+      "team": "Team",
+      "project": "Filter by project",
+      "allTeams": "All teams",
+      "allProjects": "All organization members",
+      "clear": "Clear filters",
+      "resultCount": "{count} of {total} people"
+    },
+    "projectTransfer": {
+      "open": "Change organization",
+      "title": "Transfer project",
+      "description": "The project keeps its identity, resources, secrets, documents and history in the destination organization.",
+      "destination": "Destination organization",
+      "empty": "No other organization with the required permissions.",
+      "preview": "Review transfer",
+      "confirm": "Transfer project",
+      "cancel": "Cancel",
+      "retry": "Retry",
+      "failed": "Transfer failed.",
+      "accessWarning": "Active project members join the destination organization. Linked teams are copied with their active members; their other projects remain in the source organization. Direct permissions are preserved. Inherited permissions, branding, customization and limits follow the destination organization.",
+      "dependenciesWarning": "Resources owned by other projects stay in place. Using them requires sharing with the destination organization. Existing explicit shares are preserved; chats remain personal."
     }
   },
   "shell": {
@@ -3692,7 +3743,15 @@
     "retryAccess": "Try again",
     "backToChat": "Back to chat",
     "myAccount": "My account",
-    "appSettings": "App settings"
+    "appSettings": "App settings",
+    "workspaceSwitcher": {
+      "switch": "Switch organization or project",
+      "choose": "Choose a context",
+      "search": "Search organizations or projects…",
+      "empty": "No matching accessible projects.",
+      "active": "Active project",
+      "failed": "Could not switch projects. Try again."
+    }
   },
   "auth": {
     "eyebrow": "Enterprise AI Workspace",
@@ -4246,5 +4305,13 @@
     },
     "memberEmail": "Existing user email",
     "addMember": "Add user to this organization"
+  },
+  "impersonation": {
+    "active": "Impersonation active: you are using {name}’s account.",
+    "stop": "Stop impersonating",
+    "stopping": "Returning to administrator…",
+    "error": "Could not restore the administrator session. Try again.",
+    "start": "Impersonate {name}",
+    "startError": "Could not start impersonation."
   }
 }

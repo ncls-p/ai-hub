@@ -20,7 +20,6 @@ const types = [
 ];
 export function ResourceDistributionPanel() {
   const t = useTranslations("governance");
-  const [open, setOpen] = useState(false);
   const [organizations, setOrganizations] = useState<DirectoryOrganization[]>(
     [],
   );
@@ -43,7 +42,6 @@ export function ResourceDistributionPanel() {
   const [saved, setSaved] = useState(false);
   const key = `${type}:${resourceId}`;
   useEffect(() => {
-    if (!open) return;
     const controller = new AbortController();
     fetchJson<{ organizations: DirectoryOrganization[] }>(
       "/api/organizations",
@@ -54,9 +52,9 @@ export function ResourceDistributionPanel() {
         if (!controller.signal.aborted) setError(error.message);
       });
     return () => controller.abort();
-  }, [open, revision]);
+  }, [revision]);
   useEffect(() => {
-    if (!open || !workspaceId) return;
+    if (!workspaceId) return;
     const controller = new AbortController();
     const params = new URLSearchParams({
       workspaceId,
@@ -81,7 +79,7 @@ export function ResourceDistributionPanel() {
         if (!controller.signal.aborted) setError(error.message);
       });
     return () => controller.abort();
-  }, [open, workspaceId, type, query, offset, revision]);
+  }, [workspaceId, type, query, offset, revision]);
   useEffect(() => {
     if (!resourceId) return;
     const controller = new AbortController();
@@ -135,14 +133,11 @@ export function ResourceDistributionPanel() {
     }
   }
   return (
-    <details
-      className="rounded-xl border p-4"
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+    <section
+      className="rounded-xl border bg-card p-4 sm:p-6"
+      aria-label={t("distribution")}
     >
-      <summary className="cursor-pointer font-medium">
-        {t("distribution")}
-      </summary>
+      <h2 className="text-base font-semibold">{t("distribution")}</h2>
       <div className="mt-4 flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">{t("distributionHint")}</p>
         {error ? (
@@ -280,6 +275,6 @@ export function ResourceDistributionPanel() {
           )
         ) : null}
       </div>
-    </details>
+    </section>
   );
 }

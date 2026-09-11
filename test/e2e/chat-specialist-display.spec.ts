@@ -197,6 +197,18 @@ test("keeps every specialist tool collapsed while showing explicitly published v
       page.getByRole("button", { name: "Show all specialist details" }),
     );
     await expect(page.getByText("chart.png", { exact: true })).toBeVisible();
+    const source = page.getByRole("button", {
+      name: "Source code",
+      exact: true,
+    });
+    await source.click();
+    await expect(
+      page.locator("pre").filter({ hasText: "make_chart()" }),
+    ).toBeVisible();
+    await source.click();
+    await expect(
+      page.locator("pre").filter({ hasText: "make_chart()" }),
+    ).not.toBeVisible();
     await expect(page.getByText("web search", { exact: true })).toBeVisible();
     await activate(
       page.getByRole("button", { name: "Hide specialist details" }),

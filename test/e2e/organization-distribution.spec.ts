@@ -71,7 +71,9 @@ test("creates an empty organization, exposes organization agents across projects
   );
   expect(detail.ok(), await detail.text()).toBe(true);
   await page.goto("/en/members");
-  await page.getByText("Sharing across organizations", { exact: true }).click();
+  await page
+    .getByRole("tab", { name: "Organization sharing", exact: true })
+    .click();
   await page
     .getByRole("combobox", { name: "Source project", exact: true })
     .click();
@@ -138,7 +140,7 @@ test("creates an empty organization, exposes organization agents across projects
     await sql.end();
   }
   await page.goto("/en/members");
-  await page.getByText("Usage limits", { exact: true }).click();
+  await page.getByRole("tab", { name: "Usage limits", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Add usage limit", exact: true }),
   ).toBeVisible();

@@ -1,3 +1,4 @@
+import { ImpersonatePerson } from "./impersonate-person";
 import { PersonMembershipsCell } from "./person-memberships-cell";
 import {
   EllipsisIcon,
@@ -246,6 +247,15 @@ export function AccessPeopleBranch2({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-64">
                       <DropdownMenuLabel>{person.name}</DropdownMenuLabel>
+                      {platformUsers &&
+                      !isCurrentUser &&
+                      person.platformRole !== "admin" &&
+                      !person.banned ? (
+                        <ImpersonatePerson
+                          userId={person.userId}
+                          name={person.name}
+                        />
+                      ) : null}
                       {isMember && canGrant ? (
                         <DropdownMenuItem
                           onSelect={() => {

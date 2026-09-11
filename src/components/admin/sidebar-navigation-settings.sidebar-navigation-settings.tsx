@@ -1,4 +1,6 @@
 "use client";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { useSettingsOrganizationId } from "./organization-settings-context";
 import {
   SettingsLoadError,
   SettingsSection,
@@ -33,6 +35,8 @@ import {
   SidebarNavState,
 } from "./sidebar-navigation-settings.sidebar-nav-item";
 export function SidebarNavigationSettings() {
+  const organizationId = useSettingsOrganizationId();
+  const workspace = useWorkspace();
   const t = useTranslations("admin.settingsPage.sidebarNavigation");
   const tPage = useTranslations("admin.settingsPage");
   const tNav = useTranslations("nav");
@@ -49,7 +53,10 @@ export function SidebarNavigationSettings() {
       setLoading(true);
       setLoadError(false);
       try {
-        const res = await fetch("/api/admin/sidebar-navigation", { signal });
+        const res = await fetch(
+          `/api/admin/sidebar-navigation?organizationId=${organizationId}`,
+          { signal },
+        );
         if (!res.ok) throw new Error(tPage("loadFailed"));
         const data = (await res.json()) as SidebarNavState;
         if (signal?.aborted) return;
@@ -65,7 +72,7 @@ export function SidebarNavigationSettings() {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [tPage],
+    [tPage, organizationId],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -124,11 +131,14 @@ export function SidebarNavigationSettings() {
   async function save() {
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/sidebar-navigation", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
-      });
+      const res = await fetch(
+        `/api/admin/sidebar-navigation?organizationId=${organizationId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items }),
+        },
+      );
       if (!res.ok) {
         throw new Error((await res.json()).error || tPage("saveFailed"));
       }
@@ -136,6 +146,7 @@ export function SidebarNavigationSettings() {
       setState(data);
       setItems(data.config.items);
       toast.success(t("saved"));
+      await workspace.refresh();
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tPage("saveFailed"));
@@ -147,9 +158,12 @@ export function SidebarNavigationSettings() {
   async function resetDefaults() {
     setResetting(true);
     try {
-      const res = await fetch("/api/admin/sidebar-navigation", {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/admin/sidebar-navigation?organizationId=${organizationId}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (!res.ok) {
         throw new Error((await res.json()).error || tPage("resetFailed"));
       }
@@ -157,6 +171,7 @@ export function SidebarNavigationSettings() {
       setState(data);
       setItems(data.config.items);
       toast.success(t("resetDone"));
+      await workspace.refresh();
       router.refresh();
     } catch (error) {
       toast.error(

@@ -1,5 +1,5 @@
 import { handleRoute } from "@/lib/route-handler";
-import { requireAdminApiSession } from "@/modules/admin/auth";
+import { requireOrganizationSettingsScope } from "@/modules/organization/settings-scope";
 import { testChatAutomationConnection } from "@/modules/chat/automation";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -7,9 +7,9 @@ export async function POST(req: NextRequest) {
   return handleRoute(
     req,
     async () => {
-      const auth = await requireAdminApiSession();
+      const auth = await requireOrganizationSettingsScope(req);
       if (!auth.ok) return auth.response;
-      const result = await testChatAutomationConnection();
+      const result = await testChatAutomationConnection(auth.organizationId);
       if (!result.ok) {
         return NextResponse.json(result, { status: 400 });
       }

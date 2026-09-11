@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { type CodeSandboxInputPreview } from "@/components/chat/chat-message-rendering-utils";
 import { ToolStateIcon } from "@/components/chat/tool-state-icon";
@@ -20,6 +20,8 @@ export function LiveToolInputCard({
   embedded?: boolean;
 }) {
   const t = useTranslations("chat.artifacts");
+  const codeRef = useRef<HTMLPreElement>(null);
+  const followCode = useRef(true);
   const visibleInputText = useMemo(() => {
     if (inputText.length <= MAX_LIVE_TOOL_INPUT_CHARS) return inputText;
     return `…${inputText.length - MAX_LIVE_TOOL_INPUT_CHARS} earlier characters hidden while streaming\n${inputText.slice(-MAX_LIVE_TOOL_INPUT_CHARS)}`;
@@ -31,6 +33,11 @@ export function LiveToolInputCard({
     return `…${code.length - MAX_LIVE_TOOL_INPUT_CHARS} earlier characters hidden while streaming\n${code.slice(-MAX_LIVE_TOOL_INPUT_CHARS)}`;
   }, [sandboxInput?.code]);
   const displayText = visibleCode || visibleInputText;
+
+  useEffect(() => {
+    const element = codeRef.current;
+    if (element && followCode.current) element.scrollTop = element.scrollHeight;
+  }, [displayText]);
 
   return (
     <div
@@ -82,7 +89,16 @@ export function LiveToolInputCard({
           ) : null}
         </div>
       ) : null}
-      <pre className="max-h-72 overflow-auto bg-muted/20 p-3 font-mono text-[11px] leading-4 text-muted-foreground whitespace-pre-wrap">
+      <pre
+        ref={codeRef}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          followCode.current =
+            element.scrollHeight - element.scrollTop - element.clientHeight <
+            32;
+        }}
+        className="max-h-72 overflow-auto bg-muted/20 p-3 font-mono text-[11px] leading-4 text-muted-foreground whitespace-pre-wrap"
+      >
         {displayText || t("waitingInput")}
       </pre>
     </div>

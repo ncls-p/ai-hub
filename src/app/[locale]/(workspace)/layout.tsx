@@ -7,7 +7,6 @@ import { OnboardingRedirect } from "@/components/onboarding-redirect";
 import { WorkspaceProvider } from "@/components/workspace-provider";
 import { isPlatformAdminSession } from "@/modules/admin/auth";
 import { getSession } from "@/modules/auth/session";
-import { getSidebarNavConfig } from "@/modules/navigation/sidebar-config.server";
 import { ensureWorkspaceForUser } from "@/modules/workspace/use-cases";
 
 export const metadata: Metadata = {
@@ -35,7 +34,6 @@ export default async function WorkspaceLayout({
     userId: user.id,
     role: isAdmin ? "admin" : user.role,
   });
-  const sidebarNavConfig = await getSidebarNavConfig();
 
   return (
     <WorkspaceProvider>
@@ -44,7 +42,7 @@ export default async function WorkspaceLayout({
         displayName={displayName}
         currentUserId={user.id}
         isAdmin={isAdmin}
-        sidebarNavConfig={sidebarNavConfig ?? undefined}
+        impersonatedBy={session.session.impersonatedBy}
       >
         <div className="page-content h-full">{children}</div>
       </AppShell>

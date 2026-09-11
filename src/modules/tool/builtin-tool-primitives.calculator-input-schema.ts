@@ -62,7 +62,7 @@ export const codeSandboxInputSchema = z.object({
     .boolean()
     .default(false)
     .describe(
-      "Set true only when showing the sandbox result, logs, or generated files directly in chat helps the user. Leave false for internal checks and intermediate work so the execution stays in the collapsed tool trace.",
+      "Set true only when showing the sandbox result, logs, or generated files directly in chat helps the user. Leave false for internal checks and intermediate work so the completed execution stays in the collapsed tool trace. Code is shown live while being written.",
     ),
   stdin: runtimeLimitedString(100_000, "Standard input").optional(),
   files: z

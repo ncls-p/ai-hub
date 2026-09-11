@@ -1,5 +1,5 @@
-import { handleAdminRoute } from "@/lib/route-handler";
-import { requireAdminApiSession } from "@/modules/admin/auth";
+import { handleRoute } from "@/lib/route-handler";
+import { requireOrganizationSettingsScope } from "@/modules/organization/settings-scope";
 import {
   getChatAutomationAdminState,
   setChatAutomationConfig,
@@ -33,11 +33,13 @@ const updateSchema = z
     }
   });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAdminApiSession();
+    const auth = await requireOrganizationSettingsScope(req);
     if (!auth.ok) return auth.response;
-    return NextResponse.json(await getChatAutomationAdminState());
+    return NextResponse.json(
+      await getChatAutomationAdminState(auth.organizationId),
+    );
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
@@ -47,10 +49,10 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  return handleAdminRoute(
+  return handleRoute(
     req,
     async ({ session }) => {
-      const auth = await requireAdminApiSession();
+      const auth = await requireOrganizationSettingsScope(req);
       if (!auth.ok) return auth.response;
       const parsed = updateSchema.safeParse(await req.json());
       if (!parsed.success) {
@@ -59,7 +61,10 @@ export async function PATCH(req: NextRequest) {
           { status: 400 },
         );
       }
-      const validation = await validateChatAutomationConfig(parsed.data);
+      const validation = await validateChatAutomationConfig(
+        parsed.data,
+        auth.organizationId,
+      );
       if (!validation.ok) {
         return NextResponse.json(
           {
@@ -72,9 +77,10 @@ export async function PATCH(req: NextRequest) {
       const config = await setChatAutomationConfig(
         parsed.data,
         session.user.id,
+        auth.organizationId,
       );
       return NextResponse.json(config);
     },
-    { logLabel: "Failed to update chat automation config" },
+    { allowApiKey: false, logLabel: "Failed to update chat automation config" },
   );
 }

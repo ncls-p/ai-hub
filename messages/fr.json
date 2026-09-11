@@ -2410,7 +2410,15 @@
       "retry": "Réessayer",
       "noOrganization": "Aucune organisation active. Choisissez un projet depuis le menu de votre compte."
     },
-    "accountTitle": "Mon compte"
+    "accountTitle": "Mon compte",
+    "organizationCustomization": {
+      "title": "Personnalisation par organisation",
+      "description": "Le nom, l’identité visuelle, la navigation et les générations de titres et suggestions s’appliquent uniquement à l’organisation sélectionnée.",
+      "organization": "Organisation à personnaliser",
+      "retry": "Réessayer",
+      "loading": "Chargement…",
+      "readOnly": "Vous pouvez consulter cette organisation ; sa personnalisation nécessite les droits de gestion."
+    }
   },
   "admin": {
     "platformSettingsTitle": "Paramètres de l’application",
@@ -3666,6 +3674,49 @@
       "joinTeam": "Ajouter à l’équipe {team}",
       "directAccessHint": "Les rôles ci-dessous concernent uniquement ce projet. Les accès hérités de l’organisation ou des équipes sont conservés.",
       "chooseRole": "Choisir un rôle"
+    },
+    "navigation": {
+      "label": "Rubriques des accès",
+      "hint": "Les droits se cumulent entre utilisateur, équipe et organisation. Choisissez le projet dans la rubrique Membres et droits.",
+      "access": {
+        "title": "Membres et droits",
+        "description": "Gérez les utilisateurs, leurs équipes, les rôles et les accès aux ressources du projet sélectionné."
+      },
+      "organizations": {
+        "title": "Organisations et projets",
+        "description": "Créez une organisation, ajoutez ses membres et ses projets. Le premier projet peut être créé plus tard."
+      },
+      "sharing": {
+        "title": "Partage entre organisations",
+        "description": "Choisissez une ressource et les organisations qui peuvent l’utiliser. Les droits de modification restent dans le projet d’origine."
+      },
+      "limits": {
+        "title": "Limites d’usage",
+        "description": "Définissez les plafonds LLM par utilisateur, équipe ou organisation, puis affinez par fournisseur et modèle."
+      }
+    },
+    "filters": {
+      "organization": "Organisation",
+      "team": "Équipe",
+      "project": "Filtrer par projet",
+      "allTeams": "Toutes les équipes",
+      "allProjects": "Tous les membres de l’organisation",
+      "clear": "Effacer les filtres",
+      "resultCount": "{count} personne(s) sur {total}"
+    },
+    "projectTransfer": {
+      "open": "Changer d’organisation",
+      "title": "Transférer le projet",
+      "description": "Le projet conserve son identité, ses ressources, ses secrets, ses documents et son historique dans l’organisation de destination.",
+      "destination": "Organisation de destination",
+      "empty": "Aucune autre organisation avec les droits nécessaires.",
+      "preview": "Vérifier le transfert",
+      "confirm": "Transférer le projet",
+      "cancel": "Annuler",
+      "retry": "Réessayer",
+      "failed": "Le transfert a échoué.",
+      "accessWarning": "Les membres actifs du projet rejoignent l’organisation cible. Les équipes liées sont copiées avec leurs membres actifs ; leurs autres projets restent dans l’organisation source. Les droits directs sont conservés. Les droits hérités, l’identité visuelle, les personnalisations et les limites deviennent ceux de l’organisation cible.",
+      "dependenciesWarning": "Les ressources appartenant à d’autres projets restent à leur place. Leur utilisation nécessite un partage avec l’organisation cible. Les partages explicites existants sont conservés ; les chats restent personnels."
     }
   },
   "shell": {
@@ -3692,7 +3743,15 @@
     "retryAccess": "Réessayer",
     "backToChat": "Revenir au chat",
     "myAccount": "Mon compte",
-    "appSettings": "Paramètres de l’application"
+    "appSettings": "Paramètres de l’application",
+    "workspaceSwitcher": {
+      "switch": "Changer d’organisation ou de projet",
+      "choose": "Choisir un contexte",
+      "search": "Rechercher une organisation ou un projet…",
+      "empty": "Aucun projet accessible ne correspond.",
+      "active": "Projet actif",
+      "failed": "Le changement de projet a échoué. Réessayez."
+    }
   },
   "auth": {
     "eyebrow": "Espace IA d’entreprise",
@@ -4246,5 +4305,13 @@
     },
     "memberEmail": "E-mail d’un utilisateur existant",
     "addMember": "Ajouter à cette organisation"
+  },
+  "impersonation": {
+    "active": "Impersonation active : vous utilisez le compte de {name}.",
+    "stop": "Arrêter l’impersonation",
+    "stopping": "Retour au compte administrateur…",
+    "error": "Impossible de revenir au compte administrateur. Réessayez.",
+    "start": "Se connecter en tant que {name}",
+    "startError": "Impossible de démarrer l’impersonation."
   }
 }

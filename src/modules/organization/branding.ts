@@ -25,10 +25,21 @@ async function organizationForWorkspace(workspaceId: string) {
 }
 
 export async function getOrganizationBranding(input: {
-  workspaceId: string;
+  workspaceId?: string;
+  organizationId?: string;
   userId: string;
 }) {
-  const organization = await organizationForWorkspace(input.workspaceId);
+  const organization = input.organizationId
+    ? (
+        await db
+          .select()
+          .from(organizations)
+          .where(eq(organizations.id, input.organizationId))
+          .limit(1)
+      )[0]
+    : input.workspaceId
+      ? await organizationForWorkspace(input.workspaceId)
+      : null;
   if (!organization) return null;
   const principal = {
     principalType: "user" as const,
@@ -61,7 +72,8 @@ export async function getOrganizationBranding(input: {
 }
 
 export async function updateOrganizationBranding(input: {
-  workspaceId: string;
+  workspaceId?: string;
+  organizationId?: string;
   userId: string;
   logoUrl: string | null;
   theme: OrganizationTheme;

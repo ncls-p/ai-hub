@@ -69,9 +69,15 @@ test.describe("settings page", () => {
     await resetBranding();
     try {
       await page.goto("/en/admin/settings");
-      const branding = page.locator("section").filter({
-        has: page.getByRole("heading", { name: "Organization branding" }),
-      });
+      const branding = page
+        .getByRole("region", {
+          name: "Organization customization",
+          exact: true,
+        })
+        .locator("section")
+        .filter({
+          has: page.getByRole("heading", { name: "Organization branding" }),
+        });
       await expect(branding).toBeVisible();
 
       await branding.getByRole("button", { name: "Forest" }).click();
@@ -128,9 +134,15 @@ test.describe("settings page", () => {
 
     try {
       await page.goto("/en/admin/settings");
-      const branding = page.locator("section").filter({
-        has: page.getByRole("heading", { name: "Organization branding" }),
-      });
+      const branding = page
+        .getByRole("region", {
+          name: "Organization customization",
+          exact: true,
+        })
+        .locator("section")
+        .filter({
+          has: page.getByRole("heading", { name: "Organization branding" }),
+        });
       await branding.getByRole("button", { name: "Custom" }).click();
       await branding
         .getByLabel("light primary", { exact: true })

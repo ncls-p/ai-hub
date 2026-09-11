@@ -234,6 +234,11 @@ export const authorization = {
     return isMember;
   },
 
+  async invalidateAllPermissionCaches(): Promise<void> {
+    permissionResolutions.clear();
+    await cache.delByPrefix("perm:");
+  },
+
   async invalidatePermissionCache(
     principalId: string,
     resourceType: ResourceType,

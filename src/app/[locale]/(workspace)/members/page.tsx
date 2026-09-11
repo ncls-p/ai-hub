@@ -1,6 +1,4 @@
-import { ResourceDistributionPanel } from "@/components/iam/resource-distribution-panel";
-import { UsageLimitsPanel } from "@/components/iam/usage-limits-panel";
-import { OrganizationDirectory } from "@/components/iam/organization-directory";
+import { AccessPageNavigation } from "@/components/iam/access-page-navigation";
 import { getTranslations } from "next-intl/server";
 
 import { AccessConsole } from "@/components/iam/access-console";
@@ -21,24 +19,19 @@ export default async function MembersPage() {
       description={t("description")}
       width="wide"
     >
-      <OrganizationDirectory />
-      {isPlatformAdmin ? (
-        <>
-          <ResourceDistributionPanel />
-          <UsageLimitsPanel />
-        </>
-      ) : null}
-      <AccessConsole
-        platformUsers={
-          isPlatformAdmin
-            ? users.map((user) => ({
-                ...user,
-                createdAt: user.createdAt.toISOString(),
-              }))
-            : undefined
-        }
-        currentUserId={session?.user.id}
-      />
+      <AccessPageNavigation isPlatformAdmin={isPlatformAdmin}>
+        <AccessConsole
+          platformUsers={
+            isPlatformAdmin
+              ? users.map((user) => ({
+                  ...user,
+                  createdAt: user.createdAt.toISOString(),
+                }))
+              : undefined
+          }
+          currentUserId={session?.user.id}
+        />
+      </AccessPageNavigation>
     </WorkspacePage>
   );
 }

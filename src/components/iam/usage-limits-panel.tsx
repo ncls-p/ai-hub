@@ -12,7 +12,6 @@ import {
 } from "./usage-limit-editor";
 export function UsageLimitsPanel() {
   const t = useTranslations("governance");
-  const [open, setOpen] = useState(false);
   const [catalog, setCatalog] = useState<LimitCatalog | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -20,7 +19,6 @@ export function UsageLimitsPanel() {
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<LimitRow | "new" | null>(null);
   useEffect(() => {
-    if (!open) return;
     const controller = new AbortController();
     fetchJson<LimitCatalog>("/api/admin/usage-limits", {
       signal: controller.signal,
@@ -33,7 +31,7 @@ export function UsageLimitsPanel() {
         if (!controller.signal.aborted) setError(error.message);
       });
     return () => controller.abort();
-  }, [open, revision]);
+  }, [revision]);
   async function mutate(
     method: "PUT" | "DELETE",
     data: Record<string, unknown>,
@@ -69,14 +67,11 @@ export function UsageLimitsPanel() {
     );
   }
   return (
-    <details
-      className="rounded-xl border p-4"
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+    <section
+      className="rounded-xl border bg-card p-4 sm:p-6"
+      aria-label={t("usageLimits")}
     >
-      <summary className="cursor-pointer font-medium">
-        {t("usageLimits")}
-      </summary>
+      <h2 className="text-base font-semibold">{t("usageLimits")}</h2>
       <div className="mt-4 flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">{t("usageLimitsHint")}</p>
         {error ? (
@@ -163,6 +158,6 @@ export function UsageLimitsPanel() {
           </>
         )}
       </div>
-    </details>
+    </section>
   );
 }
