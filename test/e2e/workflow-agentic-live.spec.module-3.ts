@@ -123,6 +123,13 @@ test("builds, saves, and runs a workflow through the real agentic provider strea
       page.getByText("Prepare summary", { exact: true }),
     ).toBeVisible();
 
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await page.getByRole("button", { name: "Agentic", exact: true }).click();
+      await page.getByRole("button", { name: "Visual", exact: true }).click();
+      await expect(
+        page.getByText("Prepare summary", { exact: true }),
+      ).toBeVisible();
+    }
     await page.reload();
     await page.getByRole("button", { name: "Agentic" }).click();
     await expect(

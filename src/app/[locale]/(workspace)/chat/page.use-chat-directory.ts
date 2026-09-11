@@ -54,6 +54,9 @@ export function useChatDirectory(
   const [loadingMoreConversations, setLoadingMoreConversations] =
     useState(false);
   const [loadingAgents, setLoadingAgents] = useState(true);
+  const [agentDirectoryWorkspaceId, setAgentDirectoryWorkspaceId] = useState<
+    string | null
+  >(null);
   const [loadingContext, setLoadingContext] = useState(false);
 
   const fetchConversationPage = useCallback(
@@ -281,6 +284,7 @@ export function useChatDirectory(
     if (!workspaceId) {
       queueMicrotask(() => {
         setAgents([]);
+        setAgentDirectoryWorkspaceId(null);
         setLoadingAgents(false);
       });
       return;
@@ -294,7 +298,10 @@ export function useChatDirectory(
             toast.error(error.message);
         })
         .finally(() => {
-          if (!cancelled) setLoadingAgents(false);
+          if (!cancelled) {
+            setAgentDirectoryWorkspaceId(workspaceId);
+            setLoadingAgents(false);
+          }
         });
     });
     return () => {
@@ -353,7 +360,9 @@ export function useChatDirectory(
     setConversationSearchState,
     setConversationSearchRevision,
     loadingMoreConversations,
-    loadingAgents,
+    loadingAgents:
+      loadingAgents ||
+      Boolean(workspaceId && agentDirectoryWorkspaceId !== workspaceId),
     loadingContext,
     setLoadingContext,
     fetchConversationPage,

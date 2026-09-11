@@ -289,7 +289,7 @@ export function useChatPageController() {
     ? routeAgentId
     : null;
   useEffect(() => {
-    if (loadingAgents) return;
+    if (workspaceLoading || loadingAgents) return;
     // Native history updates are synchronous, while useSearchParams catches up
     // on the following render. Do not let a stale route snapshot undo the
     // assistant choice made by the user in between those two updates.
@@ -337,6 +337,7 @@ export function useChatPageController() {
   }, [
     activeConversationId,
     availableRouteAgentId,
+    workspaceLoading,
     loadingAgents,
     pathname,
     routeAgentId,
