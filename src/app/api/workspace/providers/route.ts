@@ -22,10 +22,7 @@ import {
   listProviders,
   toSafeProvider,
 } from "@/modules/provider/use-cases";
-import type {
-  aiModels,
-  aiProviders,
-} from "@/server/infrastructure/db/schema";
+import type { aiModels, aiProviders } from "@/server/infrastructure/db/schema";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -119,7 +116,7 @@ export async function GET(req: NextRequest) {
         providers.map(async (provider: typeof aiProviders.$inferSelect) => {
           const models = (await listModels(provider.id)) as ProviderModelRow[];
           const [canViewProvider, visibleModels] = await Promise.all([
-            canViewAllProviders
+            canViewAllProviders && provider.workspaceId === workspaceId
               ? Promise.resolve(true)
               : hasResourcePermissionForRequest(
                   session.user.id,
@@ -128,7 +125,7 @@ export async function GET(req: NextRequest) {
                   "provider",
                   provider.id,
                 ),
-            canViewAllModels
+            canViewAllModels && provider.workspaceId === workspaceId
               ? Promise.resolve(models)
               : Promise.all(
                   models.map(async (model) =>
@@ -148,7 +145,16 @@ export async function GET(req: NextRequest) {
           return {
             provider:
               canViewProvider || visibleModels.length > 0
-                ? toSafeProvider(provider)
+                ? toSafeProvider(
+                    provider,
+                    await hasResourcePermissionForRequest(
+                      session.user.id,
+                      workspaceId,
+                      "providers.update",
+                      "provider",
+                      provider.id,
+                    ),
+                  )
                 : null,
             models: visibleModels,
           };

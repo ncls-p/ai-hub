@@ -67,15 +67,18 @@ export function hasMcpConnectionChanges(input: UpdateMcpServerInput) {
   );
 }
 
-export function toSafeMcpServer(server: McpServer) {
+export function toSafeMcpServer(
+  server: McpServer,
+  includeConnectionDetails = true,
+) {
   return {
     id: server.id,
     workspaceId: server.workspaceId,
     name: server.name,
     transport: server.transport,
-    command: server.command,
-    argsJson: server.argsJson,
-    url: server.url,
+    command: includeConnectionDetails ? server.command : null,
+    argsJson: includeConnectionDetails ? server.argsJson : null,
+    url: includeConnectionDetails ? server.url : null,
     enabled: server.enabled,
     requireApproval: server.requireApproval,
     isGlobal: server.isGlobal,

@@ -216,3 +216,7 @@ describe("agent runtime executor", () => {
     expect(abortActiveAgentRun("missing-run")).toBe(false);
   });
 });
+
+vi.mock("@/modules/usage/limited-language-model", () => ({
+  applyUsageLimits: async (model: unknown) => model,
+}));

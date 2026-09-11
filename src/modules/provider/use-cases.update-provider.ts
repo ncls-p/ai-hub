@@ -1,3 +1,4 @@
+import { resourceAvailabilityCondition } from "@/modules/iam/resource-availability";
 import { encryptValue } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
 import { audit } from "@/server/domain/services/audit";
@@ -122,14 +123,25 @@ export async function archiveProvider(
   logger.info("Provider archived", { providerId, userId });
 }
 
-export async function getProviderById(providerId: string, workspaceId: string) {
+export async function getProviderById(
+  providerId: string,
+  workspaceId: string,
+  includeShared = false,
+) {
   const [provider] = await db
     .select()
     .from(aiProviders)
     .where(
       and(
         eq(aiProviders.id, providerId),
-        eq(aiProviders.workspaceId, workspaceId),
+        includeShared
+          ? resourceAvailabilityCondition({
+              type: "provider",
+              id: aiProviders.id,
+              workspaceId: aiProviders.workspaceId,
+              activeWorkspaceId: workspaceId,
+            })
+          : eq(aiProviders.workspaceId, workspaceId),
         isNull(aiProviders.archivedAt),
       ),
     )
@@ -144,7 +156,12 @@ export async function listProviders(workspaceId: string) {
     .from(aiProviders)
     .where(
       and(
-        eq(aiProviders.workspaceId, workspaceId),
+        resourceAvailabilityCondition({
+          type: "provider",
+          id: aiProviders.id,
+          workspaceId: aiProviders.workspaceId,
+          activeWorkspaceId: workspaceId,
+        }),
         isNull(aiProviders.archivedAt),
       ),
     )

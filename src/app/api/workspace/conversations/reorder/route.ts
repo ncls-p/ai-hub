@@ -1,3 +1,4 @@
+import { getRequestAuthContext } from "@/modules/auth/request-auth-context";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -54,11 +55,14 @@ export async function POST(req: NextRequest) {
       }
 
       const { workspaceId, folderId, pinned, conversationIds } = parsed.data;
-      const forbidden = await requireWorkspacePermissionAsync(
-        session.user.id,
-        workspaceId,
-        "conversations.viewOwn",
-      );
+      const personalHistory = getRequestAuthContext()?.type !== "api_key";
+      const forbidden = !personalHistory
+        ? await requireWorkspacePermissionAsync(
+            session.user.id,
+            workspaceId,
+            "conversations.viewOwn",
+          )
+        : null;
       if (forbidden) return forbidden;
 
       if (folderId) {
@@ -68,7 +72,9 @@ export async function POST(req: NextRequest) {
           .where(
             and(
               eq(conversationFolders.id, folderId),
-              eq(conversationFolders.workspaceId, workspaceId),
+              !personalHistory
+                ? eq(conversationFolders.workspaceId, workspaceId)
+                : undefined,
               eq(conversationFolders.userId, session.user.id),
               isNull(conversationFolders.archivedAt),
             ),
@@ -96,7 +102,9 @@ export async function POST(req: NextRequest) {
         .where(
           and(
             inArray(conversations.id, conversationIds),
-            eq(conversations.workspaceId, workspaceId),
+            !personalHistory
+              ? eq(conversations.workspaceId, workspaceId)
+              : undefined,
             eq(conversations.userId, session.user.id),
             eq(conversations.status, "active"),
             isNull(conversations.archivedAt),

@@ -19,7 +19,11 @@ import {
 export async function updateMcpServer(input: UpdateMcpServerInput) {
   const existing = await getMcpServer(input.serverId, input.workspaceId);
   if (!existing) throw new Error("MCP server not found");
-  await assertCanManageMcpServer(existing, input.userId, input.canManageGlobal);
+  await assertCanManageMcpServer(
+    existing,
+    input.userId,
+    input.canManageGlobal && existing.workspaceId === input.workspaceId,
+  );
   if (input.isGlobal && !input.canManageGlobal) {
     throw new Error("Only admins can make MCP servers global");
   }
@@ -62,7 +66,11 @@ export async function archiveMcpServer(
 ) {
   const existing = await getMcpServer(serverId, workspaceId);
   if (!existing) throw new Error("MCP server not found");
-  await assertCanManageMcpServer(existing, userId, canManageGlobal);
+  await assertCanManageMcpServer(
+    existing,
+    userId,
+    canManageGlobal && existing.workspaceId === workspaceId,
+  );
 
   await db
     .update(mcpServers)

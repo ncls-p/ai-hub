@@ -1,3 +1,7 @@
+import {
+  resourceAvailabilityCondition,
+  distributedResourcePermissions,
+} from "@/modules/iam/resource-availability";
 import { audit } from "@/server/domain/services/audit";
 import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
@@ -18,7 +22,27 @@ export async function getVisibleAgentById(
 ) {
   // Admin curation does not grant access to another user's personal agents.
   void canAdminCurate;
-  const agent = await getAgentById(agentId, workspaceId);
+  const agent =
+    (await getAgentById(agentId, workspaceId)) ??
+    (
+      await db
+        .select()
+        .from(agents)
+        .where(
+          and(
+            eq(agents.id, agentId),
+            isNull(agents.archivedAt),
+            resourceAvailabilityCondition({
+              type: "agent",
+              id: agents.id,
+              workspaceId: agents.workspaceId,
+              activeWorkspaceId: workspaceId,
+              visibility: agents.visibility,
+            }),
+          ),
+        )
+        .limit(1)
+    )[0];
   if (!agent) return null;
   if (canUseAgent(agent, userId)) return agent;
   if (
@@ -45,7 +69,18 @@ export async function listAgents(
   const rows = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.workspaceId, workspaceId), isNull(agents.archivedAt)))
+    .where(
+      and(
+        resourceAvailabilityCondition({
+          type: "agent",
+          id: agents.id,
+          workspaceId: agents.workspaceId,
+          activeWorkspaceId: workspaceId,
+          visibility: agents.visibility,
+        }),
+        isNull(agents.archivedAt),
+      ),
+    )
     .orderBy(
       sql`${agents.isGlobal} DESC`,
       sql`${agents.organizationDisplayOrder} ASC`,
@@ -60,9 +95,23 @@ export async function listAgents(
       rows.map(({ id }) => id),
       workspaceId,
     );
-  return rows.filter(
-    (agent) => canUseAgent(agent, userId) || directlyVisibleIds.has(agent.id),
+  const visible = await Promise.all(
+    rows.map(async (agent) =>
+      canUseAgent(agent, userId) ||
+      directlyVisibleIds.has(agent.id) ||
+      (
+        await distributedResourcePermissions(
+          userId,
+          "agent",
+          agent.id,
+          workspaceId,
+        )
+      ).includes("agents.get")
+        ? agent
+        : null,
+    ),
   );
+  return visible.filter((agent) => agent !== null);
 }
 
 export function canUseAgent(agent: AgentRow, userId: string) {

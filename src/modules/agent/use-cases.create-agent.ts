@@ -1,3 +1,4 @@
+import { resourceAvailabilityCondition } from "@/modules/iam/resource-availability";
 import { randomUUID } from "node:crypto";
 import { logger } from "@/lib/logger";
 import { insertDelegationBindingsForVersion } from "@/modules/agent/delegation-use-cases";
@@ -84,7 +85,12 @@ export async function createAgent(input: CreateAgentInput) {
       .where(
         and(
           eq(aiProviders.id, providerId),
-          eq(aiProviders.workspaceId, workspaceId),
+          resourceAvailabilityCondition({
+            type: "provider",
+            id: aiProviders.id,
+            workspaceId: aiProviders.workspaceId,
+            activeWorkspaceId: workspaceId,
+          }),
           isNull(aiProviders.archivedAt),
         ),
       )
@@ -97,11 +103,19 @@ export async function createAgent(input: CreateAgentInput) {
     const [model] = await db
       .select({ id: aiModels.id })
       .from(aiModels)
+      .innerJoin(aiProviders, eq(aiProviders.id, aiModels.providerId))
       .where(
         and(
           eq(aiModels.id, modelId),
           eq(aiModels.providerId, providerId),
           eq(aiModels.enabled, true),
+          resourceAvailabilityCondition({
+            type: "model",
+            id: aiModels.id,
+            workspaceId: aiProviders.workspaceId,
+            activeWorkspaceId: workspaceId,
+            providerId: aiModels.providerId,
+          }),
         ),
       )
       .limit(1);

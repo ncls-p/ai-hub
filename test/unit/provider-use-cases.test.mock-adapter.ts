@@ -155,6 +155,19 @@ export const fakeModel = {
 // ─── toSafeProvider ───────────────────────────────────────────────────
 
 describe("toSafeProvider", () => {
+  it("hides connection URLs and query credentials from read-only recipients", () => {
+    const safe = toSafeProvider(
+      {
+        ...fakeProvider,
+        baseUrl: "https://token@example.test",
+        queryParamsJson: { api_key: "secret" },
+      },
+      false,
+    );
+    expect(safe.baseUrl).toBeNull();
+    expect(safe.queryParamsJson).toBeNull();
+    expect(JSON.stringify(safe)).not.toContain("secret");
+  });
   it("returns safe provider without encrypted fields", () => {
     const safe = toSafeProvider(fakeProvider);
     expect(safe).not.toHaveProperty("encryptedApiKey");

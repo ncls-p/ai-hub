@@ -96,6 +96,7 @@ export async function executeAgent(
     }
   }
   return executeResolvedAgent({
+    billingWorkspaceId: input.billingWorkspaceId,
     resolved,
     workspaceId: input.workspaceId,
     userId: input.userId,

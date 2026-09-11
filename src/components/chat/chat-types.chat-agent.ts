@@ -16,6 +16,7 @@ export interface ChatAgent {
 }
 
 export interface ChatConversation {
+  workspaceId?: string;
   id: string;
   title: string;
   agentId: string;

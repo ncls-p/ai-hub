@@ -1,3 +1,4 @@
+import { resourceAvailabilityCondition } from "@/modules/iam/resource-availability";
 import { applyResourceAccessSelection } from "@/modules/iam/resource-access-scope";
 import {
   getDefaultRagConfig,
@@ -31,7 +32,13 @@ export async function listKnowledgeBases(
     .from(knowledgeBases)
     .where(
       and(
-        eq(knowledgeBases.workspaceId, workspaceId),
+        resourceAvailabilityCondition({
+          type: "knowledge_base",
+          id: knowledgeBases.id,
+          workspaceId: knowledgeBases.workspaceId,
+          activeWorkspaceId: workspaceId,
+          visibility: knowledgeBases.visibility,
+        }),
         isNull(knowledgeBases.archivedAt),
       ),
     )
@@ -63,7 +70,11 @@ export async function listKnowledgeBases(
         const visible = await canViewKnowledgeBase(knowledgeBase, userId);
         if (!visible) return null;
         const canEdit =
-          canManageKnowledgeBase(knowledgeBase, userId, canManageGlobal) ||
+          canManageKnowledgeBase(
+            knowledgeBase,
+            userId,
+            canManageGlobal && knowledgeBase.workspaceId === workspaceId,
+          ) ||
           (await authorization.hasDirectPermission(
             { principalType: "user", principalId: userId },
             "knowledgeBases.manage",
@@ -88,7 +99,13 @@ export async function getKnowledgeBase(
     .where(
       and(
         eq(knowledgeBases.id, knowledgeBaseId),
-        eq(knowledgeBases.workspaceId, workspaceId),
+        resourceAvailabilityCondition({
+          type: "knowledge_base",
+          id: knowledgeBases.id,
+          workspaceId: knowledgeBases.workspaceId,
+          activeWorkspaceId: workspaceId,
+          visibility: knowledgeBases.visibility,
+        }),
         isNull(knowledgeBases.archivedAt),
       ),
     )
@@ -132,7 +149,7 @@ export async function updateKnowledgeBase(input: {
   await assertCanManageKnowledgeBase(
     existing,
     input.userId,
-    input.canManageGlobal,
+    input.canManageGlobal && existing.workspaceId === input.workspaceId,
   );
   if (input.isGlobal && !input.canManageGlobal) {
     throw new Error("Only admins can make knowledge bases global");
@@ -200,7 +217,11 @@ export async function archiveKnowledgeBase(
 ) {
   const existing = await getKnowledgeBase(knowledgeBaseId, workspaceId);
   if (!existing) throw new Error("Knowledge base not found");
-  await assertCanManageKnowledgeBase(existing, userId, canManageGlobal);
+  await assertCanManageKnowledgeBase(
+    existing,
+    userId,
+    canManageGlobal && existing.workspaceId === workspaceId,
+  );
   await db
     .update(knowledgeBases)
     .set({ archivedAt: new Date(), updatedAt: new Date() })

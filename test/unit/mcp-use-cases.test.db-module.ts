@@ -176,6 +176,21 @@ export const fakeTool = {
 // ─── toSafeMcpServer ──────────────────────────────────────────────────
 
 describe("toSafeMcpServer", () => {
+  it("hides connection credentials embedded in URLs or command arguments", () => {
+    const safe = toSafeMcpServer(
+      {
+        ...fakeSseServer,
+        url: "https://example.test?token=secret",
+        command: "secret",
+        argsJson: ["secret"],
+      },
+      false,
+    );
+    expect(safe.url).toBeNull();
+    expect(safe.command).toBeNull();
+    expect(safe.argsJson).toBeNull();
+    expect(JSON.stringify(safe)).not.toContain("secret");
+  });
   it("omits encrypted fields and exposes hasHeaders/hasEnv flags", () => {
     const safe = toSafeMcpServer(fakeSseServer);
     expect(safe).not.toHaveProperty("encryptedHeadersJson");

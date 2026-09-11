@@ -164,9 +164,27 @@ beforeEach(() => {
 describe("custom tool listing and deletion", () => {
   it("lists only accessible tools and marks editable tools", async () => {
     dbModule._c.orderBy.mockResolvedValueOnce([
-      { id: "own", createdById: "user-1", isGlobal: false, name: "Own" },
-      { id: "global", createdById: "other", isGlobal: true, name: "Global" },
-      { id: "other", createdById: "other", isGlobal: false, name: "Other" },
+      {
+        workspaceId: "ws-1",
+        id: "own",
+        createdById: "user-1",
+        isGlobal: false,
+        name: "Own",
+      },
+      {
+        workspaceId: "ws-1",
+        id: "global",
+        createdById: "other",
+        isGlobal: true,
+        name: "Global",
+      },
+      {
+        workspaceId: "ws-1",
+        id: "other",
+        createdById: "other",
+        isGlobal: false,
+        name: "Other",
+      },
     ]);
 
     const result = await listCustomTools("ws-1", "user-1", true);

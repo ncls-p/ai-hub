@@ -1,0 +1,1 @@
+ALTER TABLE "conversations" ADD COLUMN "billing_workspace_id" uuid;

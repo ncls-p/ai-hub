@@ -66,17 +66,8 @@ export function useChatDirectory(
       query?: string;
       signal?: AbortSignal;
     } = {}) => {
-      if (!workspaceId)
-        return {
-          conversations: [],
-          folders: [],
-          latestConversationId: null,
-          latestConversationAgentId: null,
-          hasMore: false,
-          nextCursor: null,
-        };
       const params = new URLSearchParams({
-        workspaceId,
+        ...(workspaceId ? { workspaceId } : {}),
         limit: String(CONVERSATION_PAGE_SIZE),
         includeMeta: "true",
       });
@@ -139,6 +130,7 @@ export function useChatDirectory(
       const exists = (id: string | null | undefined) =>
         Boolean(id && data.some((agent) => agent.id === id));
       const nextAgentId =
+        (requestedConversationId ? requestedAgentIdFromUrl : null) ??
         (exists(requestedAgentIdFromUrl) ? requestedAgentIdFromUrl : null) ??
         (exists(preferredAgentId) ? preferredAgentId : null) ??
         (exists(defaults.effectiveDefaultAgentId)
@@ -194,7 +186,7 @@ export function useChatDirectory(
 
   useEffect(() => {
     const query = conversationSearchQuery.trim();
-    if (!workspaceId || !query) return;
+    if (!query) return;
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       setConversationSearchState({
@@ -286,7 +278,13 @@ export function useChatDirectory(
   }, [conversationSearchQuery, conversationSearchState, fetchConversationPage]);
 
   useEffect(() => {
-    if (!workspaceId) return;
+    if (!workspaceId) {
+      queueMicrotask(() => {
+        setAgents([]);
+        setLoadingAgents(false);
+      });
+      return;
+    }
     const controller = new AbortController();
     let cancelled = false;
     queueMicrotask(() => {
@@ -306,7 +304,6 @@ export function useChatDirectory(
   }, [loadAgentDirectory, routeRefreshKey, workspaceId]);
 
   useEffect(() => {
-    if (!workspaceId) return;
     const controller = new AbortController();
     let cancelled = false;
     queueMicrotask(() => setLoadingContext(true));

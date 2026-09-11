@@ -1,3 +1,4 @@
+import { getRequestAuthContext } from "@/modules/auth/request-auth-context";
 import { handleRoute } from "@/lib/route-handler";
 import { getConversationMessages } from "@/modules/agent/use-cases";
 import { toAiSdkUIMessages } from "@/modules/chat/ai-sdk-ui-messages";
@@ -88,6 +89,8 @@ export async function GET(
       return NextResponse.json({
         conversation: {
           id: conversation.id,
+          workspaceId:
+            conversation.billingWorkspaceId ?? conversation.workspaceId,
           agentId: conversation.agentId,
           title: conversation.title,
           folderId: conversation.folderId,
@@ -146,7 +149,10 @@ export async function PATCH(
           .where(
             and(
               eq(conversationFolders.id, parsedBody.data.folderId),
-              eq(conversationFolders.workspaceId, conversation.workspaceId),
+              getRequestAuthContext()?.type === "api_key"
+                ? eq(conversationFolders.workspaceId, conversation.workspaceId)
+                : undefined,
+
               eq(conversationFolders.userId, session.user.id),
               isNull(conversationFolders.archivedAt),
             ),

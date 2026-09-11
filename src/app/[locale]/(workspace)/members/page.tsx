@@ -1,3 +1,6 @@
+import { ResourceDistributionPanel } from "@/components/iam/resource-distribution-panel";
+import { UsageLimitsPanel } from "@/components/iam/usage-limits-panel";
+import { OrganizationDirectory } from "@/components/iam/organization-directory";
 import { getTranslations } from "next-intl/server";
 
 import { AccessConsole } from "@/components/iam/access-console";
@@ -18,6 +21,13 @@ export default async function MembersPage() {
       description={t("description")}
       width="wide"
     >
+      <OrganizationDirectory />
+      {isPlatformAdmin ? (
+        <>
+          <ResourceDistributionPanel />
+          <UsageLimitsPanel />
+        </>
+      ) : null}
       <AccessConsole
         platformUsers={
           isPlatformAdmin

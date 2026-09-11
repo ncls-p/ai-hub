@@ -1,3 +1,4 @@
+import { getRequestAuthContext } from "@/modules/auth/request-auth-context";
 import { decryptValue } from "@/lib/crypto";
 import {
   handleRoute,
@@ -61,15 +62,13 @@ export async function GET(req: NextRequest) {
         includeMeta: searchParams.get("includeMeta") ?? undefined,
         limit: searchParams.get("limit") ?? undefined,
       });
-      const hasConversationScope =
-        parsed.success &&
-        Boolean(parsed.data.workspaceId || parsed.data.agentId);
-      if (!hasConversationScope) {
+      if (!parsed.success) {
         return NextResponse.json(
-          { error: "workspaceId or agentId must be a valid UUID" },
+          { error: "Invalid conversation query" },
           { status: 400 },
         );
       }
+      const personalHistory = getRequestAuthContext()?.type !== "api_key";
       const { agentId, includeMeta, limit, q } = parsed.data;
       let workspaceId = parsed.data.workspaceId ?? null;
       const cursor = parseConversationCursor(parsed.data.before);
@@ -79,7 +78,7 @@ export async function GET(req: NextRequest) {
           { status: 400 },
         );
       }
-      if (!workspaceId && agentId) {
+      if (!personalHistory && !workspaceId && agentId) {
         const [agent] = await db
           .select({ workspaceId: agents.workspaceId })
           .from(agents)
@@ -93,20 +92,24 @@ export async function GET(req: NextRequest) {
         }
         workspaceId = agent.workspaceId;
       }
-      if (!workspaceId) {
+      if (!personalHistory && !workspaceId) {
         return NextResponse.json(
           { error: "workspaceId or agentId must be a valid UUID" },
           { status: 400 },
         );
       }
-      const scopeForbidden = await requireRequestPermissionScopeAsync(
-        session.user.id,
-        workspaceId,
-        "conversations.viewOwn",
-      );
-      if (scopeForbidden) return scopeForbidden;
-      if (!(await isWorkspaceMemberForRequest(session.user.id, workspaceId))) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      if (!personalHistory && workspaceId) {
+        const scopeForbidden = await requireRequestPermissionScopeAsync(
+          session.user.id,
+          workspaceId,
+          "conversations.viewOwn",
+        );
+        if (scopeForbidden) return scopeForbidden;
+        if (
+          !(await isWorkspaceMemberForRequest(session.user.id, workspaceId))
+        ) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
       }
       const directlyBoundIds = await listDirectlyBoundResourceIds(
         session.user.id,
@@ -118,7 +121,7 @@ export async function GET(req: NextRequest) {
             conversationId,
             granted: await hasResourcePermissionForRequest(
               session.user.id,
-              workspaceId,
+              workspaceId ?? "",
               "conversations.viewOwn",
               "conversation",
               conversationId,
@@ -145,7 +148,9 @@ export async function GET(req: NextRequest) {
           )
         : eq(conversations.userId, session.user.id);
       const scopeConditions = [
-        eq(conversations.workspaceId, workspaceId),
+        ...(!personalHistory && workspaceId
+          ? [eq(conversations.workspaceId, workspaceId)]
+          : []),
         visibleConversationCondition,
         eq(conversations.status, "active"),
         isNull(conversations.archivedAt),
@@ -388,7 +393,9 @@ export async function GET(req: NextRequest) {
             .from(conversationFolders)
             .where(
               and(
-                eq(conversationFolders.workspaceId, workspaceId),
+                ...(!personalHistory && workspaceId
+                  ? [eq(conversationFolders.workspaceId, workspaceId)]
+                  : []),
                 eq(conversationFolders.userId, session.user.id),
                 isNull(conversationFolders.archivedAt),
               ),

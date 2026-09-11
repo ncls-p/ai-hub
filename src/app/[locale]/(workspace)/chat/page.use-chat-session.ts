@@ -101,6 +101,14 @@ export function useChatSession(c: SessionContext) {
     setInterfaceMode,
     setLoadingContext,
   } = c;
+  const [conversationWorkspace, setConversationWorkspace] = useState<{
+    id: string;
+    workspaceId: string;
+  } | null>(null);
+  const executionWorkspaceId =
+    conversationWorkspace?.id === activeConversationId
+      ? conversationWorkspace.workspaceId
+      : workspaceId;
   const [activeVersion, setActiveVersion] = useState<AgentVersion | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadedConversationId, setLoadedConversationId] = useState<
@@ -125,7 +133,7 @@ export function useChatSession(c: SessionContext) {
   const stream = useChatStream({
     agentId: selectedAgentId,
     conversationId: activeConversationId,
-    workspaceId: workspaceId,
+    workspaceId: executionWorkspaceId,
     canChat,
     onConversationCreated: (conversationId, firstMessage, options) => {
       skipNextMessageLoadForConversationRef.current = conversationId;
@@ -315,12 +323,15 @@ export function useChatSession(c: SessionContext) {
   ]);
 
   useEffect(() => {
-    if (!selectedAgentId || !workspaceId) return;
+    if (!selectedAgentId || !executionWorkspaceId) return;
     const controller = new AbortController();
     let cancelled = false;
-    queueMicrotask(() => setLoadingContext(true));
+    queueMicrotask(() => {
+      setLoadingContext(true);
+      setActiveVersion(null);
+    });
     void fetchJson<AgentVersion[]>(
-      `/api/workspace/agents/${selectedAgentId}/versions?workspaceId=${workspaceId}`,
+      `/api/workspace/agents/${selectedAgentId}/versions?workspaceId=${executionWorkspaceId}`,
       { signal: controller.signal },
     )
       .then((versions) => {
@@ -338,7 +349,7 @@ export function useChatSession(c: SessionContext) {
       cancelled = true;
       controller.abort();
     };
-  }, [selectedAgentId, setLoadingContext, workspaceId]);
+  }, [selectedAgentId, setLoadingContext, executionWorkspaceId]);
 
   useEffect(() => {
     if (!workspaceId || !permissionsReady || !canViewUsage) {
@@ -408,6 +419,11 @@ export function useChatSession(c: SessionContext) {
           setSelectedAgentId(data.conversation.agentId);
         }
         if (data.conversation) {
+          if (data.conversation.workspaceId)
+            setConversationWorkspace({
+              id: activeConversationId,
+              workspaceId: data.conversation.workspaceId,
+            });
           setConversationCanContinue(data.conversation.canContinue !== false);
           setConversationIsOwner(data.conversation.isOwner !== false);
           setEphemeral(data.conversation.isEphemeral === true);

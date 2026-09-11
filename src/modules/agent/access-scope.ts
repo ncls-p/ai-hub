@@ -406,6 +406,7 @@ export async function getAgentAccessSelection(
   const [binding] = await db
     .select({ teamId: roleBindings.principalId })
     .from(roleBindings)
+    .innerJoin(teams, eq(teams.id, roleBindings.principalId))
     .innerJoin(roles, eq(roleBindings.roleId, roles.id))
     .where(
       and(

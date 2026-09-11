@@ -1,3 +1,4 @@
+import { distributedResourcePermissions } from "@/modules/iam/resource-availability";
 import { logHandledWarning } from "@/lib/logger";
 import type { AccessResourceType } from "@/server/domain/entities/access-resource";
 import { cache } from "@/server/infrastructure/cache";
@@ -127,6 +128,18 @@ export const authorization = {
     resourceId: string,
     workspaceId?: string,
   ): Promise<boolean> {
+    if (
+      ctx.principalType === "user" &&
+      (
+        await distributedResourcePermissions(
+          ctx.principalId,
+          resourceType,
+          resourceId,
+          workspaceId,
+        )
+      ).includes(permission)
+    )
+      return true;
     return (
       await this.listDirectlyAuthorizedResourceIds(
         ctx,
@@ -152,6 +165,18 @@ export const authorization = {
     resourceType: ResourceType,
     resourceId: string,
   ): Promise<PermissionCheckResult> {
+    if (
+      ctx.principalType === "user" &&
+      resourceType !== "workspace" &&
+      resourceType !== "organization"
+    ) {
+      const distributed = await distributedResourcePermissions(
+        ctx.principalId,
+        resourceType,
+        resourceId,
+      );
+      if (distributed.includes(permission)) return { granted: true };
+    }
     const permissions = await resolvePermissions(ctx, resourceType, resourceId);
     const granted = permissions.some((p) => matchesPermission(p, permission));
 

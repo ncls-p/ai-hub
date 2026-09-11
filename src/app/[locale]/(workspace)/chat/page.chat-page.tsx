@@ -302,7 +302,7 @@ export function useChatPageController() {
     if (internallyReplacedConversationId) {
       internallyReplacedConversationIdRef.current = null;
     }
-    if (routeAgentId && !availableRouteAgentId) {
+    if (routeAgentId && !availableRouteAgentId && !routeConversationId) {
       const params = new URLSearchParams(routeSearch);
       params.delete("agentId");
       const query = params.toString();
@@ -444,7 +444,11 @@ export function useChatPageController() {
       void setUserDefaultAgent(agentId),
     onSetupComplete: () => void reloadAgentContext(),
   };
-  if (workspaceLoading || loadingAgents || agents.length === 0)
+  if (
+    workspaceLoading ||
+    loadingAgents ||
+    (agents.length === 0 && !activeConversationId)
+  )
     return (
       <ChatPageBoundary
         state={workspaceLoading || loadingAgents ? "loading" : "empty"}

@@ -1,3 +1,4 @@
+import { applyUsageLimits } from "@/modules/usage/limited-language-model";
 import { buildBoundTools } from "@/app/api/workspace/[agentId]/chat/route-support";
 import {
   appendAgentRunStep,
@@ -68,9 +69,14 @@ export async function executeResolvedAgent(
       );
     }
     const adapter = getAdapter(provider.providerKind);
-    const model = adapter.createChatModel(
-      provider.runtimeConfig,
-      provider.modelId,
+    const model = await applyUsageLimits(
+      adapter.createChatModel(provider.runtimeConfig, provider.modelId),
+      {
+        userId: input.userId,
+        workspaceId: input.billingWorkspaceId ?? input.workspaceId,
+        providerId: provider.providerId,
+        modelId: provider.modelRecordId ?? null,
+      },
     );
     const reasoningSettings = reasoningCallSettings(
       input.reasoningEffort,

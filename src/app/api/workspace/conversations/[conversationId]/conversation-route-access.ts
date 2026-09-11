@@ -1,3 +1,4 @@
+import { getRequestAuthContext } from "@/modules/auth/request-auth-context";
 import { isWorkspaceMemberForRequest } from "@/modules/auth/workspace-access";
 import { requireResourcePermissionAsync } from "@/lib/route-handler";
 import { getConversationAccess } from "@/modules/chat/conversation-sharing";
@@ -32,6 +33,7 @@ export async function getAuthorizedConversation(
       ),
     } as const;
   if (
+    getRequestAuthContext()?.type === "api_key" &&
     !(await isWorkspaceMemberForRequest(
       userId,
       access.conversation.workspaceId,
@@ -42,13 +44,16 @@ export async function getAuthorizedConversation(
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     } as const;
   }
-  const forbidden = await requireResourcePermissionAsync(
-    userId,
-    access.conversation.workspaceId,
-    permission,
-    "conversation",
-    conversationId,
-  );
+  const forbidden =
+    getRequestAuthContext()?.type === "api_key"
+      ? await requireResourcePermissionAsync(
+          userId,
+          access.conversation.workspaceId,
+          permission,
+          "conversation",
+          conversationId,
+        )
+      : null;
   if (forbidden) return { ok: false, response: forbidden } as const;
   return {
     ok: true,

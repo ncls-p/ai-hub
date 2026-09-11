@@ -123,7 +123,11 @@ export async function createWorkflowRun(input: {
   idempotencyKey?: string;
   trigger?: "api" | "agent";
 }) {
-  const workflow = await requireWorkflow(input.workflowId, input.workspaceId);
+  const workflow = await requireWorkflow(
+    input.workflowId,
+    input.workspaceId,
+    true,
+  );
   const versionNumber =
     input.versionNumber ??
     (input.useLatestDraft ? workflow.latestVersion : workflow.activeVersion);

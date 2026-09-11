@@ -1,3 +1,4 @@
+import { resourceAvailabilityCondition } from "@/modules/iam/resource-availability";
 import { audit } from "@/server/domain/services/audit";
 import { authorization } from "@/server/domain/services/authorization";
 import { db } from "@/server/infrastructure/db";
@@ -22,7 +23,12 @@ export async function listAgentSkills(
     .from(agentSkills)
     .where(
       and(
-        eq(agentSkills.workspaceId, workspaceId),
+        resourceAvailabilityCondition({
+          type: "skill",
+          id: agentSkills.id,
+          workspaceId: agentSkills.workspaceId,
+          activeWorkspaceId: workspaceId,
+        }),
         isNull(agentSkills.archivedAt),
       ),
     )
@@ -41,7 +47,11 @@ export async function listAgentSkills(
         return {
           ...skill,
           canEdit:
-            canManageSkill(skill, userId, canManageGlobal) ||
+            canManageSkill(
+              skill,
+              userId,
+              canManageGlobal && skill.workspaceId === workspaceId,
+            ) ||
             (await authorization.hasDirectPermission(
               { principalType: "user", principalId: userId },
               "tools.configure",

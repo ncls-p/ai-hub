@@ -1,3 +1,4 @@
+import { applyUsageLimits } from "@/modules/usage/limited-language-model";
 import type { JSONValue } from "@ai-sdk/provider";
 import { generateText, streamText } from "ai";
 
@@ -107,14 +108,26 @@ export async function prepareExecution(
       "insufficient_quota",
     );
   }
-  return resolveOpenAIProxyModel(context.workspaceId, requestedModel);
+  const resolved = await resolveOpenAIProxyModel(
+    context.workspaceId,
+    requestedModel,
+  );
+  resolved.languageModel = await applyUsageLimits(resolved.languageModel, {
+    userId: context.userId,
+    workspaceId: context.workspaceId,
+    providerId: resolved.providerId,
+    modelId: resolved.modelRecordId,
+  });
+  return resolved;
 }
 
 export function usageRecorder(input: {
   context: ProxyExecutionContext;
   model: Awaited<ReturnType<typeof resolveOpenAIProxyModel>>;
   operation:
-    "openai.chat.completions" | "openai.responses" | "anthropic.messages";
+    | "openai.chat.completions"
+    | "openai.responses"
+    | "anthropic.messages";
   startedAt: number;
 }) {
   let recorded = false;

@@ -1,3 +1,4 @@
+import { getRequestAuthContext } from "@/modules/auth/request-auth-context";
 import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 
 import {
@@ -27,7 +28,11 @@ export async function canReadSharedConversationAsset(
   userId: string,
   kind: "attachment" | "code_workspace",
 ) {
-  if (!(await isWorkspaceMemberForRequest(userId, asset.workspaceId)))
+  const personal = getRequestAuthContext()?.type !== "api_key";
+  if (
+    !personal &&
+    !(await isWorkspaceMemberForRequest(userId, asset.workspaceId))
+  )
     return false;
 
   const references = await db
@@ -63,6 +68,7 @@ export async function canReadSharedConversationAsset(
         ),
       ),
     );
+  if (personal) return references.length > 0;
   for (const reference of references) {
     if (
       await hasResourcePermissionForRequest(
@@ -84,6 +90,7 @@ export async function canReadConversationAsset(
   kind: "attachment" | "code_workspace",
 ) {
   if (asset.createdByUserId === userId) {
+    if (getRequestAuthContext()?.type !== "api_key") return true;
     return hasWorkspacePermissionForRequest(
       userId,
       asset.workspaceId,

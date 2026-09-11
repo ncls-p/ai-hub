@@ -303,3 +303,7 @@ describe("runCustomToolBuilder", () => {
     expect(result.actionCount).toBe(1);
   });
 });
+
+vi.mock("@/modules/usage/limited-language-model", () => ({
+  applyUsageLimits: async (model: unknown) => model,
+}));

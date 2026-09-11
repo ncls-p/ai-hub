@@ -1,3 +1,5 @@
+import { applyUsageLimits } from "@/modules/usage/limited-language-model";
+import type { UsageLimitContext } from "@/modules/usage/usage-limits";
 import { generateText } from "ai";
 
 import { logHandledWarning } from "@/lib/logger";
@@ -70,15 +72,20 @@ function hasParsedArtifacts(value: { title: string; suggestions: string[] }) {
 }
 
 async function generateArtifactsWithRuntimeModel(input: {
+  usageContext?: UsageLimitContext;
   runtime: RuntimeModel;
   prompt: string;
   maxOutputTokens: number;
 }) {
   const adapter = getAdapter(input.runtime.providerKind);
-  const model = adapter.createChatModel(
+  const baseModel = adapter.createChatModel(
     input.runtime.runtimeConfig,
     input.runtime.modelId,
   );
+
+  const model = input.usageContext
+    ? await applyUsageLimits(baseModel, input.usageContext)
+    : baseModel;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const runtimeDeadline = createRuntimeDeadline(
@@ -104,6 +111,8 @@ async function generateArtifactsWithRuntimeModel(input: {
 }
 
 export async function generateChatAutomationArtifacts(input: {
+  userId?: string;
+  workspaceId?: string;
   userMessage: string;
   assistantText: string;
   fallbackTitle: string;
@@ -136,6 +145,15 @@ export async function generateChatAutomationArtifacts(input: {
 
   try {
     const object = await generateArtifactsWithRuntimeModel({
+      usageContext:
+        input.userId && input.workspaceId && config.providerId
+          ? {
+              userId: input.userId,
+              workspaceId: input.workspaceId,
+              providerId: config.providerId,
+              modelId: config.modelId ?? null,
+            }
+          : undefined,
       runtime: resolved.runtime,
       maxOutputTokens: 1024,
       prompt: [

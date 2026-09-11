@@ -1,3 +1,4 @@
+import { getRequestAuthContext } from "@/modules/auth/request-auth-context";
 import { and, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -64,11 +65,14 @@ export async function PATCH(
           { status: 404 },
         );
       }
-      const forbidden = await requireWorkspacePermissionAsync(
-        session.user.id,
-        folder.workspaceId,
-        "conversations.viewOwn",
-      );
+      const forbidden =
+        getRequestAuthContext()?.type === "api_key"
+          ? await requireWorkspacePermissionAsync(
+              session.user.id,
+              folder.workspaceId,
+              "conversations.viewOwn",
+            )
+          : null;
       if (forbidden) return forbidden;
       const [updated] = await db
         .update(conversationFolders)
@@ -102,11 +106,14 @@ export async function DELETE(
           { status: 404 },
         );
       }
-      const forbidden = await requireWorkspacePermissionAsync(
-        session.user.id,
-        folder.workspaceId,
-        "conversations.viewOwn",
-      );
+      const forbidden =
+        getRequestAuthContext()?.type === "api_key"
+          ? await requireWorkspacePermissionAsync(
+              session.user.id,
+              folder.workspaceId,
+              "conversations.viewOwn",
+            )
+          : null;
       if (forbidden) return forbidden;
       await db.transaction(async (tx) => {
         await tx

@@ -1,3 +1,4 @@
+import { distributedResourcePermissions } from "@/modules/iam/resource-availability";
 import { getRequestAuthContext } from "@/modules/auth/request-auth-context";
 import type { AccessResourceType } from "@/server/domain/entities/access-resource";
 import {
@@ -82,6 +83,20 @@ export async function checkResourcePermissionForRequest(
   if (!scopeResult.granted) return scopeResult;
 
   const resource = await findAccessResource(resourceType, resourceId);
+  if (
+    resource &&
+    resource.workspaceId !== workspaceId &&
+    (
+      await distributedResourcePermissions(
+        userId,
+        resourceType,
+        resourceId,
+        workspaceId,
+      )
+    ).includes(permission)
+  ) {
+    return { granted: true };
+  }
   if (!resource || resource.workspaceId !== workspaceId) {
     return { granted: false, reason: "Resource not found in this project" };
   }

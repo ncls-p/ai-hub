@@ -14,3 +14,5 @@ export * from "./schema-tables/tool-connections";
 export * from "./schema-tables/usage";
 export * from "./schema-tables/workflows";
 export * from "./schema-tables/workspace";
+export * from "./schema-tables/resource-distribution";
+export * from "./schema-tables/usage-limits";

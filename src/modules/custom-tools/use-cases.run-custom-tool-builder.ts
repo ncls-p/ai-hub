@@ -1,3 +1,4 @@
+import { applyUsageLimits } from "@/modules/usage/limited-language-model";
 import { generateText, stepCountIs } from "ai";
 import { eq, sql } from "drizzle-orm";
 
@@ -42,9 +43,14 @@ export async function runCustomToolBuilder(input: CustomToolBuilderInput) {
   if (!provider) throw new Error("Custom tool builder LLM is not configured");
 
   const adapter = getAdapter(provider.kind);
-  const model = adapter.createChatModel(
-    provider.runtimeConfig,
-    provider.modelId,
+  const model = await applyUsageLimits(
+    adapter.createChatModel(provider.runtimeConfig, provider.modelId),
+    {
+      userId: input.userId,
+      workspaceId: input.workspaceId,
+      providerId: config.providerId!,
+      modelId: config.modelId ?? null,
+    },
   );
   const secretRequests: Array<{
     id: string;

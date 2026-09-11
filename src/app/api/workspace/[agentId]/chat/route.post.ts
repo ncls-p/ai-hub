@@ -1,3 +1,8 @@
+import {
+  hasResourcePermissionForRequest,
+  isWorkspaceMemberForRequest,
+} from "@/modules/auth/workspace-access";
+import { applyUsageLimits } from "@/modules/usage/limited-language-model";
 import { logger, logHandledError } from "@/lib/logger";
 import {
   requireResourcePermissionAsync,
@@ -146,6 +151,35 @@ export async function POST(
     const conversationAccess = existingConversationId
       ? await getConversationAccess(existingConversationId, actorUserId)
       : null;
+    const billingWorkspaceId =
+      conversationAccess?.conversation.billingWorkspaceId ??
+      parsed.data.workspaceId ??
+      agent.workspaceId;
+    if (
+      !(await runWithRequestAuth(
+        auth,
+        async () =>
+          (await isWorkspaceMemberForRequest(
+            actorUserId,
+            billingWorkspaceId,
+          )) &&
+          (billingWorkspaceId === agent.workspaceId ||
+            (await hasResourcePermissionForRequest(
+              actorUserId,
+              billingWorkspaceId,
+              "agents.chat",
+              "agent",
+              agent.id,
+            ))),
+      ))
+    ) {
+      return rejectChatRequest(
+        403,
+        "billing_workspace_forbidden",
+        { error: "Forbidden" },
+        { agentId, userId: actorUserId },
+      );
+    }
     const canContinueSharedConversation = Boolean(
       conversationAccess?.role === "recipient" &&
       conversationAccess.canContinue &&
@@ -156,7 +190,6 @@ export async function POST(
       "agents.get",
       "agent",
       agent.id,
-      agent.workspaceId,
     );
     if (
       !canUseAgent(agent, actorUserId) &&
@@ -275,6 +308,7 @@ export async function POST(
     }
 
     const preparedConversation = await prepareChatConversation({
+      billingWorkspaceId,
       agent,
       actorUserId,
       agentId,
@@ -309,9 +343,17 @@ export async function POST(
 
     const adapter = getAdapter(providerConfig.providerKind);
     const model = wrapLanguageModel({
-      model: adapter.createChatModel(
-        providerConfig.runtimeConfig,
-        providerConfig.modelId,
+      model: await applyUsageLimits(
+        adapter.createChatModel(
+          providerConfig.runtimeConfig,
+          providerConfig.modelId,
+        ),
+        {
+          userId: actorUserId,
+          workspaceId: billingWorkspaceId,
+          providerId: providerConfig.providerId,
+          modelId: providerConfig.modelRecordId ?? null,
+        },
       ),
       middleware: extractReasoningMiddleware({ tagName: "think" }),
     });
