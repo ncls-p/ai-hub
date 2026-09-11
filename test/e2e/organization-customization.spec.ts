@@ -168,7 +168,7 @@ test("isolates branding, title generation and navigation per organization and sw
     await expect(
       page.getByText("Could not switch projects. Try again.", { exact: true }),
     ).toBeVisible();
-    await expect(trigger).toHaveText(previousContext);
+    await expect(trigger).toHaveText(previousContext, { useInnerText: true });
     await page.getByRole("option", { name: /Amber sibling/ }).click();
     await expect(trigger).toContainText("Amber sibling");
     await page.reload();
