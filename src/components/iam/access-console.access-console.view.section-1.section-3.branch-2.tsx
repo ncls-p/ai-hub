@@ -1,3 +1,4 @@
+import { PersonMembershipsCell } from "./person-memberships-cell";
 import {
   EllipsisIcon,
   LockKeyholeIcon,
@@ -222,31 +223,7 @@ export function AccessPeopleBranch2({
                   </details>
                 </td>
                 <td className="px-3 py-4 @max-3xl:col-span-3 @max-3xl:border-t @max-3xl:border-border/60 @max-3xl:px-4 @max-3xl:py-3">
-                  <span className="mb-2 hidden text-xs font-medium text-muted-foreground @max-3xl:block">
-                    {t("teamsColumn")}
-                  </span>
-                  <details className="max-w-full">
-                    <summary className="cursor-pointer py-2 text-sm text-muted-foreground">
-                      {t("simpleAccess.teamCount", {
-                        count: person.teams.length,
-                      })}
-                    </summary>
-                    <div className="flex max-w-xs flex-wrap gap-1">
-                      {person.teams.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        person.teams.map((team) => (
-                          <Badge
-                            key={team.id}
-                            variant="outline"
-                            className="max-w-full whitespace-normal break-words [overflow-wrap:anywhere]"
-                          >
-                            {team.name}
-                          </Badge>
-                        ))
-                      )}
-                    </div>
-                  </details>
+                  <PersonMembershipsCell model={model} person={person} />
                 </td>
                 <td className="px-6 py-4 text-right @max-3xl:col-start-3 @max-3xl:row-start-1 @max-3xl:px-3">
                   <DropdownMenu>

@@ -118,6 +118,7 @@ test("builds, saves, and runs a workflow through the real agentic provider strea
     await expect(
       page.getByText("The summary workflow is ready."),
     ).toBeVisible();
+    await page.getByRole("button", { name: "Visual", exact: true }).click();
     await expect(
       page.getByText("Prepare summary", { exact: true }),
     ).toBeVisible();

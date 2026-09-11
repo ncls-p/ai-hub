@@ -1,17 +1,17 @@
 "use client";
 
+import { useAccessSnapshot } from "./use-access-snapshot";
+import { AccessProjectSelector } from "./access-project-selector";
+
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useWorkspace } from "@/hooks/use-workspace";
 import { fetchJson } from "@/lib/api-client";
 import { buildAccessPeople } from "@/modules/iam/access-view-model";
 import { AccessConsoleView } from "./access-console.access-console.view";
-import {
-  AccessSnapshot,
-  PlatformAccessUser,
-} from "./access-console.access-member";
+import { PlatformAccessUser } from "./access-console.access-member";
 import {
   AccessConsoleSkeleton,
   INITIAL_ACCOUNT_FORM,
@@ -42,9 +42,8 @@ export function useAccessConsoleController({
     setWorkspaceId,
     refresh: refreshWorkspaces,
   } = useWorkspace();
-  const [snapshot, setSnapshot] = useState<AccessSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const { snapshot, loading, refreshError, load } =
+    useAccessSnapshot(workspaceId);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const [organizationOpen, setOrganizationOpen] = useState(false);
@@ -85,39 +84,6 @@ export function useAccessConsoleController({
   const [busyPlatformUserId, setBusyPlatformUserId] = useState<string | null>(
     null,
   );
-
-  const load = useCallback(
-    async (options?: { preserveData?: boolean }) => {
-      if (!workspaceId) return;
-      if (!options?.preserveData) setLoading(true);
-      setRefreshError(null);
-      try {
-        const data = await fetchJson<AccessSnapshot>(
-          `/api/workspace/iam?workspaceId=${workspaceId}`,
-        );
-        setSnapshot({
-          ...data,
-          roles: data.roles.map((role) => {
-            const key = role.isSystem ? builtInRoleKey(role.name) : undefined;
-            return key
-              ? { ...role, description: t(`builtInRoleDescriptions.${key}`) }
-              : role;
-          }),
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : t("loadError");
-        setRefreshError(message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [t, workspaceId],
-  );
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- request lifecycle starts after the active project is known
-    void load();
-  }, [load]);
 
   async function mutate(
     key: string,
@@ -249,10 +215,13 @@ export function useAccessConsoleController({
   }
   if (!snapshot || !snapshotIsCurrent) {
     return (
-      <InitialError
-        message={refreshError ?? t("loadError")}
-        onRetry={() => void load()}
-      />
+      <div className="flex flex-col gap-5">
+        <AccessProjectSelector />
+        <InitialError
+          message={refreshError ?? t("loadError")}
+          onRetry={() => void load()}
+        />
+      </div>
     );
   }
 

@@ -201,6 +201,7 @@ function OrganizationBrandingContent() {
           <input
             ref={inputRef}
             type="file"
+            aria-label={t("chooseLogo")}
             accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
             className="sr-only"
             onChange={(event) => void onFile(event.target.files?.[0])}

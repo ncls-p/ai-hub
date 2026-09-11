@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { useAccessConsoleController } from "./access-console.access-console";
 import { AccessConsoleSection1 } from "./access-console.access-console.view.section-1";
-import { AccessProjectSelector } from "./access-project-selector";
+import { AccessConsoleSection2 } from "./access-console.access-console.view.section-2";
 
 export type AccessConsoleViewModel = Extract<
   ReturnType<typeof useAccessConsoleController>,
@@ -37,7 +37,7 @@ export function AccessConsoleView({
         </Alert>
       ) : null}
 
-      <AccessProjectSelector />
+      <AccessConsoleSection2 model={model} />
 
       {!canManageAnything ? (
         <Alert>

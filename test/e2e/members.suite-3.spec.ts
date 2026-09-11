@@ -132,7 +132,7 @@ test.describe("members page", () => {
     const teamCard = page
       .locator('[data-slot="card"]')
       .filter({ hasText: teamName });
-    await teamCard.getByText("View members", { exact: true }).click();
+    await expect(teamCard.locator("details")).toHaveAttribute("open", "");
     await teamCard.getByRole("combobox").click();
     await page.getByRole("option", { name: e2eMember.name }).click();
     await teamCard.getByRole("button", { name: "Add", exact: true }).click();

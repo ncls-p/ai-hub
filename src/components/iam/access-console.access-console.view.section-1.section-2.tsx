@@ -1,3 +1,4 @@
+import { PrincipalMembershipsDialog } from "./principal-memberships-dialog";
 import { PlusIcon, SearchIcon, UsersIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -188,6 +189,12 @@ export function AccessMainSection2({
             <TeamCard
               key={team.id}
               team={team}
+              projectAccess={
+                <PrincipalMembershipsDialog
+                  model={model}
+                  principal={{ id: team.id, name: team.name, type: "group" }}
+                />
+              }
               members={activeMembers}
               canManage={canManageTeams}
               canDelete={model.snapshot.actions.organization["teams.delete"]}

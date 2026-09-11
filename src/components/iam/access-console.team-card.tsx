@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { TeamEditDialog } from "./team-edit-dialog";
 
 import { PlusIcon } from "lucide-react";
@@ -31,6 +32,7 @@ import { ConfirmRemovalButton } from "./access-console.scope-path";
 
 export function TeamCard({
   team,
+  projectAccess,
   members,
   canManage,
   canDelete,
@@ -41,6 +43,7 @@ export function TeamCard({
   onEdit,
 }: {
   team: AccessTeam;
+  projectAccess?: ReactNode;
   members: AccessMember[];
   canManage: boolean;
   canDelete: boolean;
@@ -74,6 +77,7 @@ export function TeamCard({
           <Badge variant="secondary">
             {t("memberCount", { count: team.members.length })}
           </Badge>
+          {projectAccess}
           {canManage ? (
             <TeamEditDialog
               team={team}
@@ -93,7 +97,7 @@ export function TeamCard({
         </CardAction>
       </CardHeader>
       <CardContent className="px-0">
-        <details>
+        <details open>
           <summary className="cursor-pointer py-2 text-sm text-muted-foreground">
             {t("simpleAccess.teamMembers")}
           </summary>

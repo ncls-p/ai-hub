@@ -1,3 +1,4 @@
+import { useWorkspace } from "@/hooks/use-workspace";
 import { Building2Icon, PlusIcon } from "lucide-react";
 
 import { ScopeLifecycleDialog } from "@/components/iam/scope-lifecycle-dialog";
@@ -32,6 +33,7 @@ export function AccessConsoleSection2({
 }: {
   model: AccessConsoleViewModel;
 }) {
+  const { workspaces } = useWorkspace();
   const {
     canCreateProjects,
     canManageOrganizationLifecycle,
@@ -63,7 +65,7 @@ export function AccessConsoleSection2({
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {snapshot.projects.map((project) => (
+                {workspaces.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
                   </SelectItem>
@@ -74,10 +76,10 @@ export function AccessConsoleSection2({
         </Field>
       </div>
 
-      <details className="w-full sm:w-auto">
-        <summary className="cursor-pointer py-2 text-sm text-muted-foreground">
+      <div className="w-full sm:w-auto">
+        <h3 className="py-2 text-sm font-medium">
           {t("simpleAccess.projectSettings")}
-        </summary>
+        </h3>
         <p className="max-w-md py-2 text-sm text-muted-foreground">
           {snapshot.organization.name} · {t("inheritanceHint")}
         </p>
@@ -233,7 +235,7 @@ export function AccessConsoleSection2({
             </Dialog>
           ) : null}
         </div>
-      </details>
+      </div>
     </div>
   );
 }
