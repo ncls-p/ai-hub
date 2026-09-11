@@ -1,8 +1,11 @@
+import { getResourceAccessSelection } from "@/modules/iam/resource-access-scope";
 import { addOrganizationUser } from "@/modules/organization/add-organization-user";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/server/infrastructure/db";
 import {
+  roles,
+  roleBindings,
   teams,
   teamMembers,
   users,
@@ -186,6 +189,32 @@ suite("organization distribution and concurrent usage limits", () => {
       ]),
     );
     await db.update(users).set({ role: "user" }).where(eq(users.id, f.owner));
+  });
+  it("does not mistake an inherited organization grant for a team scope", async () => {
+    const [viewer] = await db
+      .select()
+      .from(roles)
+      .where(eq(roles.name, "workspace.viewer"))
+      .limit(1);
+    const resourceId = crypto.randomUUID();
+    await db
+      .insert(roleBindings)
+      .values({
+        principalType: "group",
+        principalId: f.organizationId,
+        roleId: viewer.id,
+        resourceType: "knowledge_base",
+        resourceId,
+        createdById: f.owner,
+      });
+    expect(
+      await getResourceAccessSelection({
+        resourceType: "knowledge_base",
+        resourceId,
+        visibility: "organization",
+        isGlobal: true,
+      }),
+    ).toEqual({ scope: "organization" });
   });
   it("serializes parallel calls and settles exactly once", async () => {
     const [limit] = await db

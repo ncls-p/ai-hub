@@ -9,6 +9,7 @@ import {
   roleBindings,
   roles,
   teamMembers,
+  teams,
 } from "@/server/infrastructure/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import {
@@ -36,6 +37,7 @@ export async function getResourceAccessSelection(input: {
   const [binding] = await db
     .select({ teamId: roleBindings.principalId })
     .from(roleBindings)
+    .innerJoin(teams, eq(teams.id, roleBindings.principalId))
     .innerJoin(roles, eq(roleBindings.roleId, roles.id))
     .where(
       and(
