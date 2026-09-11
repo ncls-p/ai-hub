@@ -3651,6 +3651,21 @@
       "projectViewer": "Consulter les ressources et l’activité du projet.",
       "knowledgeEditor": "Consulter et modifier une collection de connaissances partagée.",
       "assistantUser": "Utiliser un assistant qui vous est partagé."
+    },
+    "memberships": {
+      "manage": "Équipes et projets",
+      "projects": "Projets",
+      "manageFor": "Gérer les affectations de {name}",
+      "title": "Affectations de {name}",
+      "description": "Ajoutez cette personne à plusieurs équipes et projets. Chaque ajout conserve ses autres appartenances.",
+      "teamDescription": "Donnez accès à plusieurs projets à toute l’équipe. Les membres héritent des rôles attribués ici.",
+      "project": "Projet à gérer",
+      "loading": "Chargement des affectations…",
+      "member": "Membre de cette équipe",
+      "notMember": "Ne fait pas partie de cette équipe",
+      "joinTeam": "Ajouter à l’équipe {team}",
+      "directAccessHint": "Les rôles ci-dessous concernent uniquement ce projet. Les accès hérités de l’organisation ou des équipes sont conservés.",
+      "chooseRole": "Choisir un rôle"
     }
   },
   "shell": {

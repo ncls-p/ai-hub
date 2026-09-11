@@ -3651,6 +3651,21 @@
       "projectViewer": "View project resources and activity.",
       "knowledgeEditor": "View and edit a shared knowledge collection.",
       "assistantUser": "Use an assistant shared with you."
+    },
+    "memberships": {
+      "manage": "Teams and projects",
+      "projects": "Projects",
+      "manageFor": "Manage assignments for {name}",
+      "title": "Assignments for {name}",
+      "description": "Add this person to multiple teams and projects. Each addition keeps their other memberships.",
+      "teamDescription": "Give the whole team access to multiple projects. Members inherit the roles assigned here.",
+      "project": "Project to manage",
+      "loading": "Loading assignments…",
+      "member": "Member of this team",
+      "notMember": "Not a member of this team",
+      "joinTeam": "Add to team {team}",
+      "directAccessHint": "The roles below apply only to this project. Access inherited from the organization or teams is preserved.",
+      "chooseRole": "Choose a role"
     }
   },
   "shell": {

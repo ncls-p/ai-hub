@@ -78,6 +78,7 @@ export async function injectConversationImpact(
         messages?: Array<{
           id: string;
           role: string;
+          status?: string;
           parts: Array<{ type: string; content: string }>;
         }>;
       };
@@ -97,6 +98,9 @@ export async function injectConversationImpact(
         (message) => message.role === "assistant",
       );
       if (assistant) {
+        // This fixture represents finalized usage. A still-settling stream or
+        // browser draft must not replace its synthetic impact after navigation.
+        assistant.status = "completed";
         assistant.parts = [
           ...assistant.parts.filter((part) => part.type !== "impact"),
           impact,
@@ -105,6 +109,7 @@ export async function injectConversationImpact(
         body.messages.push({
           id: "30000000-0000-4000-8000-000000000001",
           role: "assistant",
+          status: "completed",
           parts: [{ type: "text", content: "Workspace ready." }, impact],
         });
       }
