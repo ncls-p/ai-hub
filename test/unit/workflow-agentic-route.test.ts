@@ -266,3 +266,7 @@ describe("workflow agentic route", () => {
     );
   });
 });
+
+vi.mock("@/modules/usage/limited-language-model", () => ({
+  applyUsageLimits: async (model: unknown) => model,
+}));

@@ -203,6 +203,7 @@ export async function buildDelegationTools(input: {
             );
           }
           const result = await executeResolvedAgent({
+            billingWorkspaceId: input.execution.billingWorkspaceId,
             resolved: child,
             workspaceId: input.execution.workspaceId,
             userId: input.execution.userId,

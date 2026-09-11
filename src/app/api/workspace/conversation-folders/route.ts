@@ -1,3 +1,4 @@
+import { getRequestAuthContext } from "@/modules/auth/request-auth-context";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -36,18 +37,23 @@ export async function GET(req: NextRequest) {
           { status: 400 },
         );
       }
-      const forbidden = await requireWorkspacePermissionAsync(
-        session.user.id,
-        parsed.data,
-        "conversations.viewOwn",
-      );
+      const forbidden =
+        getRequestAuthContext()?.type === "api_key"
+          ? await requireWorkspacePermissionAsync(
+              session.user.id,
+              parsed.data,
+              "conversations.viewOwn",
+            )
+          : null;
       if (forbidden) return forbidden;
       const folders = await db
         .select()
         .from(conversationFolders)
         .where(
           and(
-            eq(conversationFolders.workspaceId, parsed.data),
+            getRequestAuthContext()?.type === "api_key"
+              ? eq(conversationFolders.workspaceId, parsed.data)
+              : undefined,
             eq(conversationFolders.userId, session.user.id),
             isNull(conversationFolders.archivedAt),
           ),
@@ -71,11 +77,14 @@ export async function POST(req: NextRequest) {
       if (!parsed.success) {
         return NextResponse.json({ error: "Invalid request" }, { status: 400 });
       }
-      const forbidden = await requireWorkspacePermissionAsync(
-        session.user.id,
-        parsed.data.workspaceId,
-        "conversations.viewOwn",
-      );
+      const forbidden =
+        getRequestAuthContext()?.type === "api_key"
+          ? await requireWorkspacePermissionAsync(
+              session.user.id,
+              parsed.data.workspaceId,
+              "conversations.viewOwn",
+            )
+          : null;
       if (forbidden) return forbidden;
       const [folder] = await db
         .insert(conversationFolders)

@@ -270,6 +270,7 @@ export function useChatSubmitHandler(input: {
         localUserMessageId: userMessage.id,
         resendFromMessageId: options.resendFromMessageId,
         body: {
+          workspaceId: workspaceId ?? undefined,
           content,
           conversationId: conversationId ?? undefined,
           ephemeral: options.ephemeral,

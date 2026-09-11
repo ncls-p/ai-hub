@@ -65,12 +65,11 @@ export function useWorkspaceHistory() {
   );
 
   useEffect(() => {
-    if (!workspaceId) return;
     const controller = new AbortController();
     let active = true;
     const refreshCycle = refreshCycleRef.current;
     const params = new URLSearchParams({
-      workspaceId,
+      ...(workspaceId ? { workspaceId } : {}),
       limit: "50",
       includeMeta: "true",
     });
@@ -144,7 +143,7 @@ export function useWorkspaceHistory() {
 
   useEffect(() => {
     const normalizedQuery = query.trim();
-    if (!workspaceId || !normalizedQuery) {
+    if (!normalizedQuery) {
       return;
     }
 
@@ -152,7 +151,7 @@ export function useWorkspaceHistory() {
     let active = true;
     const timeout = window.setTimeout(() => {
       const params = new URLSearchParams({
-        workspaceId,
+        ...(workspaceId ? { workspaceId } : {}),
         limit: "50",
         includeMeta: "true",
         q: normalizedQuery,
@@ -166,7 +165,7 @@ export function useWorkspaceHistory() {
         .then((payload) => {
           if (!active) return;
           setSearchResults(normalizeConversations(payload).conversations);
-          setSearchWorkspaceId(workspaceId);
+          setSearchWorkspaceId("personal");
         })
         .catch((error: unknown) => {
           if (error instanceof DOMException && error.name === "AbortError") {
@@ -174,7 +173,7 @@ export function useWorkspaceHistory() {
           }
           if (active) {
             setSearchResults([]);
-            setSearchWorkspaceId(workspaceId);
+            setSearchWorkspaceId("personal");
             setSearchError(true);
           }
         })
@@ -378,7 +377,7 @@ export function useWorkspaceHistory() {
 
   const scopedSearch = resolveWorkspaceHistorySearchState({
     query,
-    workspaceId,
+    workspaceId: "personal",
     resultWorkspaceId: searchWorkspaceId,
     results: searchResults,
     inFlight: searching,

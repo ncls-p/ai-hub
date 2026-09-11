@@ -220,3 +220,7 @@ describe("workspace API token access", () => {
     expect(checkPermission).not.toHaveBeenCalled();
   });
 });
+
+vi.mock("@/modules/iam/resource-availability", () => ({
+  distributedResourcePermissions: async () => [],
+}));

@@ -24,15 +24,18 @@ type ProviderKind = (typeof providerKindEnum.enumValues)[number];
 type ProviderAuthType = (typeof providerAuthTypeEnum.enumValues)[number];
 type ProviderRow = typeof aiProviders.$inferSelect;
 
-export function toSafeProvider(provider: ProviderRow) {
+export function toSafeProvider(
+  provider: ProviderRow,
+  includeConnectionDetails = true,
+) {
   return {
     id: provider.id,
     workspaceId: provider.workspaceId,
     kind: provider.kind,
     name: provider.name,
-    baseUrl: provider.baseUrl,
+    baseUrl: includeConnectionDetails ? provider.baseUrl : null,
     authType: provider.authType,
-    queryParamsJson: provider.queryParamsJson,
+    queryParamsJson: includeConnectionDetails ? provider.queryParamsJson : null,
     openaiCompatibleApiRoute: normalizeOpenAICompatibleApiRoute(
       provider.openaiCompatibleApiRoute,
     ),

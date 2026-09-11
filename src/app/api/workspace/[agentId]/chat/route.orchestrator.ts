@@ -104,6 +104,8 @@ export function runOrchestratorChat(context: ChatExecutionContext) {
   void (async () => {
     try {
       const result = await executeAgent({
+        billingWorkspaceId:
+          conversation.billingWorkspaceId ?? agent.workspaceId,
         workspaceId: agent.workspaceId,
         userId: actorUserId,
         agentId,

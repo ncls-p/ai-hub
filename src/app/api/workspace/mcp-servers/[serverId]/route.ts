@@ -1,3 +1,4 @@
+import { hasResourcePermissionForRequest } from "@/modules/auth/workspace-access";
 import {
   handleRoute,
   requireResourcePermissionAsync,
@@ -72,6 +73,16 @@ export async function GET(
         );
       return NextResponse.json({
         ...toMcpServerForEdit(server),
+        ...toSafeMcpServer(
+          server,
+          await hasResourcePermissionForRequest(
+            session.user.id,
+            parsed.data.workspaceId,
+            "mcpServers.manage",
+            "mcp_server",
+            server.id,
+          ),
+        ),
         access: await getResourceAccessSelection({
           resourceType: "mcp_server",
           resourceId: server.id,

@@ -292,3 +292,7 @@ describe("agent runtime executor", () => {
     expect(JSON.stringify(onProgress.mock.calls)).not.toContain("super-secret");
   });
 });
+
+vi.mock("@/modules/usage/limited-language-model", () => ({
+  applyUsageLimits: async (model: unknown) => model,
+}));

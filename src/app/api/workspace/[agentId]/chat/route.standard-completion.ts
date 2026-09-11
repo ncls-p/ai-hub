@@ -134,6 +134,8 @@ export async function completeStandardChat(input: {
     );
     const artifacts = assistantText
       ? await generateChatAutomationArtifacts({
+          userId: actorUserId,
+          workspaceId: conversation.billingWorkspaceId ?? agent.workspaceId,
           userMessage: content,
           assistantText,
           fallbackTitle: conversation.title,

@@ -267,3 +267,7 @@ describe("workflow agentic route", () => {
     expect(mocks.appendWorkflowAgentMessage).toHaveBeenCalledTimes(2);
   });
 });
+
+vi.mock("@/modules/usage/limited-language-model", () => ({
+  applyUsageLimits: async (model: unknown) => model,
+}));

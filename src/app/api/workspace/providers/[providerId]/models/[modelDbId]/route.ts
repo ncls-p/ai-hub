@@ -79,7 +79,7 @@ export async function PATCH(
         modelDbId,
       );
       if (forbidden) return forbidden;
-      const provider = await getProviderById(providerId, workspaceId);
+      const provider = await getProviderById(providerId, workspaceId, true);
       const model = await assertModelBelongsToProvider(modelDbId, providerId);
       if (!provider || !model) {
         return NextResponse.json({ error: "Model not found" }, { status: 404 });

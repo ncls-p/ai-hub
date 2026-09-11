@@ -1,3 +1,4 @@
+import { resourceAvailabilityCondition } from "@/modules/iam/resource-availability";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
@@ -105,6 +106,7 @@ export async function listCustomTools(
     .select({
       id: customTools.id,
       name: customTools.name,
+      workspaceId: customTools.workspaceId,
       description: customTools.description,
       status: customTools.status,
       n8nWorkflowId: customTools.n8nWorkflowId,
@@ -118,7 +120,12 @@ export async function listCustomTools(
     .from(customTools)
     .where(
       and(
-        eq(customTools.workspaceId, workspaceId),
+        resourceAvailabilityCondition({
+          type: "custom_tool",
+          id: customTools.id,
+          workspaceId: customTools.workspaceId,
+          activeWorkspaceId: workspaceId,
+        }),
         isNull(customTools.archivedAt),
       ),
     )
@@ -142,7 +149,7 @@ export async function listCustomTools(
           canEdit: await canManageCustomTool(
             tool as CustomToolRow,
             userId,
-            canManageGlobal,
+            canManageGlobal && tool.workspaceId === workspaceId,
           ),
         };
       }),

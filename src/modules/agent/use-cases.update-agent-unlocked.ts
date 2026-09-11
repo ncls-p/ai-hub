@@ -1,3 +1,4 @@
+import { resourceAvailabilityCondition } from "@/modules/iam/resource-availability";
 import { logger } from "@/lib/logger";
 import {
   cloneDelegationBindings,
@@ -217,7 +218,12 @@ export async function updateAgentUnlocked(input: UpdateAgentInput) {
           .where(
             and(
               eq(aiProviders.id, nextProviderId),
-              eq(aiProviders.workspaceId, workspaceId),
+              resourceAvailabilityCondition({
+                type: "provider",
+                id: aiProviders.id,
+                workspaceId: aiProviders.workspaceId,
+                activeWorkspaceId: workspaceId,
+              }),
               isNull(aiProviders.archivedAt),
             ),
           )
@@ -230,11 +236,19 @@ export async function updateAgentUnlocked(input: UpdateAgentInput) {
         const [model] = await tx
           .select({ id: aiModels.id })
           .from(aiModels)
+          .innerJoin(aiProviders, eq(aiProviders.id, aiModels.providerId))
           .where(
             and(
               eq(aiModels.id, nextModelId),
               eq(aiModels.providerId, nextProviderId),
               eq(aiModels.enabled, true),
+              resourceAvailabilityCondition({
+                type: "model",
+                id: aiModels.id,
+                workspaceId: aiProviders.workspaceId,
+                activeWorkspaceId: workspaceId,
+                providerId: aiModels.providerId,
+              }),
             ),
           )
           .limit(1);

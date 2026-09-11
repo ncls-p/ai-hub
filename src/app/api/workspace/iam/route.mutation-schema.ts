@@ -33,7 +33,12 @@ export const mutationSchema = z.discriminatedUnion("action", [
     action: z.literal("createOrganization"),
     organizationName: z.string().trim().min(2).max(255),
     organizationSlug: z.string().trim().max(128).optional(),
-    projectName: z.string().trim().min(2).max(255),
+    projectName: z
+      .string()
+      .trim()
+      .max(255)
+      .refine((value) => !value || value.length >= 2)
+      .optional(),
     projectSlug: z.string().trim().max(128).optional(),
   }),
   z.object({

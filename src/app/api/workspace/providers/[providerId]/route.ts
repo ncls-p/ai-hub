@@ -1,3 +1,4 @@
+import { hasResourcePermissionForRequest } from "@/modules/auth/workspace-access";
 import { OPENAI_COMPATIBLE_API_ROUTES } from "@/lib/openai-compatible-api";
 import { OPENAI_COMPATIBILITY_PROFILES } from "@/lib/openai-compatibility-profile";
 import {
@@ -58,14 +59,25 @@ export async function GET(
         providerId,
       );
       if (forbidden) return forbidden;
-      const provider = await getProviderById(providerId, workspaceId);
+      const provider = await getProviderById(providerId, workspaceId, true);
       if (!provider) {
         return NextResponse.json(
           { error: "Provider not found" },
           { status: 404 },
         );
       }
-      return NextResponse.json(toSafeProvider(provider));
+      return NextResponse.json(
+        toSafeProvider(
+          provider,
+          await hasResourcePermissionForRequest(
+            session.user.id,
+            workspaceId,
+            "providers.update",
+            "provider",
+            provider.id,
+          ),
+        ),
+      );
     },
     { logLabel: "Failed to get provider" },
   );

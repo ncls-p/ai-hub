@@ -47,8 +47,11 @@ async function deleteConversation(conversationId: string) {
 }
 
 test.beforeAll(async () => {
-  ({ agentId: primaryAgentId, alternateAgentId, workspaceId } =
-    await ensureE2EAssistantPair());
+  ({
+    agentId: primaryAgentId,
+    alternateAgentId,
+    workspaceId,
+  } = await ensureE2EAssistantPair());
 });
 
 test.beforeEach(async ({ page }) => {
@@ -63,7 +66,26 @@ test.beforeEach(async ({ page }) => {
 test("switches assistant and model without reloading the chat page", async ({
   page,
 }) => {
+  let releaseDirectory!: () => void;
+  let notifyDirectory!: () => void;
+  const directoryGate = new Promise<void>((resolve) => {
+    releaseDirectory = resolve;
+  });
+  const directoryRequested = new Promise<void>((resolve) => {
+    notifyDirectory = resolve;
+  });
+  await page.route("**/api/workspace/agents?**", async (route) => {
+    notifyDirectory();
+    await directoryGate;
+    await route.continue();
+  });
   await page.goto(`/fr/chat?agentId=${primaryAgentId}`);
+  await directoryRequested;
+  try {
+    await expect(page).toHaveURL(`/fr/chat?agentId=${primaryAgentId}`);
+  } finally {
+    releaseDirectory();
+  }
 
   const selector = page.getByRole("button", { name: "Assistant actuel" });
   await expect(selector).toContainText("E2E menu assistant", {
@@ -75,9 +97,7 @@ test("switches assistant and model without reloading the chat page", async ({
   );
 
   await selector.click();
-  await page
-    .getByRole("menuitem", { name: /E2E alternate assistant/ })
-    .click();
+  await page.getByRole("menuitem", { name: /E2E alternate assistant/ }).click();
 
   await expect(page).toHaveURL(`/fr/chat?agentId=${alternateAgentId}`);
   await expect(selector).toContainText("E2E alternate assistant");
@@ -142,9 +162,7 @@ test("keeps the chosen assistant when leaving an existing conversation", async (
 test("removes an unavailable assistant from the URL without losing the locale", async ({
   page,
 }) => {
-  await page.goto(
-    "/fr/chat?agentId=00000000-0000-4000-8000-000000000000",
-  );
+  await page.goto("/fr/chat?agentId=00000000-0000-4000-8000-000000000000");
 
   await expect(page).toHaveURL("/fr/chat");
   await expect(

@@ -186,3 +186,7 @@ describe("canDelegatePermissionSet", () => {
     ).toBe(false);
   });
 });
+
+vi.mock("@/modules/iam/resource-availability", () => ({
+  distributedResourcePermissions: async () => [],
+}));

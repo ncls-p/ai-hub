@@ -1,3 +1,4 @@
+import { resourceAvailabilityCondition } from "@/modules/iam/resource-availability";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/server/infrastructure/db";
@@ -76,12 +77,26 @@ export async function findIdempotentWorkflowRun(input: {
   return run ?? null;
 }
 
-export async function requireWorkflow(workflowId: string, workspaceId: string) {
+export async function requireWorkflow(
+  workflowId: string,
+  workspaceId: string,
+  includeShared = false,
+) {
   const [workflow] = await db
     .select()
     .from(workflows)
     .where(
-      and(eq(workflows.id, workflowId), eq(workflows.workspaceId, workspaceId)),
+      and(
+        eq(workflows.id, workflowId),
+        includeShared
+          ? resourceAvailabilityCondition({
+              type: "workflow",
+              id: workflows.id,
+              workspaceId: workflows.workspaceId,
+              activeWorkspaceId: workspaceId,
+            })
+          : eq(workflows.workspaceId, workspaceId),
+      ),
     )
     .limit(1);
   if (!workflow || workflow.status === "archived") {
@@ -96,7 +111,12 @@ export async function listWorkflows(workspaceId: string) {
     .from(workflows)
     .where(
       and(
-        eq(workflows.workspaceId, workspaceId),
+        resourceAvailabilityCondition({
+          type: "workflow",
+          id: workflows.id,
+          workspaceId: workflows.workspaceId,
+          activeWorkspaceId: workspaceId,
+        }),
         sql`${workflows.status} <> 'archived'`,
       ),
     )
@@ -107,7 +127,7 @@ export async function getWorkflowDetail(
   workflowId: string,
   workspaceId: string,
 ) {
-  const workflow = await requireWorkflow(workflowId, workspaceId);
+  const workflow = await requireWorkflow(workflowId, workspaceId, true);
   const [version] = await db
     .select()
     .from(workflowVersions)

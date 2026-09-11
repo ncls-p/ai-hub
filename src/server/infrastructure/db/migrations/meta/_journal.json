@@ -421,6 +421,20 @@
       "when": 1788852190065,
       "tag": "0059_resource_sharing",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1789130520272,
+      "tag": "0060_absurd_madelyne_pryor",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1789130864538,
+      "tag": "0061_flashy_bishop",
+      "breakpoints": true
     }
   ]
 }

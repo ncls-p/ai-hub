@@ -12,7 +12,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { agents, agentVersions } from "./agents";
+import { agents } from "./agents";
 import { users } from "./auth";
 import { workspaces } from "./workspace";
 
@@ -41,9 +41,8 @@ export const conversationFolders = pgTable(
   "conversation_folders",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    workspaceId: uuid(WORKSPACE_ID_COLUMN)
-      .notNull()
-      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
+    // Historical execution context; personal history survives project deletion.
+    workspaceId: uuid(WORKSPACE_ID_COLUMN).notNull(),
     userId: uuid(USER_ID_COLUMN)
       .notNull()
       .references(() => users.id, { onDelete: CASCADE_ACTION }),
@@ -73,13 +72,11 @@ export const conversations = pgTable(
   "conversations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    workspaceId: uuid(WORKSPACE_ID_COLUMN)
-      .notNull()
-      .references(() => workspaces.id, { onDelete: CASCADE_ACTION }),
-    agentId: uuid("agent_id")
-      .notNull()
-      .references(() => agents.id, { onDelete: CASCADE_ACTION }),
-    agentVersionId: uuid("agent_version_id").references(() => agentVersions.id),
+    // Historical execution context; personal history survives project deletion.
+    workspaceId: uuid(WORKSPACE_ID_COLUMN).notNull(),
+    billingWorkspaceId: uuid("billing_workspace_id"),
+    agentId: uuid("agent_id").notNull(),
+    agentVersionId: uuid("agent_version_id"),
     userId: uuid(USER_ID_COLUMN)
       .notNull()
       .references(() => users.id),

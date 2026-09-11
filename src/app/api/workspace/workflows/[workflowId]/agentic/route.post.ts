@@ -1,3 +1,4 @@
+import { applyUsageLimits } from "@/modules/usage/limited-language-model";
 import { stepCountIs, streamText } from "ai";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -213,9 +214,17 @@ export async function POST(
         initialWebResearchError,
       });
       const adapter = getAdapter(builder.provider.providerKind);
-      const model = adapter.createChatModel(
-        builder.provider.runtimeConfig,
-        builder.provider.modelId,
+      const model = await applyUsageLimits(
+        adapter.createChatModel(
+          builder.provider.runtimeConfig,
+          builder.provider.modelId,
+        ),
+        {
+          userId: session.user.id,
+          workspaceId,
+          providerId: builder.provider.providerId,
+          modelId: builder.provider.modelRecordId ?? null,
+        },
       );
       const deadline = createRuntimeDeadline(0, req.signal);
       const result = streamText({

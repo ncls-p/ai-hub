@@ -1,3 +1,4 @@
+import { resourceAvailabilityCondition } from "@/modules/iam/resource-availability";
 import { logger } from "@/lib/logger";
 import { applyResourceAccessSelection } from "@/modules/iam/resource-access-scope";
 import { audit } from "@/server/domain/services/audit";
@@ -79,7 +80,13 @@ export async function listMcpServers(
     .from(mcpServers)
     .where(
       and(
-        eq(mcpServers.workspaceId, workspaceId),
+        resourceAvailabilityCondition({
+          type: "mcp_server",
+          id: mcpServers.id,
+          workspaceId: mcpServers.workspaceId,
+          activeWorkspaceId: workspaceId,
+          visibility: mcpServers.visibility,
+        }),
         isNull(mcpServers.archivedAt),
       ),
     )
@@ -103,7 +110,8 @@ export async function listMcpServers(
               ));
             if (!visible) return null;
             const canEdit =
-              canManageMcpServer(server, userId, canManageGlobal) ||
+              (server.workspaceId === workspaceId &&
+                canManageMcpServer(server, userId, canManageGlobal)) ||
               (await authorization.hasDirectPermission(
                 { principalType: "user", principalId: userId },
                 "mcpServers.manage",
@@ -111,11 +119,14 @@ export async function listMcpServers(
                 server.id,
                 workspaceId,
               ));
-            return { ...toSafeMcpServer(server), canEdit };
+            return { ...toSafeMcpServer(server, canEdit), canEdit };
           }),
         )
       ).filter((server) => server !== null)
-    : rows.map((server) => ({ ...toSafeMcpServer(server), canEdit: true }));
+    : rows.map((server) => ({
+        ...toSafeMcpServer(server),
+        canEdit: true,
+      }));
   return visibleRows;
 }
 
@@ -130,7 +141,13 @@ export async function getMcpServer(
     .where(
       and(
         eq(mcpServers.id, serverId),
-        eq(mcpServers.workspaceId, workspaceId),
+        resourceAvailabilityCondition({
+          type: "mcp_server",
+          id: mcpServers.id,
+          workspaceId: mcpServers.workspaceId,
+          activeWorkspaceId: workspaceId,
+          visibility: mcpServers.visibility,
+        }),
         isNull(mcpServers.archivedAt),
       ),
     )

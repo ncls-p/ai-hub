@@ -176,7 +176,7 @@ export function WorkflowBuilderView({
       {editorMode === "agentic" ? (
         isDesktop ? (
           <div className="min-h-0 flex-1">
-            <ResizablePanelGroup orientation="horizontal">
+            <ResizablePanelGroup key={editorMode} orientation="horizontal">
               <ResizablePanel
                 id="workflow-agentic-chat"
                 defaultSize="36%"
@@ -249,7 +249,7 @@ export function WorkflowBuilderView({
         )
       ) : isDesktop ? (
         <div className="min-h-0 flex-1">
-          <ResizablePanelGroup orientation="horizontal">
+          <ResizablePanelGroup key={editorMode} orientation="horizontal">
             <ResizablePanel
               id="workflow-palette"
               defaultSize="18%"

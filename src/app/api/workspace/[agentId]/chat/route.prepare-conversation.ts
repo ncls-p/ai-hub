@@ -53,6 +53,7 @@ type RejectRequest = (
 ) => Response;
 
 type PrepareChatConversationInput = {
+  billingWorkspaceId?: string;
   agent: ChatAgentRow;
   actorUserId: string;
   agentId: string;
@@ -262,6 +263,7 @@ async function prepareChatConversationUnlocked(
     const [newConversation] = await db
       .insert(conversations)
       .values({
+        billingWorkspaceId: input.billingWorkspaceId ?? agent.workspaceId,
         workspaceId: agent.workspaceId,
         agentId,
         agentVersionId: version.id,

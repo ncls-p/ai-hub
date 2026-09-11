@@ -1,3 +1,4 @@
+import { resourceAvailabilityCondition } from "@/modules/iam/resource-availability";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { decryptValue } from "@/lib/crypto";
@@ -63,7 +64,13 @@ async function catalogRows(workspaceId: string): Promise<CatalogRow[]> {
     .innerJoin(aiProviders, eq(aiModels.providerId, aiProviders.id))
     .where(
       and(
-        eq(aiProviders.workspaceId, workspaceId),
+        resourceAvailabilityCondition({
+          type: "model",
+          id: aiModels.id,
+          workspaceId: aiProviders.workspaceId,
+          activeWorkspaceId: workspaceId,
+          providerId: aiProviders.id,
+        }),
         eq(aiProviders.enabled, true),
         isNull(aiProviders.archivedAt),
         eq(aiModels.enabled, true),

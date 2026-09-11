@@ -154,7 +154,6 @@ export function AccessConsoleSection2({
                     </FieldLabel>
                     <Input
                       id="first-project-name"
-                      required
                       minLength={2}
                       value={organizationForm.projectName}
                       onChange={(event) =>

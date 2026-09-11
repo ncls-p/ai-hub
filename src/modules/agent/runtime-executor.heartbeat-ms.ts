@@ -108,6 +108,7 @@ type AgentToolProgressCallback = (
 export type SuccessfulToolResult = { toolName: string; output: unknown };
 
 export type InternalExecutionInput = {
+  billingWorkspaceId?: string;
   resolved: ResolvedAgent;
   workspaceId: string;
   userId: string;
@@ -132,6 +133,7 @@ export type InternalExecutionInput = {
 };
 
 export type ExecuteAgentInput = {
+  billingWorkspaceId?: string;
   workspaceId: string;
   userId: string;
   agentId: string;

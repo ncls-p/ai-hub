@@ -1,3 +1,4 @@
+import { createOrganizationOnly } from "@/modules/organization/organization-management";
 import { createMemberAccount } from "@/modules/iam/use-cases.create-member-account";
 import { updateTeam } from "@/modules/iam/use-cases.update-team";
 import { NextRequest, NextResponse } from "next/server";
@@ -56,6 +57,18 @@ export async function POST(req: NextRequest) {
           await updateTeam({ ...input, actorUserId: session.user.id });
           break;
         case "createOrganization": {
+          if (!input.projectName)
+            return NextResponse.json(
+              {
+                organization: await createOrganizationOnly(
+                  session.user.id,
+                  input.organizationName,
+                  input.organizationSlug,
+                ),
+                project: null,
+              },
+              { status: 201 },
+            );
           const project = await createOrganizationWithProject({
             userId: session.user.id,
             organizationName: input.organizationName,

@@ -88,7 +88,7 @@ export async function GET(
         workspaceId,
       );
       if (forbidden) return forbidden;
-      const provider = await getProviderById(providerId, workspaceId);
+      const provider = await getProviderById(providerId, workspaceId, true);
       if (!provider) {
         return NextResponse.json(
           { error: "Provider not found" },
