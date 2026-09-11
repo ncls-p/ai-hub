@@ -99,7 +99,11 @@ test("manages multiple team and project memberships from people and teams", asyn
       (element) => element.scrollWidth <= element.clientWidth,
     ),
   ).toBe(true);
+  await expect(
+    dialog.getByRole("combobox", { name: "Project to manage" }),
+  ).toBeEnabled();
   await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
   await page.getByRole("tab", { name: "Teams", exact: true }).click();
   await page
     .getByRole("button", {
@@ -115,7 +119,11 @@ test("manages multiple team and project memberships from people and teams", asyn
   await expect(
     dialog.getByRole("button", { name: /^Remove access for / }),
   ).toBeVisible();
+  await expect(
+    dialog.getByRole("combobox", { name: "Project to manage" }),
+  ).toBeEnabled();
   await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
   const snapshot = await (
     await page.request.get(`/api/workspace/iam?workspaceId=${workspaceId}`)
   ).json();
