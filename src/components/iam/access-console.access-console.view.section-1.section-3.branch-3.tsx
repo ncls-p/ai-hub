@@ -14,6 +14,9 @@ export function AccessPeopleBranch3({
   model: AccessConsoleViewModel;
 }) {
   const { peopleQuery, t } = model;
+  const filtered = Boolean(
+    peopleQuery || model.peopleTeamId !== "all" || model.peopleProjectOnly,
+  );
   return (
     <Empty className="min-h-52">
       <EmptyHeader>
@@ -21,10 +24,10 @@ export function AccessPeopleBranch3({
           <ShieldIcon aria-hidden="true" />
         </EmptyMedia>
         <EmptyTitle>
-          {peopleQuery ? t("noSearchResults") : t("noAssignments")}
+          {filtered ? t("noSearchResults") : t("noAssignments")}
         </EmptyTitle>
         <EmptyDescription>
-          {peopleQuery
+          {filtered
             ? t("noSearchResultsDescription")
             : t("noAssignmentsDescription")}
         </EmptyDescription>

@@ -11,6 +11,7 @@ import {
 } from "@/modules/chat/todo-list";
 import { parseAgentToolDisplayContext } from "@/modules/agent/tool-progress-payload";
 import {
+  isCodeSandboxToolName,
   htmlArtifactFromInputText,
   htmlArtifactFromToolInput,
   shouldShowCodeSandboxToUser,
@@ -210,7 +211,8 @@ export function toolPartHasStandaloneRendering(part: ChatMessagePart) {
   return Boolean(
     visualToolName === "render_html_artifact" ||
     visualToolName === "generate_image" ||
-    (visualToolName === "run_code_sandbox" && showSandboxToUser) ||
+    (isCodeSandboxToolName(visualToolName) &&
+      (showSandboxToUser || parsed.streamingInput)) ||
     visualToolName === "github_publish_code_workspace" ||
     visualToolName.startsWith("code_workspace_") ||
     (codeSandboxOutputFromUnknown(parsed.output) && showSandboxToUser) ||

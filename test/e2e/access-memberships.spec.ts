@@ -93,6 +93,64 @@ test("manages multiple team and project memberships from people and teams", asyn
       dialog.getByRole("button", { name: /^Remove access for / }),
     ).toBeVisible();
   }
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.getByRole("combobox", { name: "Organization", exact: true }),
+  ).toContainText(`Access org ${suffix}`);
+  await page.getByRole("combobox", { name: "Team", exact: true }).click();
+  await page
+    .getByRole("option", { name: "Membership team A", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: `Manage assignments for ${e2eMember.name}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Manage assignments for E2E Admin",
+      exact: true,
+    }),
+  ).not.toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Filter by project", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: secondProject.name, exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Active project", exact: true }),
+  ).toContainText(secondProject.name);
+  await expect(
+    page.getByRole("button", {
+      name: `Manage assignments for ${e2eMember.name}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.locator("#people-search").fill("does-not-exist");
+  await expect(
+    page.getByRole("button", {
+      name: `Manage assignments for ${e2eMember.name}`,
+      exact: true,
+    }),
+  ).not.toBeVisible();
+  await page
+    .getByRole("button", { name: "Clear filters", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: `Manage assignments for ${e2eMember.name}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: `Manage assignments for ${e2eMember.name}`,
+      exact: true,
+    })
+    .click();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await dialog.evaluate(

@@ -1,3 +1,4 @@
+import { GovernanceSelect } from "./governance-select";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { Building2Icon, PlusIcon } from "lucide-react";
 
@@ -55,7 +56,32 @@ export function AccessConsoleSection2({
     workspaceId,
   } = model;
   return (
-    <div className="flex flex-wrap items-end gap-3">
+    <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
+      <div className="min-w-0 w-full sm:w-56">
+        <GovernanceSelect
+          label={t("filters.organization")}
+          value={snapshot.organization.id}
+          options={Array.from(
+            new Map(
+              workspaces.map((project) => [
+                project.organizationId,
+                { id: project.organizationId, name: project.organizationName },
+              ]),
+            ).values(),
+          )}
+          onChange={(id) => {
+            const project = workspaces.find(
+              (project) => project.organizationId === id,
+            );
+            if (project) {
+              model.setPeopleTeamId("all");
+              model.setPeopleProjectOnly(false);
+              model.setSelectedPeople([]);
+              setWorkspaceId(project.id);
+            }
+          }}
+        />
+      </div>
       <div className="min-w-0 flex-1 sm:max-w-md">
         <Field>
           <FieldLabel htmlFor="access-project">{t("activeProject")}</FieldLabel>

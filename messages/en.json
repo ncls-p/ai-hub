@@ -3666,6 +3666,35 @@
       "joinTeam": "Add to team {team}",
       "directAccessHint": "The roles below apply only to this project. Access inherited from the organization or teams is preserved.",
       "chooseRole": "Choose a role"
+    },
+    "navigation": {
+      "label": "Access sections",
+      "hint": "Access combines user, team and organization roles. Choose the project in People and permissions.",
+      "access": {
+        "title": "People and permissions",
+        "description": "Manage people, their teams, roles and resource access for the selected project."
+      },
+      "organizations": {
+        "title": "Organizations and projects",
+        "description": "Create an organization and add its members and projects. The first project can be created later."
+      },
+      "sharing": {
+        "title": "Organization sharing",
+        "description": "Choose a resource and the organizations that can use it. Editing rights stay with the source project."
+      },
+      "limits": {
+        "title": "Usage limits",
+        "description": "Set LLM limits by user, team or organization, then narrow them by provider and model."
+      }
+    },
+    "filters": {
+      "organization": "Organization",
+      "team": "Team",
+      "project": "Filter by project",
+      "allTeams": "All teams",
+      "allProjects": "All organization members",
+      "clear": "Clear filters",
+      "resultCount": "{count} of {total} people"
     }
   },
   "shell": {

@@ -141,6 +141,24 @@ describe("code sandbox result rendering", () => {
     ).toBe(true);
   });
 
+  it("shows sandbox code while streaming before the final visibility flag", () => {
+    for (const toolName of [
+      "run_code_sandbox",
+      "specialist_run_code_sandbox",
+    ]) {
+      expect(
+        toolPartHasStandaloneRendering({
+          type: "tool-call",
+          content: JSON.stringify({
+            toolName,
+            streamingInput: true,
+            inputText: '{"language":"python","code":"print(',
+          }),
+        }),
+      ).toBe(true);
+    }
+  });
+
   it("keeps every child-agent visual tool inside the specialist trace", () => {
     for (const toolName of [
       "run_code_sandbox",

@@ -154,8 +154,10 @@ export const ToolPartCard = memo(function ToolPartCard({
     [parsed.output],
   );
   const sandboxInput = useMemo(
-    () => codeSandboxInputFromUnknown(parsed.input),
-    [parsed.input],
+    () =>
+      codeSandboxInputFromUnknown(parsed.input) ??
+      codeSandboxInputFromInputText(parsed.inputText),
+    [parsed.input, parsed.inputText],
   );
   const liveSandboxInput = useMemo(
     () =>
@@ -338,11 +340,7 @@ export const ToolPartCard = memo(function ToolPartCard({
     specializedContent = (
       <HtmlArtifactCard artifact={inputArtifact} isLive embedded />
     );
-  } else if (
-    parsed.streamingInput &&
-    parsed.inputText !== undefined &&
-    (!isCodeSandboxToolName(parsed.toolName) || showSandboxToUser)
-  ) {
+  } else if (parsed.streamingInput && parsed.inputText !== undefined) {
     specializedContent = (
       <LiveToolInputCard
         toolName={friendlyName}

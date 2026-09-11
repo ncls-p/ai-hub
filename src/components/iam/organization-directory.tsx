@@ -18,7 +18,6 @@ export type DirectoryOrganization = {
 export function OrganizationDirectory() {
   const t = useTranslations("governance");
   const workspace = useWorkspace();
-  const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<DirectoryOrganization[]>([]);
   const [organizationId, setOrganizationId] = useState("");
   const [name, setName] = useState("");
@@ -29,7 +28,6 @@ export function OrganizationDirectory() {
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    if (!open) return;
     const controller = new AbortController();
     fetchJson<{ organizations: DirectoryOrganization[] }>(
       "/api/organizations",
@@ -47,7 +45,7 @@ export function OrganizationDirectory() {
         }
       });
     return () => controller.abort();
-  }, [open, revision]);
+  }, [revision]);
   async function save(
     action: "createOrganization" | "createProject" | "addMember",
   ) {
@@ -83,41 +81,12 @@ export function OrganizationDirectory() {
   }
   const selected = rows.find((row) => row.id === organizationId);
   return (
-    <details
-      className="rounded-xl border p-4"
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+    <section
+      className="rounded-xl border bg-card p-4 sm:p-6"
+      aria-label={t("organizations")}
     >
-      <summary className="cursor-pointer font-medium">
-        {t("organizations")}
-      </summary>
+      <h2 className="text-base font-semibold">{t("organizations")}</h2>
       <div className="mt-4 flex flex-col gap-4">
-        {selected?.canManageMembers ? (
-          <form
-            className="flex flex-col gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void save("addMember");
-            }}
-          >
-            <Field>
-              <FieldLabel htmlFor="organization-member-email">
-                {t("memberEmail")}
-              </FieldLabel>
-              <Input
-                id="organization-member-email"
-                type="email"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                disabled={pending}
-              />
-            </Field>
-            <Button type="submit" disabled={pending}>
-              {t("addMember")}
-            </Button>
-          </form>
-        ) : null}
         <p className="text-sm text-muted-foreground">
           {t("organizationsHint")}
         </p>
@@ -188,6 +157,32 @@ export function OrganizationDirectory() {
                     </Button>
                   ))}
                 </div>
+                {selected.canManageMembers ? (
+                  <form
+                    className="flex flex-col gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void save("addMember");
+                    }}
+                  >
+                    <Field>
+                      <FieldLabel htmlFor="organization-member-email">
+                        {t("memberEmail")}
+                      </FieldLabel>
+                      <Input
+                        id="organization-member-email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        disabled={pending}
+                      />
+                    </Field>
+                    <Button type="submit" disabled={pending}>
+                      {t("addMember")}
+                    </Button>
+                  </form>
+                ) : null}
                 {selected.canCreateProject ? (
                   <form
                     className="flex flex-col gap-3 sm:flex-row sm:items-end"
@@ -217,6 +212,6 @@ export function OrganizationDirectory() {
           </>
         )}
       </div>
-    </details>
+    </section>
   );
 }

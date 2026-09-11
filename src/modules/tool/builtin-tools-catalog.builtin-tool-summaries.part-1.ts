@@ -57,7 +57,7 @@ export const BUILTIN_TOOL_SUMMARIESPart1: BuiltInToolSummary[] = [
     name: "run_code_sandbox",
     displayName: "Code sandbox",
     description:
-      "Run Python, Node.js, or Bash in a wiped sandbox with data, chart, image, and CPU PyTorch libraries.",
+      "Run Python, Node.js, or Bash in a wiped sandbox with web access and data, chart, image, and CPU PyTorch libraries.",
     riskLevel: "high",
     category: "Code",
   },

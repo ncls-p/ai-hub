@@ -3666,6 +3666,35 @@
       "joinTeam": "Ajouter à l’équipe {team}",
       "directAccessHint": "Les rôles ci-dessous concernent uniquement ce projet. Les accès hérités de l’organisation ou des équipes sont conservés.",
       "chooseRole": "Choisir un rôle"
+    },
+    "navigation": {
+      "label": "Rubriques des accès",
+      "hint": "Les droits se cumulent entre utilisateur, équipe et organisation. Choisissez le projet dans la rubrique Membres et droits.",
+      "access": {
+        "title": "Membres et droits",
+        "description": "Gérez les utilisateurs, leurs équipes, les rôles et les accès aux ressources du projet sélectionné."
+      },
+      "organizations": {
+        "title": "Organisations et projets",
+        "description": "Créez une organisation, ajoutez ses membres et ses projets. Le premier projet peut être créé plus tard."
+      },
+      "sharing": {
+        "title": "Partage entre organisations",
+        "description": "Choisissez une ressource et les organisations qui peuvent l’utiliser. Les droits de modification restent dans le projet d’origine."
+      },
+      "limits": {
+        "title": "Limites d’usage",
+        "description": "Définissez les plafonds LLM par utilisateur, équipe ou organisation, puis affinez par fournisseur et modèle."
+      }
+    },
+    "filters": {
+      "organization": "Organisation",
+      "team": "Équipe",
+      "project": "Filtrer par projet",
+      "allTeams": "Toutes les équipes",
+      "allProjects": "Tous les membres de l’organisation",
+      "clear": "Effacer les filtres",
+      "resultCount": "{count} personne(s) sur {total}"
     }
   },
   "shell": {
