@@ -53,35 +53,25 @@ export function AccessPageNavigation({
     limits: <UsageLimitsPanel />,
   };
   return (
-    <Tabs
-      value={active}
-      onValueChange={select}
-      className="gap-6 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start"
-    >
-      <div className="min-w-0 lg:sticky lg:top-6">
+    <Tabs value={active} onValueChange={select} className="min-w-0 gap-5">
+      <div className="min-w-0">
         <TabsList
           aria-label={t("label")}
-          className="grid w-full grid-cols-2 gap-1 p-1.5 lg:grid-cols-1"
+          className="grid w-full grid-cols-2 gap-1 p-1 sm:flex sm:w-fit"
         >
           {sections.map(({ value, icon: Icon }) => (
             <TabsTrigger
               key={value}
               value={value}
-              className="min-h-12 justify-start gap-3 px-3 py-3 text-left whitespace-normal"
+              className="min-h-10 gap-2 px-3 py-2 whitespace-normal"
             >
               <Icon aria-hidden="true" className="size-4" />
               <span>{t(`${value}.title`)}</span>
             </TabsTrigger>
           ))}
         </TabsList>
-        <p className="hidden px-3 pt-4 text-xs leading-5 text-muted-foreground lg:block">
-          {t("hint")}
-        </p>
       </div>
       <div className="min-w-0">
-        <p className="mb-5 max-w-3xl text-sm leading-6 text-muted-foreground">
-          {t(`${active}.description`)}
-        </p>
         {sections.map(({ value }) => (
           <TabsContent
             key={value}

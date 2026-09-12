@@ -21,6 +21,29 @@ test("keeps access navigation, drafts and direct links usable on desktop and mob
   await expect(
     page.getByRole("combobox", { name: "Active project", exact: true }),
   ).toBeVisible();
+  const settings = page.getByRole("button", {
+    name: "Project and organization settings",
+    exact: true,
+  });
+  await expect(settings).toHaveAttribute("aria-expanded", "false");
+  await expect(
+    page.getByRole("button", { name: "New project", exact: true }),
+  ).toBeHidden();
+  await settings.focus();
+  await page.keyboard.press("Enter");
+  await expect(settings).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.getByRole("button", { name: "Transfer project", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Transfer project", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Transfer project", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(settings).toBeVisible();
+  await settings.click();
   await page.getByRole("tab", { name: "Teams", exact: true }).click();
   await expect(page).toHaveURL(/tab=teams/);
   await page.reload();

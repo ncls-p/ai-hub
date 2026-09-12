@@ -144,9 +144,21 @@ test("moves a whole project into an empty organization while retaining resources
       .getByRole("option", { name: `${project.name} edited`, exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Change organization", exact: true })
+      .getByRole("button", {
+        name: "Project and organization settings",
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole("button", { name: "Transfer project", exact: true })
       .click();
     const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByText(
+        `Project to transfer: Transfer source ${suffix} / ${project.name} edited`,
+        { exact: true },
+      ),
+    ).toBeVisible();
     await dialog
       .getByRole("combobox", { name: "Destination organization", exact: true })
       .click();

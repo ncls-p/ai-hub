@@ -29,9 +29,13 @@ type Preview = {
 };
 export function ProjectTransferDialog({
   workspaceId,
+  workspaceName,
+  organizationName,
   onTransferred,
 }: {
   workspaceId: string;
+  workspaceName: string;
+  organizationName: string;
   onTransferred: () => Promise<void>;
 }) {
   const t = useTranslations("access.projectTransfer");
@@ -125,6 +129,12 @@ export function ProjectTransferDialog({
             </AlertDescription>
           </Alert>
         ) : null}
+        <p className="text-sm font-medium">
+          {t("source", {
+            project: workspaceName,
+            organization: organizationName,
+          })}
+        </p>
         <GovernanceSelect
           label={t("destination")}
           value={destination}

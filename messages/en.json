@@ -3705,7 +3705,8 @@
       "resultCount": "{count} of {total} people"
     },
     "projectTransfer": {
-      "open": "Change organization",
+      "source": "Project to transfer: {organization} / {project}",
+      "open": "Transfer project",
       "title": "Transfer project",
       "description": "The project keeps its identity, resources, secrets, documents and history in the destination organization.",
       "destination": "Destination organization",

@@ -78,3 +78,20 @@ et conversations, les accès des équipes, les personnalisations indépendantes,
 le sélecteur mobile et sa persistance, ainsi que l'impersonation et le retour
 à la session administrateur. Les tests PostgreSQL vérifient le catalogue de
 modèles partagé et la révocation ; les tests unitaires vérifient aussi l'audit.
+
+## Access navigation and transfer entry point
+
+Access uses compact section tabs to keep room for member lists. Project and
+organization lifecycle actions are grouped under the collapsed “Project and
+organization settings” button. This disclosure supports Enter/Space and leaves
+people filters and membership actions immediately available. “Transfer project”
+is distinct from switching the active context; its dialog names the source
+organization and project before choosing the destination.
+
+| Journey | Verification |
+| --- | --- |
+| Open settings, cancel transfer, return to the list | Keyboard disclosure and dialog browser regression |
+| Transfer an existing project to an empty organization | Existing database and browser preservation tests |
+| Create, rename and delete a project | Lifecycle browser regression through the disclosure |
+| Switch sections and use back/reload | Preserved drafts and URL browser regression |
+| Mobile and read-only access | Overflow, visible controls and permission browser regressions |
