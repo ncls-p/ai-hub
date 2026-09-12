@@ -187,7 +187,7 @@ export const SYSTEM_ROLES: Omit<Role, "createdAt" | "updatedAt">[] = [
     scopeType: "workspace",
     name: "workspace.viewer",
     displayName: "Project Viewer",
-    description: "Read-only access to project resources and activity.",
+    description: "Read-only access to project resources.",
     permissions: [
       "workspaces.get",
       "providers.viewMetadata",
@@ -198,8 +198,6 @@ export const SYSTEM_ROLES: Omit<Role, "createdAt" | "updatedAt">[] = [
       "mcpServers.get",
       "knowledgeBases.viewAllowed",
       "marketplaceItems.view",
-      "usage.view",
-      "audit.view",
       "workflows.view",
     ],
     isSystem: true,
