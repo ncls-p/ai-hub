@@ -53,4 +53,21 @@ describe("organization labels", () => {
       { id: "aaaaaaaa-1", name: "Helpline · aaaaaaaa-1" },
     ]);
   });
+  it("distinguishes identically named projects inside the same organization", () => {
+    expect(
+      organizationProjectLabels([
+        {
+          id: "org",
+          name: "Helpline",
+          projects: [
+            { id: "aaaaaaaa-one", name: "Veolia" },
+            { id: "bbbbbbbb-two", name: "Veolia" },
+          ],
+        },
+      ]),
+    ).toEqual([
+      { id: "aaaaaaaa-one", name: "Helpline · Veolia · aaaaaaaa" },
+      { id: "bbbbbbbb-two", name: "Helpline · Veolia · bbbbbbbb" },
+    ]);
+  });
 });

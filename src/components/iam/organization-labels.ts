@@ -54,7 +54,7 @@ export function organizationProjectLabels(
     organizations.flatMap((organization) =>
       organization.projects.map((project) => ({
         id: project.id,
-        discriminator: organization.id,
+        discriminator: project.id,
         name: `${organization.name} · ${project.name}`,
       })),
     ),
