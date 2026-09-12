@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  organizationLabels,
+  organizationProjectLabels,
+} from "./organization-labels";
 import { GovernanceSelect } from "./governance-select";
 import type { DirectoryOrganization } from "./organization-directory";
 const types = [
@@ -41,6 +45,7 @@ export function ResourceDistributionPanel() {
   const [revision, setRevision] = useState(0);
   const [saved, setSaved] = useState(false);
   const key = `${type}:${resourceId}`;
+  const recipients = organizationLabels(organizations);
   useEffect(() => {
     const controller = new AbortController();
     fetchJson<{ organizations: DirectoryOrganization[] }>(
@@ -157,12 +162,7 @@ export function ResourceDistributionPanel() {
           <GovernanceSelect
             label={t("sourceProject")}
             value={workspaceId}
-            options={organizations.flatMap((org) =>
-              org.projects.map((project) => ({
-                id: project.id,
-                name: `${org.name} · ${project.name}`,
-              })),
-            )}
+            options={organizationProjectLabels(organizations)}
             disabled={pending}
             onChange={(value) => {
               setWorkspaceId(value);
@@ -230,7 +230,9 @@ export function ResourceDistributionPanel() {
                     className="flex min-h-10 items-center gap-2 text-sm"
                   >
                     <Checkbox
-                      aria-label={org.name}
+                      aria-label={
+                        recipients.find((item) => item.id === org.id)?.name
+                      }
                       checked={recipientIds.includes(org.id)}
                       disabled={pending}
                       onCheckedChange={(checked) => {
@@ -242,7 +244,7 @@ export function ResourceDistributionPanel() {
                         setSaved(false);
                       }}
                     />
-                    {org.name}
+                    {recipients.find((item) => item.id === org.id)?.name}
                   </label>
                 ))}
               </fieldset>

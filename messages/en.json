@@ -3718,7 +3718,12 @@
       "failed": "Transfer failed.",
       "accessWarning": "Active project members join the destination organization. Linked teams are copied with their active members; their other projects remain in the source organization. Direct permissions are preserved. Inherited permissions, branding, customization and limits follow the destination organization.",
       "dependenciesWarning": "Resources owned by other projects stay in place. Using them requires sharing with the destination organization. Existing explicit shares are preserved; chats remain personal."
-    }
+    },
+    "organizationMemberLabel": "Member",
+    "appointOrganizationAdmin": "Make org admin",
+    "appointOrganizationAdminFor": "Make {name} an organization administrator",
+    "organizationAdminGrantDescription": "{name} will be able to administer {organization}, manage its members and all its projects, and appoint other organization administrators. This role grants no access to other organizations.",
+    "confirmOrganizationAdmin": "Make administrator"
   },
   "shell": {
     "skipToContent": "Skip to content",
@@ -4305,7 +4310,8 @@
       "custom_tool": "Custom tool"
     },
     "memberEmail": "Existing user email",
-    "addMember": "Add user to this organization"
+    "addMember": "Add user to this organization",
+    "homonymousOrganizations": "Separate organizations share the same name. Their projects distinguish them; a short identifier appears when needed."
   },
   "impersonation": {
     "active": "Impersonation active: you are using {name}’s account.",

@@ -8,6 +8,7 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 
+import { PersonOrganizationRole } from "./person-organization-role";
 import { PersonProjectRole } from "./person-project-role";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,7 @@ export function AccessPeopleBranch2({
               />
             </th>
             <th className="w-1/4 px-3 py-3">{t("personColumn")}</th>
+            <th className="px-3 py-3">{t("organizationRole")}</th>
             <th className="px-3 py-3">{t("simpleAccess.projectRole")}</th>
             <th className="w-1/6 px-3 py-3">{t("teamsColumn")}</th>
             <th className="w-16 px-3 py-3 text-right">
@@ -139,7 +141,13 @@ export function AccessPeopleBranch2({
                 </td>
                 <td className="px-3 py-4 @max-3xl:col-span-3 @max-3xl:border-t @max-3xl:border-border/60 @max-3xl:px-4 @max-3xl:py-3">
                   <span className="mb-2 hidden text-xs font-medium text-muted-foreground @max-3xl:block">
-                    {t("accessColumn")}
+                    {t("organizationRole")}
+                  </span>
+                  <PersonOrganizationRole model={model} person={person} />
+                </td>
+                <td className="px-3 py-4 @max-3xl:col-span-3 @max-3xl:border-t @max-3xl:border-border/60 @max-3xl:px-4 @max-3xl:py-3">
+                  <span className="mb-2 hidden text-xs font-medium text-muted-foreground @max-3xl:block">
+                    {t("simpleAccess.projectRole")}
                   </span>
                   <PersonProjectRole model={model} person={person} />
                   <details className="mt-2">
