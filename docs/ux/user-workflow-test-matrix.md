@@ -60,6 +60,15 @@ Chaque ressource distante doit distinguer :
 
 ## Organisations, projets et accès
 
+Les rôles d’organisation se gèrent sur les personnes dans **Membres et droits**. **Organisations et projets** identifie et organise les structures, sans formulaire de promotion administrative.
+
+| Scénario ajouté | Attendu | Couverture |
+| --- | --- | --- |
+| Nomination d’un administrateur d’organisation | Un admin orga nomme un membre ; celui-ci peut nommer un autre admin dans la même organisation, sans devenir admin de plateforme ni propriétaire | Playwright, API réelle, PostgreSQL |
+| Annulation et erreur de nomination | Annuler ne modifie aucun droit ; un rejet conserve le dialogue pour réessayer | Playwright |
+| Organisations homonymes | Projets puis identifiant stable pour différencier les entrées ; aucune fusion ou suppression implicite | Vitest + Playwright, répertoire et partage |
+
+
 | Scénario                            | Attendu                                                                                              | Couverture                            |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | Plusieurs organisations             | Création indépendante, propriétaire initial et premier projet atomiques                              | Route + module + migration PostgreSQL |

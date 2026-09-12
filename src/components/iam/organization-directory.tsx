@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { organizationLabels } from "./organization-labels";
 import { GovernanceSelect } from "./governance-select";
 export type DirectoryOrganization = {
   id: string;
@@ -136,9 +137,14 @@ export function OrganizationDirectory() {
               label={t("organization")}
               value={organizationId}
               onChange={setOrganizationId}
-              options={rows}
+              options={organizationLabels(rows)}
               disabled={pending}
             />
+            {new Set(rows.map((row) => row.name)).size < rows.length ? (
+              <p className="text-sm text-muted-foreground">
+                {t("homonymousOrganizations")}
+              </p>
+            ) : null}
             {selected ? (
               <>
                 <p className="text-sm text-muted-foreground">

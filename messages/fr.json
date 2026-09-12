@@ -3718,7 +3718,12 @@
       "failed": "Le transfert a échoué.",
       "accessWarning": "Les membres actifs du projet rejoignent l’organisation cible. Les équipes liées sont copiées avec leurs membres actifs ; leurs autres projets restent dans l’organisation source. Les droits directs sont conservés. Les droits hérités, l’identité visuelle, les personnalisations et les limites deviennent ceux de l’organisation cible.",
       "dependenciesWarning": "Les ressources appartenant à d’autres projets restent à leur place. Leur utilisation nécessite un partage avec l’organisation cible. Les partages explicites existants sont conservés ; les chats restent personnels."
-    }
+    },
+    "organizationMemberLabel": "Membre",
+    "appointOrganizationAdmin": "Nommer admin orga",
+    "appointOrganizationAdminFor": "Nommer {name} administrateur de l’organisation",
+    "organizationAdminGrantDescription": "{name} pourra administrer {organization}, gérer ses membres et tous ses projets, et nommer d’autres administrateurs d’organisation. Ce rôle ne donne pas de droits sur les autres organisations.",
+    "confirmOrganizationAdmin": "Nommer administrateur"
   },
   "shell": {
     "skipToContent": "Aller au contenu",
@@ -4305,7 +4310,8 @@
       "custom_tool": "Outil personnalisé"
     },
     "memberEmail": "E-mail d’un utilisateur existant",
-    "addMember": "Ajouter à cette organisation"
+    "addMember": "Ajouter à cette organisation",
+    "homonymousOrganizations": "Des organisations distinctes portent le même nom. Leurs projets sont indiqués pour les différencier ; un identifiant court apparaît si nécessaire."
   },
   "impersonation": {
     "active": "Impersonation active : vous utilisez le compte de {name}.",
