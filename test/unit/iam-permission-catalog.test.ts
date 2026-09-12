@@ -84,4 +84,26 @@ describe("IAM permission catalog", () => {
     expect(viewer?.permissions).not.toContain("agents.create");
     expect(viewer?.permissions).not.toContain("roles.manage");
   });
+  it("reserves usage and audit for administrators or explicitly delegated roles", () => {
+    for (const name of [
+      "workspace.viewer",
+      "workspace.member",
+      "organization.user",
+    ]) {
+      const role = SYSTEM_ROLES.find((entry) => entry.name === name)!;
+      expect(role.permissions).not.toContain("usage.view");
+      expect(role.permissions).not.toContain("audit.view");
+      expect(role.permissions).not.toContain("audit.export");
+    }
+    for (const name of [
+      "workspace.admin",
+      "organization.admin",
+      "organization.owner",
+    ]) {
+      const role = SYSTEM_ROLES.find((entry) => entry.name === name)!;
+      expect(role.permissions).toEqual(
+        expect.arrayContaining(["usage.view", "audit.view", "audit.export"]),
+      );
+    }
+  });
 });

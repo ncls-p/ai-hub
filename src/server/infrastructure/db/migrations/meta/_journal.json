@@ -442,6 +442,13 @@
       "when": 1789140393119,
       "tag": "0062_organization_customization",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1789200000000,
+      "tag": "0063_restrict_viewer_activity",
+      "breakpoints": true
     }
   ]
 }
