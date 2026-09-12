@@ -263,6 +263,12 @@ test("creates, renames and deletes a project from Access", async ({ page }) => {
   await ensureE2EUser();
   await login(page);
   await page.goto("/en/members");
+  await page
+    .getByRole("button", {
+      name: "Project and organization settings",
+      exact: true,
+    })
+    .click();
   await page.getByRole("button", { name: "New project", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const name = `Project lifecycle ${Date.now()}`;
@@ -283,6 +289,12 @@ test("creates, renames and deletes a project from Access", async ({ page }) => {
   await expect(
     page.getByRole("combobox", { name: "Active project", exact: true }),
   ).toHaveText(name);
+  await page
+    .getByRole("button", {
+      name: "Project and organization settings",
+      exact: true,
+    })
+    .click();
   await page.getByRole("button", { name: "Manage", exact: true }).click();
   await page
     .getByRole("menuitem", { name: "Rename project", exact: true })
